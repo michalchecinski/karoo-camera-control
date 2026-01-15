@@ -1,20 +1,76 @@
 package com.karoocameracontrol
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import io.hammerhead.karooext.KarooSystemService
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import com.karoocameracontrol.screens.MainScreen
 import com.karoocameracontrol.theme.AppTheme
 
 class MainActivity : ComponentActivity() {
+
+    private var permissionsGranted by mutableStateOf(false)
+
+    private val requestPermissionsLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val allGranted = permissions.entries.all { it.value }
+            if (allGranted) {
+                Log.d(TAG, "All required permissions granted.")
+                permissionsGranted = true
+            } else {
+                Log.w(TAG, "Not all required permissions granted.")
+                permissionsGranted = false
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        checkAndRequestPermissions()
+
         setContent {
             AppTheme {
-                MainScreen()
+                MainScreen(permissionsGranted = permissionsGranted)
             }
         }
+    }
+
+    private fun checkAndRequestPermissions() {
+        val permissionsToRequest = mutableListOf<String>()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.BLUETOOTH_SCAN)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+        } else {
+            // For older Android versions, BLUETOOTH and BLUETOOTH_ADMIN are granted at install time
+            // ACCESS_FINE_LOCATION is required for BLE scanning
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            requestPermissionsLauncher.launch(permissionsToRequest.toTypedArray())
+        } else {
+            Log.d(TAG, "All necessary permissions already granted.")
+            permissionsGranted = true
+        }
+    }
+
+    companion object {
+        private const val TAG = "MainActivity"
     }
 }

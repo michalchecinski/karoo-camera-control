@@ -3,6 +3,7 @@ package com.karoocameracontrol.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,7 +23,9 @@ fun MainScreen() {
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = stringResource(id = R.string.hello_karoo), color = MaterialTheme.colorScheme.onBackground)
+        Button(onClick = { /*TODO*/ }) {
+            Text(text = stringResource(id = R.string.pair_your_camera))
+        }
     }
 }
 

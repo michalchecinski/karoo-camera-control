@@ -2,4 +2,5 @@
     <string name="app_name">Karoo Camera Control</string>
     <string name="hello_karoo">Hello Karoo!</string>
     <string name="extension_name">Karoo Camera Control</string>
+    <string name="pair_your_camera">Pair your action cam</string>
 </resources>

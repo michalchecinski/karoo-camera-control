@@ -4,21 +4,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import com.karoocameracontrol.extension.ConnectionState
 import com.karoocameracontrol.extension.GoProManager
 import com.karoocameracontrol.theme.AppTheme
+import kotlinx.coroutines.launch
 
 @Composable
 fun MainScreen(permissionsGranted: Boolean) {
     val context = LocalContext.current
     val goProManager = GoProManager.getInstance(context)
+    val scope = rememberCoroutineScope()
 
     val connectionState by goProManager.connectionState.collectAsState()
     val scannedDevices by goProManager.scannedDevices.collectAsState()
     val savedDeviceName by goProManager.savedDeviceNameFlow.collectAsState()
+    val isRecording by goProManager.isRecording.collectAsState()
 
     DisposableEffect(Unit) {
         onDispose {
@@ -34,6 +38,16 @@ fun MainScreen(permissionsGranted: Boolean) {
         is ConnectionState.Connected -> {
             ConnectedScreen(
                 deviceName = state.deviceName,
+                isRecording = isRecording,
+                onToggleRecording = {
+                    scope.launch {
+                        if (isRecording) {
+                            goProManager.stopRecording()
+                        } else {
+                            goProManager.startRecording()
+                        }
+                    }
+                },
                 onDisconnect = { goProManager.disconnect() },
                 onForget = { goProManager.forgetPairedDevice() }
             )

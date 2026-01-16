@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun ConnectedScreen(
     deviceName: String?,
+    isRecording: Boolean,
+    onToggleRecording: () -> Unit,
     onDisconnect: () -> Unit,
     onForget: () -> Unit
 ) {
@@ -30,6 +32,16 @@ fun ConnectedScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
+
+            Button(
+                onClick = onToggleRecording,
+                modifier = Modifier.padding(bottom = 16.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(text = if (isRecording) "Stop Recording" else "Start Recording")
+            }
 
             Button(onClick = onDisconnect) {
                 Text(text = "Disconnect")

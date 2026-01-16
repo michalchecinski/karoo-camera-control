@@ -25,11 +25,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -39,6 +37,8 @@ import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+
+data class PairedDevice(val address: String, val name: String)
 
 sealed class ConnectionState {
     object Disconnected : ConnectionState()
@@ -69,8 +69,8 @@ class GoProManager private constructor(private val context: Context) {
     private val _scannedDevices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val scannedDevices: StateFlow<List<BluetoothDevice>> = _scannedDevices.asStateFlow()
 
-    private val _savedDeviceNameFlow = MutableStateFlow<String?>(null)
-    val savedDeviceNameFlow: StateFlow<String?> = _savedDeviceNameFlow.asStateFlow()
+    private val _pairedDevices = MutableStateFlow<List<PairedDevice>>(emptyList())
+    val pairedDevices: StateFlow<List<PairedDevice>> = _pairedDevices.asStateFlow()
 
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
@@ -100,20 +100,51 @@ class GoProManager private constructor(private val context: Context) {
         context.getSharedPreferences("GoProPrefs", Context.MODE_PRIVATE)
     }
     
-    private var savedDeviceAddress: String?
-        get() = prefs.getString("saved_device_address", null)
-        set(value) = prefs.edit().putString("saved_device_address", value).apply()
-        
-    private var savedDeviceName: String?
-        get() = prefs.getString("saved_device_name", null)
-        set(value) {
-            prefs.edit().putString("saved_device_name", value).apply()
-            _savedDeviceNameFlow.value = value // Update the StateFlow
-        }
-    
     init {
-        // Initialize the StateFlow with the current saved device name from preferences
-        _savedDeviceNameFlow.value = prefs.getString("saved_device_name", null)
+        loadPairedDevices()
+    }
+
+    private fun loadPairedDevices() {
+        val addresses = prefs.getStringSet("paired_device_addresses", emptySet()) ?: emptySet()
+        val devices = addresses.mapNotNull { address ->
+            val name = prefs.getString("device_name_$address", null) ?: return@mapNotNull null
+            PairedDevice(address, name)
+        }
+        _pairedDevices.value = devices
+    }
+
+    private fun savePairedDevice(device: BluetoothDevice) {
+        val address = device.address
+        val name = device.name ?: "Unknown GoPro"
+        
+        val currentAddresses = prefs.getStringSet("paired_device_addresses", emptySet()) ?: emptySet()
+        val newAddresses = currentAddresses + address
+        
+        prefs.edit()
+            .putStringSet("paired_device_addresses", newAddresses)
+            .putString("device_name_$address", name)
+            .apply()
+            
+        loadPairedDevices()
+    }
+
+    fun removePairedDevice(address: String) {
+        val currentAddresses = prefs.getStringSet("paired_device_addresses", emptySet()) ?: emptySet()
+        val newAddresses = currentAddresses - address
+        
+        prefs.edit()
+            .putStringSet("paired_device_addresses", newAddresses)
+            .remove("device_name_$address")
+            .apply()
+            
+        loadPairedDevices()
+        
+        // If we removed the currently connected device, disconnect? 
+        val connectedDeviceName = (connectionState.value as? ConnectionState.Connected)?.deviceName
+        if (connectedDeviceName != null) {
+            // Logic: usually manual disconnect is better, but removing pairing implies forgetting.
+            // We'll leave it connected for now.
+        }
     }
 
     // Coroutine scope for BLE operations
@@ -138,16 +169,6 @@ class GoProManager private constructor(private val context: Context) {
             super.onScanResult(callbackType, result)
             val device = result.device
             
-            // Auto-connect if matches saved device
-            val savedAddress = savedDeviceAddress
-            if (savedAddress != null && device.address == savedAddress) {
-                Log.d(TAG, "Found known device ${device.name}, auto-connecting.")
-                if (_connectionState.value !is ConnectionState.Connecting && _connectionState.value !is ConnectionState.Connected) {
-                     connect(device)
-                }
-                return
-            }
-            
             if (!_scannedDevices.value.contains(device)) {
                 _scannedDevices.value = _scannedDevices.value + device
                 Log.d(TAG, "Found GoPro: ${device.name} (${device.address})")
@@ -158,15 +179,6 @@ class GoProManager private constructor(private val context: Context) {
             super.onBatchScanResults(results)
             for (result in results) {
                 val device = result.device
-                val savedAddress = savedDeviceAddress
-                
-                if (savedAddress != null && device.address == savedAddress) {
-                     Log.d(TAG, "Found known device (batch) ${device.name}, auto-connecting.")
-                     if (_connectionState.value !is ConnectionState.Connecting && _connectionState.value !is ConnectionState.Connected) {
-                         connect(device)
-                     }
-                     return
-                }
                 
                 if (!_scannedDevices.value.contains(device)) {
                     _scannedDevices.value = _scannedDevices.value + device
@@ -222,7 +234,6 @@ class GoProManager private constructor(private val context: Context) {
             if (currentOperationType == BleOperationType.DISCOVER_SERVICES) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     Log.d(TAG, "Services discovered successfully.")
-                    logGattTable(gatt) // Debugging: Print all found services/chars
                     resumeActiveContinuation(Unit)
                 } else {
                     Log.e(TAG, "Service discovery failed: $status")
@@ -274,16 +285,11 @@ class GoProManager private constructor(private val context: Context) {
             super.onCharacteristicChanged(gatt, characteristic)
             val value = characteristic.value ?: return
             
-            // Log raw packet for debugging (can be noisy)
-            // val hexValue = value.joinToString(" ") { "%02x".format(it) }
-            // Log.d(TAG, "Notification raw: $hexValue")
-
             if (characteristic.uuid == GoProUUID.QUERY_RESPONSE || characteristic.uuid == GoProUUID.COMMAND_RESPONSE) {
                 val header = value[0].toInt() and 0xFF
                 
                 if ((header and 0x80) == 0x80) {
                     // Continuation packet
-                    // Payload is value[1..end]
                     responseBuffer.write(value, 1, value.size - 1)
                 } else {
                     // Start packet
@@ -291,20 +297,15 @@ class GoProManager private constructor(private val context: Context) {
                     var offset = 1
                     
                     if ((header and 0x20) == 0x20) {
-                        // 13-bit length: 001xxxxx yyyyyyyy
-                        if (value.size < 2) return // Should not happen
+                        // 13-bit length
+                        if (value.size < 2) return 
                         val lenHigh = header and 0x1F
                         val lenLow = value[1].toInt() and 0xFF
                         expectedResponseLength = (lenHigh shl 8) or lenLow
                         offset = 2
                     } else if ((header and 0x40) == 0x40) {
-                        // 16-bit length (rare, but reserved?): 01000000 xxxxxxxx yyyyyyyy
-                        // Assuming 8-bit length standard for now if not 0x20 or 0x80.
-                        // Actually standard is:
-                        // 00xxxxx -> 5 bit length
                         expectedResponseLength = header and 0x1F
                     } else {
-                        // 00xxxxx -> 5 bit length
                         expectedResponseLength = header and 0x1F
                     }
                     
@@ -316,7 +317,6 @@ class GoProManager private constructor(private val context: Context) {
                 // Check if we have the full packet
                 if (expectedResponseLength > 0 && responseBuffer.size() >= expectedResponseLength) {
                     val fullData = responseBuffer.toByteArray()
-                    // Log.d(TAG, "Full Packet Reassembled: ${fullData.size} bytes")
                     processCharacteristicData(fullData)
                     
                     // Reset for next
@@ -330,11 +330,10 @@ class GoProManager private constructor(private val context: Context) {
             val hexValue = value.joinToString(" ") { "%02x".format(it) }
             Log.d(TAG, "Process Data: $hexValue")
             
-            // Parser for Status ID 10 (Encoding) - 0x0A, 0x01 (Boolean), Value
+            // Parser for Status ID 10 (Encoding)
             for (i in 0 until value.size - 2) {
                 if (value[i] == 0x0A.toByte() && value[i+1] == 0x01.toByte()) {
                     val isRecording = value[i+2] == 0x01.toByte()
-                    Log.d(TAG, "Parsed Recording State: $isRecording")
                     _isRecording.value = isRecording
                     if (!isRecording) _recordingDuration.value = 0
                 }
@@ -354,39 +353,34 @@ class GoProManager private constructor(private val context: Context) {
                                            (valBytes[1].toInt() and 0xFF shl 16) or 
                                            (valBytes[2].toInt() and 0xFF shl 8) or 
                                            (valBytes[3].toInt() and 0xFF)
-                            Log.d(TAG, "Parsed Recording Duration: $duration seconds")
                             _recordingDuration.value = duration
                         }
                     }
                 }
                 
-                // ID 54 (0x36): Remaining Space (KB likely) - Type 0x08 (Long)
+                // ID 54 (0x36): Remaining Space
                 if (id == 0x36.toByte()) {
                      if (i + 1 < value.size) {
                         val typeByte = value[i+1]
-                        // Type 0x08 is 64-bit integer
                         if (typeByte == 0x08.toByte() && i + 9 < value.size) {
                             val valBytes = value.sliceArray((i+2)..(i+9))
                             var remSpace: Long = 0
                             for (b in valBytes) {
                                 remSpace = (remSpace shl 8) or (b.toLong() and 0xFF)
                             }
-                            Log.d(TAG, "Parsed Remaining Space: $remSpace KB")
                             _remainingSpace.value = remSpace
                         } else if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
-                            // Fallback for 4-byte int if it occurs
                             val valBytes = value.sliceArray((i+2)..(i+5))
                             val remSpace = (valBytes[0].toInt() and 0xFF shl 24) or 
                                           (valBytes[1].toInt() and 0xFF shl 16) or 
                                           (valBytes[2].toInt() and 0xFF shl 8) or 
                                           (valBytes[3].toInt() and 0xFF)
-                            Log.d(TAG, "Parsed Remaining Space (Int): $remSpace KB")
                             _remainingSpace.value = remSpace.toLong()
                         }
                     }
                 }
                 
-                // ID 35 (0x23): Remaining Video Time (Seconds) - Type 0x04 (Int) or 0x03 (Short)
+                // ID 35 (0x23): Remaining Video Time
                 if (id == 0x23.toByte()) {
                      if (i + 1 < value.size) {
                         val typeByte = value[i+1]
@@ -396,7 +390,6 @@ class GoProManager private constructor(private val context: Context) {
                                           (valBytes[1].toInt() and 0xFF shl 16) or 
                                           (valBytes[2].toInt() and 0xFF shl 8) or 
                                           (valBytes[3].toInt() and 0xFF)
-                            Log.d(TAG, "Parsed Remaining Video Time: $remTime seconds")
                             _remainingVideoTime.value = remTime
                         }
                     }
@@ -406,70 +399,50 @@ class GoProManager private constructor(private val context: Context) {
                 if (id == 0x2B.toByte()) {
                     if (i + 1 < value.size) {
                         val typeByte = value[i+1]
-                        
-                        // Type 0x02 (Short) or 0x03 (Short) - 2 bytes
                         if ((typeByte == 0x02.toByte() || typeByte == 0x03.toByte()) && i + 3 < value.size) {
                              val b1 = value[i+2].toInt() and 0xFF
                              val b2 = value[i+3].toInt() and 0xFF
                              val modeVal = (b1 shl 8) or b2
-                             Log.d(TAG, "Parsed Camera Mode (Short): $modeVal")
                              _cameraMode.value = modeVal
                         }
-                        // Type 0x04 (Int - 4 bytes)
                         else if (typeByte == 0x04.toByte() && i + 5 < value.size) {
                              val b1 = value[i+2].toInt() and 0xFF
                              val b2 = value[i+3].toInt() and 0xFF
                              val b3 = value[i+4].toInt() and 0xFF
                              val b4 = value[i+5].toInt() and 0xFF
                              val modeVal = (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
-                             Log.d(TAG, "Parsed Camera Mode (Int): $modeVal")
                              _cameraMode.value = modeVal
                         }
                     }
                 }
                 
-                // ID 96 (0x60): Flat Mode / Preset (Alternative for Hero 12?)
+                // ID 96 (0x60): Flat Mode / Preset
                 if (id == 0x60.toByte()) {
                     if (i + 1 < value.size) {
                         val typeByte = value[i+1]
-                        // Type 0x04 (Int - 4 bytes)
                         if (typeByte == 0x04.toByte() && i + 5 < value.size) {
                              val b1 = value[i+2].toInt() and 0xFF
                              val b2 = value[i+3].toInt() and 0xFF
                              val b3 = value[i+4].toInt() and 0xFF
                              val b4 = value[i+5].toInt() and 0xFF
                              val modeVal = (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
-                             Log.d(TAG, "Parsed Camera Mode (ID 96): $modeVal")
                              _cameraMode.value = modeVal
                         }
                     }
                 }
 
-                // ID 70 (0x46): Battery Level - Type 0x01 or 0x02
+                // ID 70 (0x46): Battery Level
                 if (id == 0x46.toByte()) {
                      if (i + 1 < value.size) {
                          val typeByte = value[i+1]
-                         // Accept Type 0x01 (Byte) or 0x02 (Short/Byte)
                          if ((typeByte == 0x01.toByte() || typeByte == 0x02.toByte()) && i + 2 < value.size) {
                              val batLevel = value[i+2].toInt() and 0xFF
-                             Log.d(TAG, "Parsed Battery Level: $batLevel")
                              _batteryLevel.value = batLevel
                          }
                      }
                 }
             }
         }
-    }
-    
-    private fun logGattTable(gatt: BluetoothGatt) {
-        Log.d(TAG, "--- GATT Table ---")
-        gatt.services.forEach { service ->
-            Log.d(TAG, "Service: ${service.uuid}")
-            service.characteristics.forEach { char ->
-                Log.d(TAG, "  |-- Char: ${char.uuid}")
-            }
-        }
-        Log.d(TAG, "------------------")
     }
     
     private fun resumeActiveContinuation(value: Any?) {
@@ -538,24 +511,18 @@ class GoProManager private constructor(private val context: Context) {
         }
     }
 
-    fun connectToSavedDevice() {
-        val address = savedDeviceAddress ?: return
+    fun connectToDevice(address: String) {
         val device = bluetoothAdapter?.getRemoteDevice(address) ?: return
-        connect(device)
+        connect(device, isPaired = true)
     }
     
     suspend fun startRecording() {
-        // Command: Shutter On (03 01 01 01)
-        // Note: Length 3, Cmd 01, Params 01 01. Works for user.
         val cmd = byteArrayOf(0x03, 0x01, 0x01, 0x01)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
         
-        // Polling sequence to ensure we catch the "Recording" state.
-        // We poll up to 10 times (every 500ms). If state becomes true, we stop polling.
         for (i in 1..10) {
             kotlinx.coroutines.delay(500)
             if (_isRecording.value) {
-                Log.d(TAG, "Recording start detected early, stopping poll.")
                 break
             }
             pollRecordingState()
@@ -563,16 +530,12 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun stopRecording() {
-        // Command: Shutter Off (03 01 01 00)
         val cmd = byteArrayOf(0x03, 0x01, 0x01, 0x00)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
         
-        // Poll sequence: GoPro takes time to save the file (Busy state).
-        // We poll up to 5 times (5 seconds). If state becomes false, we stop polling.
         for (i in 1..5) {
             kotlinx.coroutines.delay(1000)
             if (!_isRecording.value) {
-                Log.d(TAG, "Recording stopped detected early, stopping poll.")
                 break
             }
             pollRecordingState()
@@ -580,9 +543,6 @@ class GoProManager private constructor(private val context: Context) {
     }
     
     suspend fun setMode(mode: Int) {
-        // Command 0x3E (Load Preset Group)
-        // Correct Format based on OpenGoPro: Length 0x04, Cmd 0x3E, ValLen 0x02, Value (2 bytes)
-        // Example Video: 04 3E 02 03 E8 (1000)
         val modeId = when (mode) {
             0 -> 1000
             1 -> 1001
@@ -596,14 +556,12 @@ class GoProManager private constructor(private val context: Context) {
         val cmd = byteArrayOf(0x04, 0x3E, 0x02, m1, m2)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
         
-        // Poll status to see update
         kotlinx.coroutines.delay(200)
         pollInitialStatus()
     }
     
     private suspend fun pollRecordingState() {
         try {
-             // Cmd 0x13 (Get Status), Param 0x0A (Encoding/IsRecording)
             val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
             writeCharacteristicSuspend(GoProUUID.QUERY, statusCmd)
         } catch (e: Exception) {
@@ -613,30 +571,23 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun pollInitialStatus() {
         try {
-            // Cmd 0x13 (Get Status), Param 0x0A (Encoding/IsRecording)
             val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
             writeCharacteristicSuspend(GoProUUID.QUERY, statusCmd)
             
-            // Cmd 0x13 (Get Status), Param 0x0D (Video Progress/Duration)
             if (_isRecording.value) {
                 val durationCmd = byteArrayOf(0x02, 0x13, 0x0D)
                 writeCharacteristicSuspend(GoProUUID.QUERY, durationCmd)
             }
             
-            // Cmd 0x13 (Get Status), Param 0x46 (Battery Level)
             val batteryCmd = byteArrayOf(0x02, 0x13, 0x46)
             writeCharacteristicSuspend(GoProUUID.QUERY, batteryCmd)
             
-            // Cmd 0x13 (Get Status), Param 0x36 (Remaining Space)
             val remSpaceCmd = byteArrayOf(0x02, 0x13, 0x36)
             writeCharacteristicSuspend(GoProUUID.QUERY, remSpaceCmd)
 
-            // Cmd 0x13 (Get Status), Param 0x23 (Remaining Video Time)
             val remTimeCmd = byteArrayOf(0x02, 0x13, 0x23)
             writeCharacteristicSuspend(GoProUUID.QUERY, remTimeCmd)
             
-            // Cmd 0x13 (Get Status), Param 0x2B (Mode) & 0x60 (Mode ID 96)
-            // Some cameras use 43, some 96.
             val modeCmd = byteArrayOf(0x02, 0x13, 0x2B)
             writeCharacteristicSuspend(GoProUUID.QUERY, modeCmd)
             
@@ -648,7 +599,7 @@ class GoProManager private constructor(private val context: Context) {
         }
     }
 
-    fun connect(device: BluetoothDevice) {
+    fun connect(device: BluetoothDevice, isPaired: Boolean = false) {
         if (!hasPermissions()) {
              _connectionState.value = ConnectionState.Error("Permissions not granted")
              return
@@ -663,15 +614,12 @@ class GoProManager private constructor(private val context: Context) {
         
         connectionJob?.cancel()
         connectionJob = scope.launch {
-            _connectionState.value = ConnectionState.Connecting(device.name ?: savedDeviceName)
+            _connectionState.value = ConnectionState.Connecting(device.name ?: device.address)
             
             while (isActive) {
                 try {
                     // 1. Connect
-                    val isReconnect = device.address == savedDeviceAddress
-                    // If it is a saved device, we use autoConnect=true which waits indefinitely.
-                    // If it is a new device, we use autoConnect=false with timeout.
-                    connectGattSuspend(device, autoConnect = isReconnect)
+                    connectGattSuspend(device, autoConnect = isPaired)
                     
                     // 2. Discover Services
                     discoverServicesSuspend()
@@ -679,38 +627,32 @@ class GoProManager private constructor(private val context: Context) {
                     // 3. Handshake: Read Password (Pairs device)
                     readCharacteristicSuspend(GoProUUID.WIFI_AP_PASSWORD)
                     
-                    // 4. Handshake: Enable Notifications on RESPONSE characteristics
+                    // 4. Handshake: Enable Notifications
                     enableNotificationSuspend(GoProUUID.COMMAND_RESPONSE)
                     enableNotificationSuspend(GoProUUID.SETTING_RESPONSE)
                     enableNotificationSuspend(GoProUUID.QUERY_RESPONSE)
                     
-                    // 5. Register for Status Updates (ID 10 - Encoding, ID 13 - Duration)
+                    // 5. Register for Status Updates
                     registerForStatusUpdatesSuspend()
                     
-                    // 6. Get Initial Status (Encoding, Battery, Storage)
+                    // 6. Get Initial Status
                     pollInitialStatus()
                     
-                    savedDeviceAddress = device.address
-                    savedDeviceName = device.name ?: device.address // Fallback if name is missing
-                    _connectionState.value = ConnectionState.Connected(savedDeviceName)
+                    savePairedDevice(device)
+                    _connectionState.value = ConnectionState.Connected(device.name ?: device.address)
                     Log.d(TAG, "GoPro Connection Fully Established!")
                     
-                    // Exit the retry loop on success
                     break
                     
                 } catch (e: Exception) {
                     Log.e(TAG, "Connection failed", e)
-                    disconnect() // Close GATT to reset state
+                    disconnect()
                     
-                    // Check if we should retry
-                    if (device.address == savedDeviceAddress) {
+                    if (isPaired) {
                         Log.d(TAG, "Retrying connection for saved device in 2 seconds...")
-                        // Update state to reflect we are still trying to connect
-                        _connectionState.value = ConnectionState.Connecting(device.name ?: savedDeviceName)
+                        _connectionState.value = ConnectionState.Connecting(device.name ?: device.address)
                         kotlinx.coroutines.delay(2000)
-                        // Loop continues
                     } else {
-                        // For non-saved devices, report error and stop
                         _connectionState.value = ConnectionState.Error(e.message ?: "Connection failed")
                         break
                     }
@@ -721,14 +663,18 @@ class GoProManager private constructor(private val context: Context) {
     
     private suspend fun registerForStatusUpdatesSuspend() {
         try {
-            // Command 0x53 (Register), IDs...
-            // Length: 1 (Cmd 0x53) + 7 (IDs) = 8 bytes.
             val cmd = byteArrayOf(0x08, 0x53, 0x0A, 0x0D, 0x46, 0x36, 0x23, 0x2B, 0x60)
             writeCharacteristicSuspend(GoProUUID.QUERY, cmd)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register for status updates: ${e.message}")
-            // Don't fail the connection for this, but log it
         }
+    }
+
+    fun forgetConnectedDevice() {
+        connectedGatt?.device?.address?.let { address ->
+            removePairedDevice(address)
+        }
+        disconnect()
     }
 
     fun disconnect() {
@@ -740,17 +686,10 @@ class GoProManager private constructor(private val context: Context) {
         _isRecording.value = false
         _recordingDuration.value = 0
     }
-    
-    fun forgetPairedDevice() {
-        savedDeviceAddress = null
-        savedDeviceName = null
-        disconnect()
-    }
 
     // Suspend Functions
 
     private suspend fun connectGattSuspend(device: BluetoothDevice, autoConnect: Boolean) = operationMutex.withLock {
-        // If autoConnect is true, we wait indefinitely (no timeout) for the device to appear
         if (autoConnect) {
             suspendCancellableCoroutine<Unit> { cont ->
                 currentOperationType = BleOperationType.CONNECT
@@ -759,7 +698,6 @@ class GoProManager private constructor(private val context: Context) {
                 connectedGatt = device.connectGatt(context, true, gattCallback)
             }
         } else {
-            // For direct connection, we use a timeout
             withTimeout(10000) {
                 suspendCancellableCoroutine<Unit> { cont ->
                     currentOperationType = BleOperationType.CONNECT
@@ -785,7 +723,6 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun readCharacteristicSuspend(uuid: UUID) = operationMutex.withLock {
         val gatt = connectedGatt ?: throw Exception("Not connected")
-        // Robustness: Search all services for the characteristic
         val char = findCharacteristic(gatt, uuid) ?: throw Exception("Characteristic $uuid not found in any service")
         
         withTimeout(5000) {
@@ -804,10 +741,6 @@ class GoProManager private constructor(private val context: Context) {
         val gatt = connectedGatt ?: throw Exception("Not connected")
         val char = findCharacteristic(gatt, uuid) ?: throw Exception("Characteristic $uuid not found in any service")
         
-        // Write Type: Default is WRITE, but some use WRITE_NO_RESPONSE. GoPro usually expects responses for Commands?
-        // Actually COMMAND char usually supports WRITE or WRITE_NO_RESPONSE.
-        // If we want onCharacteristicWrite callback, we usually use WRITE (default).
-        // Let's set value and write.
         char.value = value
         char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         
@@ -825,13 +758,10 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun enableNotificationSuspend(uuid: UUID) = operationMutex.withLock {
         val gatt = connectedGatt ?: throw Exception("Not connected")
-        // Robustness: Search all services
         val char = findCharacteristic(gatt, uuid) ?: throw Exception("Characteristic $uuid not found in any service")
         
-        // 1. Enable locally
         gatt.setCharacteristicNotification(char, true)
         
-        // 2. Write Descriptor remotely
         val cccUuid = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
         val descriptor = char.getDescriptor(cccUuid) ?: throw Exception("CCCD Descriptor not found for $uuid")
         descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE

@@ -24,7 +24,7 @@ fun MainScreen(permissionsGranted: Boolean) {
 
     val connectionState by goProManager.connectionState.collectAsState()
     val scannedDevices by goProManager.scannedDevices.collectAsState()
-    val savedDeviceName by goProManager.savedDeviceNameFlow.collectAsState()
+    val pairedDevices by goProManager.pairedDevices.collectAsState()
     val isRecording by goProManager.isRecording.collectAsState()
     val recordingDuration by goProManager.recordingDuration.collectAsState()
     val batteryLevel by goProManager.batteryLevel.collectAsState()
@@ -35,9 +35,6 @@ fun MainScreen(permissionsGranted: Boolean) {
 
     DisposableEffect(Unit) {
         onDispose {
-            // Only stop scan/disconnect if the screen is actually being destroyed (e.g. Activity finish),
-            // but Compose might dispose/recompose on config changes. 
-            // In a single-activity app, MainScreen is the root.
             goProManager.stopScan()
             goProManager.disconnect()
         }
@@ -80,19 +77,20 @@ fun MainScreen(permissionsGranted: Boolean) {
                     }
                 },
                 onDisconnect = { goProManager.disconnect() },
-                onForget = { goProManager.forgetPairedDevice() }
+                onForget = { goProManager.forgetConnectedDevice() }
             )
         }
         else -> {
             ScanningScreen(
                 connectionState = connectionState,
                 scannedDevices = scannedDevices,
+                pairedDevices = pairedDevices,
                 permissionsGranted = permissionsGranted,
                 onStartScan = { goProManager.startScan() },
                 onStopScan = { goProManager.stopScan() },
                 onConnect = { device -> goProManager.connect(device) },
-                onConnectToSaved = { goProManager.connectToSavedDevice() },
-                savedDeviceName = savedDeviceName
+                onConnectToPaired = { address -> goProManager.connectToDevice(address) },
+                onRemovePaired = { address -> goProManager.removePairedDevice(address) }
             )
         }
     }
@@ -106,6 +104,6 @@ fun MainScreen(permissionsGranted: Boolean) {
 @Composable
 fun DefaultPreview() {
     AppTheme {
-        MainScreen(permissionsGranted = true) // Preview with permissions granted
+        MainScreen(permissionsGranted = true)
     }
 }

@@ -34,11 +34,6 @@ When implementing Hammerhead Karoo functionality please follow guidelines and co
     ./gradlew installDebug
     ```
 
-*   **Run Unit Tests:**
-    ```bash
-    ./gradlew test
-    ```
-
 ## Project Structure
 
 *   **`app/`**: The main application module.

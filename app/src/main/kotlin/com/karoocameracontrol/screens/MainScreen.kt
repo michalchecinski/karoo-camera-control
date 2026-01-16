@@ -89,7 +89,7 @@ fun MainScreen(
                 },
                 onDisconnect = { goProManager.disconnect() },
                 onForget = { goProManager.forgetConnectedDevice() },
-                onFinish = { goProManager.disconnect() }
+                onFinish = { onFinish() }
             )
         }
         else -> {
@@ -107,10 +107,7 @@ fun MainScreen(
                 onConnect = { device -> goProManager.connect(device) },
                 onConnectToPaired = { address -> goProManager.connectToDevice(address) },
                 onRemovePaired = { address -> goProManager.removePairedDevice(address) },
-                onFinish = {
-                    goProManager.stopScan()
-                    goProManager.disconnect()
-                }
+                onFinish = { onFinish() }
             )
         }
     }

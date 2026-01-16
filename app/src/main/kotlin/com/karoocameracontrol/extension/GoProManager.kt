@@ -29,6 +29,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -73,6 +74,9 @@ class GoProManager private constructor(private val context: Context) {
 
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+
+    private val _recordingDuration = MutableStateFlow(0)
+    val recordingDuration: StateFlow<Int> = _recordingDuration.asStateFlow()
 
     private var scanning = false
     
@@ -180,6 +184,7 @@ class GoProManager private constructor(private val context: Context) {
                     connectedGatt = null
                     _connectionState.value = ConnectionState.Disconnected
                     _isRecording.value = false
+                    _recordingDuration.value = 0
                     // If we were waiting for something else, this is an error
                     if (currentOperationType != BleOperationType.NONE) {
                         resumeActiveContinuationWithException(Exception("Disconnected unexpectedly"))
@@ -191,6 +196,7 @@ class GoProManager private constructor(private val context: Context) {
                 connectedGatt = null
                 _connectionState.value = ConnectionState.Error("Connection error: $status")
                 _isRecording.value = false
+                _recordingDuration.value = 0
                 resumeActiveContinuationWithException(Exception("Connection error: $status"))
             }
         }
@@ -255,14 +261,39 @@ class GoProManager private constructor(private val context: Context) {
             Log.d(TAG, "Notification on ${characteristic.uuid}: $hexValue")
             
             if (characteristic.uuid == GoProUUID.QUERY_RESPONSE || characteristic.uuid == GoProUUID.COMMAND_RESPONSE) {
-                // Simple parser for status ID 10 (Encoding)
-                // Look for sequence: 0x0A (ID), 0x01 (Type Boolean), Value
+                // Parser for Status ID 10 (Encoding) - 0x0A, 0x01 (Boolean), Value
                 for (i in 0 until value.size - 2) {
                     if (value[i] == 0x0A.toByte() && value[i+1] == 0x01.toByte()) {
                         val isRecording = value[i+2] == 0x01.toByte()
                         Log.d(TAG, "Parsed Recording State: $isRecording")
                         _isRecording.value = isRecording
-                        break
+                        if (!isRecording) _recordingDuration.value = 0
+                    }
+                }
+                
+                // Parser for Status ID 13 (Video Progress) - 0x0D, Type (0x03 or 0x04), Value (4 bytes)
+                for (i in 0 until value.size) { // Loop through all bytes
+                    if (value[i] == 0x0D.toByte()) { // Found Status ID 13
+                        if (i + 1 < value.size) { // Check if type byte exists
+                            val typeByte = value[i+1]
+                            Log.d(TAG, "Found Status ID 13, Type byte: 0x%02x".format(typeByte))
+                            // Accept type 0x03 (Short/Integer?) or 0x04 (Integer/Long?) - both seem to imply 4 bytes here based on logs
+                            if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) { // Expecting 4 bytes value
+                                val b1 = value[i+2].toInt() and 0xFF
+                                val b2 = value[i+3].toInt() and 0xFF
+                                val b3 = value[i+4].toInt() and 0xFF
+                                val b4 = value[i+5].toInt() and 0xFF
+                                val duration = (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
+                                Log.d(TAG, "Parsed Recording Duration: $duration seconds")
+                                _recordingDuration.value = duration
+                                // Break from this inner loop if a full ID13-Type-Value sequence is found and parsed
+                                break 
+                            } else {
+                                Log.w(TAG, "Status ID 13: Unexpected type 0x%02x or insufficient bytes for 4-byte integer value (i=$i, size=${value.size})".format(typeByte))
+                            }
+                        } else {
+                            Log.w(TAG, "Status ID 13: Insufficient bytes to read type (i=$i, size=${value.size})")
+                        }
                     }
                 }
             }
@@ -392,8 +423,25 @@ class GoProManager private constructor(private val context: Context) {
              // Cmd 0x13 (Get Status), Param 0x0A (Encoding/IsRecording)
             val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
             writeCharacteristicSuspend(GoProUUID.QUERY, statusCmd)
+            
+            // Cmd 0x13 (Get Status), Param 0x0D (Video Progress/Duration)
+            // We only care if recording is active, but polling it doesn't hurt.
+            if (_isRecording.value) {
+                val durationCmd = byteArrayOf(0x02, 0x13, 0x0D)
+                writeCharacteristicSuspend(GoProUUID.QUERY, durationCmd)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to poll status", e)
+        }
+    }
+
+    private suspend fun pollDuration() {
+        try {
+            // Cmd 0x13 (Get Status), Param 0x0D (Video Progress/Duration)
+            val durationCmd = byteArrayOf(0x02, 0x13, 0x0D)
+            writeCharacteristicSuspend(GoProUUID.QUERY, durationCmd)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to poll duration: ${e.message}")
         }
     }
 
@@ -433,8 +481,7 @@ class GoProManager private constructor(private val context: Context) {
                     enableNotificationSuspend(GoProUUID.SETTING_RESPONSE)
                     enableNotificationSuspend(GoProUUID.QUERY_RESPONSE)
                     
-                    // 5. Register for Status Updates (ID 10 - Encoding)
-                    // Command 0x53 (Register), ID 0x0A
+                    // 5. Register for Status Updates (ID 10 - Encoding, ID 13 - Duration)
                     registerForStatusUpdatesSuspend()
                     
                     // 6. Get Initial Status (Encoding)
@@ -444,6 +491,21 @@ class GoProManager private constructor(private val context: Context) {
                     savedDeviceName = device.name ?: device.address // Fallback if name is missing
                     _connectionState.value = ConnectionState.Connected(savedDeviceName)
                     Log.d(TAG, "GoPro Connection Fully Established!")
+                    
+                    // Launch a separate coroutine to manage duration polling based on recording state
+                    launch {
+                        _isRecording.collectLatest { recording ->
+                            if (recording) {
+                                Log.d(TAG, "Recording active, starting duration poll loop.")
+                                while (isActive) {
+                                    pollDuration()
+                                    kotlinx.coroutines.delay(1000)
+                                }
+                            } else {
+                                Log.d(TAG, "Recording inactive, stopping duration poll loop.")
+                            }
+                        }
+                    }
                     
                     // Exit the retry loop on success
                     break
@@ -471,9 +533,10 @@ class GoProManager private constructor(private val context: Context) {
     
     private suspend fun registerForStatusUpdatesSuspend() {
         try {
-            // Command 0x53 (Register), ID 0x0A (Encoding)
-            // Length: 2 bytes (0x53, 0x0A)
-            val cmd = byteArrayOf(0x02, 0x53, 0x0A)
+            // Command 0x53 (Register), ID 0x0A (Encoding), ID 0x0D (Duration)
+            // Note: Sending multiple IDs in one register command is often supported.
+            // Length 3 bytes payload: 0x53, 0x0A, 0x0D
+            val cmd = byteArrayOf(0x03, 0x53, 0x0A, 0x0D)
             writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register for status updates: ${e.message}")
@@ -488,6 +551,7 @@ class GoProManager private constructor(private val context: Context) {
         connectedGatt = null
         _connectionState.value = ConnectionState.Disconnected
         _isRecording.value = false
+        _recordingDuration.value = 0
     }
     
     fun forgetPairedDevice() {

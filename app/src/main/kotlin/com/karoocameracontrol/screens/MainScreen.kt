@@ -26,6 +26,7 @@ fun MainScreen(permissionsGranted: Boolean) {
     val scannedDevices by goProManager.scannedDevices.collectAsState()
     val savedDeviceName by goProManager.savedDeviceNameFlow.collectAsState()
     val isRecording by goProManager.isRecording.collectAsState()
+    val recordingDuration by goProManager.recordingDuration.collectAsState()
     
     var isProcessing by remember { mutableStateOf(false) }
 
@@ -45,6 +46,7 @@ fun MainScreen(permissionsGranted: Boolean) {
                 deviceName = state.deviceName,
                 isRecording = isRecording,
                 isProcessing = isProcessing,
+                recordingDuration = recordingDuration,
                 onToggleRecording = {
                     if (isProcessing) return@ConnectedScreen
                     isProcessing = true

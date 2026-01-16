@@ -13,12 +13,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun ConnectedScreen(
     deviceName: String?,
     isRecording: Boolean,
     isProcessing: Boolean,
+    recordingDuration: Int,
     onToggleRecording: () -> Unit,
     onDisconnect: () -> Unit,
     onForget: () -> Unit
@@ -35,6 +37,18 @@ fun ConnectedScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
+
+            if (isRecording) {
+                val duration = recordingDuration.seconds
+                val formattedDuration = duration.toComponents { _, minutes, seconds, _ ->
+                    "%02d:%02d".format(minutes, seconds)
+                }
+                Text(
+                    text = formattedDuration,
+                    style = MaterialTheme.typography.displayMedium,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+            }
 
             Button(
                 onClick = onToggleRecording,

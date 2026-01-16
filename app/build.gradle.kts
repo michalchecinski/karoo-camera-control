@@ -12,13 +12,16 @@ android {
         applicationId = "com.karoocameracontrol"
         minSdk = 23
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (System.getenv("BUILD_NUMBER")?.toInt() ?: 1)
+        versionName = System.getenv("RELEASE_VERSION") ?: "1.0"
     }
 
     buildTypes {
-        release {
+        debug {
             isMinifyEnabled = false
+        }
+        release {
+            isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

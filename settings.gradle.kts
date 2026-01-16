@@ -21,5 +21,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Karoo Extension Template"
+rootProject.name = "Karoo Camera Control"
 include("app")

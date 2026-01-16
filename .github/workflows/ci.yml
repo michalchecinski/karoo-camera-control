@@ -30,8 +30,8 @@ jobs:
           GH_USER: ${{ github.actor }}
           GH_KEY: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "gpr.user=${GH_USER}" >> local.properties
-          echo "gpr.key=${GH_KEY}" >> local.properties
+          echo "gpr.user=${GH_USER}" >> gradle.properties
+          echo "gpr.key=${GH_KEY}" >> gradle.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew

@@ -16,7 +16,7 @@ For now only GoPro cameras are supported.
 | HERO10 Black | v01.10.00 |
 | HERO9 Black | v01.70.00 |
 
-Up-to date supported cameras list can be found [here](https://gopro.github.io/OpenGoPro/#compatibility).
+Up-to date [supported GoPro cameras list can be found here](https://gopro.github.io/OpenGoPro/#compatibility).
 
 ## Credits
 

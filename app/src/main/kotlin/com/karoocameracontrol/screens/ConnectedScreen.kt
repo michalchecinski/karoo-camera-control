@@ -15,7 +15,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun ConnectedScreen(
     deviceName: String?,
-    onDisconnect: () -> Unit
+    onDisconnect: () -> Unit,
+    onForget: () -> Unit
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -32,6 +33,16 @@ fun ConnectedScreen(
 
             Button(onClick = onDisconnect) {
                 Text(text = "Disconnect")
+            }
+            
+            Button(
+                onClick = onForget,
+                modifier = Modifier.padding(top = 16.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text(text = "Unpair / Forget")
             }
         }
     }

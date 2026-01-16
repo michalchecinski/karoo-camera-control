@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import com.karoocameracontrol.R
 import com.karoocameracontrol.extension.ConnectionState
 
+import androidx.compose.runtime.LaunchedEffect
+
 @Composable
 fun ScanningScreen(
     connectionState: ConnectionState,
@@ -35,6 +37,12 @@ fun ScanningScreen(
     onStopScan: () -> Unit,
     onConnect: (BluetoothDevice) -> Unit
 ) {
+    LaunchedEffect(permissionsGranted) {
+        if (permissionsGranted && connectionState !is ConnectionState.Scanning) {
+            onStartScan()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()

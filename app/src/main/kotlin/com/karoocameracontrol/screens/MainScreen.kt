@@ -19,11 +19,7 @@ fun MainScreen(permissionsGranted: Boolean) {
     val connectionState by goProManager.connectionState.collectAsState()
     val scannedDevices by goProManager.scannedDevices.collectAsState()
 
-    DisposableEffect(permissionsGranted) {
-        if (permissionsGranted && connectionState !is ConnectionState.Scanning && connectionState !is ConnectionState.Connected) {
-            // Optionally start scan automatically if permissions are granted when screen is composed
-            // goProManager.startScan()
-        }
+    DisposableEffect(Unit) {
         onDispose {
             // Only stop scan/disconnect if the screen is actually being destroyed (e.g. Activity finish),
             // but Compose might dispose/recompose on config changes. 
@@ -37,7 +33,8 @@ fun MainScreen(permissionsGranted: Boolean) {
         is ConnectionState.Connected -> {
             ConnectedScreen(
                 deviceName = state.deviceName,
-                onDisconnect = { goProManager.disconnect() }
+                onDisconnect = { goProManager.disconnect() },
+                onForget = { goProManager.forgetPairedDevice() }
             )
         }
         else -> {

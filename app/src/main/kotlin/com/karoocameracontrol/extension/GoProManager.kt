@@ -69,6 +69,14 @@ class GoProManager private constructor(private val context: Context) {
 
     private var scanning = false
     
+    private val prefs by lazy {
+        context.getSharedPreferences("GoProPrefs", Context.MODE_PRIVATE)
+    }
+    
+    private var savedDeviceAddress: String?
+        get() = prefs.getString("saved_device_address", null)
+        set(value) = prefs.edit().putString("saved_device_address", value).apply()
+
     // Coroutine scope for BLE operations
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var connectionJob: Job? = null
@@ -90,6 +98,17 @@ class GoProManager private constructor(private val context: Context) {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
             val device = result.device
+            
+            // Auto-connect if matches saved device
+            val savedAddress = savedDeviceAddress
+            if (savedAddress != null && device.address == savedAddress) {
+                Log.d(TAG, "Found known device ${device.name}, auto-connecting.")
+                if (_connectionState.value !is ConnectionState.Connecting && _connectionState.value !is ConnectionState.Connected) {
+                     connect(device)
+                }
+                return
+            }
+            
             if (!_scannedDevices.value.contains(device)) {
                 _scannedDevices.value = _scannedDevices.value + device
                 Log.d(TAG, "Found GoPro: ${device.name} (${device.address})")
@@ -100,6 +119,16 @@ class GoProManager private constructor(private val context: Context) {
             super.onBatchScanResults(results)
             for (result in results) {
                 val device = result.device
+                val savedAddress = savedDeviceAddress
+                
+                if (savedAddress != null && device.address == savedAddress) {
+                     Log.d(TAG, "Found known device (batch) ${device.name}, auto-connecting.")
+                     if (_connectionState.value !is ConnectionState.Connecting && _connectionState.value !is ConnectionState.Connected) {
+                         connect(device)
+                     }
+                     return
+                }
+                
                 if (!_scannedDevices.value.contains(device)) {
                     _scannedDevices.value = _scannedDevices.value + device
                     Log.d(TAG, "Found GoPro (batch): ${device.name} (${device.address})")
@@ -269,6 +298,11 @@ class GoProManager private constructor(private val context: Context) {
              return
         }
         
+        if (_connectionState.value is ConnectionState.Connecting || _connectionState.value is ConnectionState.Connected) {
+            Log.w(TAG, "Already connecting or connected, ignoring connect request.")
+            return
+        }
+        
         stopScan()
         
         connectionJob?.cancel()
@@ -290,6 +324,7 @@ class GoProManager private constructor(private val context: Context) {
                 enableNotificationSuspend(GoProUUID.SETTING_RESPONSE)
                 enableNotificationSuspend(GoProUUID.QUERY_RESPONSE)
                 
+                savedDeviceAddress = device.address
                 _connectionState.value = ConnectionState.Connected(device.name)
                 Log.d(TAG, "GoPro Connection Fully Established!")
                 
@@ -307,6 +342,11 @@ class GoProManager private constructor(private val context: Context) {
         connectedGatt?.close()
         connectedGatt = null
         _connectionState.value = ConnectionState.Disconnected
+    }
+    
+    fun forgetPairedDevice() {
+        savedDeviceAddress = null
+        disconnect()
     }
 
     // Suspend Functions

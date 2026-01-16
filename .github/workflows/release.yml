@@ -84,3 +84,21 @@ jobs:
       - name: Build Changelog
         id: build_changelog
         uses: mikepenz/release-changelog-builder-action@439f79b5b5428107c7688c1d2b0e8bacc9b8792c # v6.0.1
+        with:
+          outputFile: changelog.md
+
+      - name: Convert changelog to txt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+          pandoc changelog.md -t plain -o changelog.txt
+
+      - name: Prepare manifest
+        run: |
+          chmod +x .github/scripts/prepare-manifest.sh
+          ./.github/scripts/prepare-manifest.sh ${{ needs.setup.outputs.version }} ${{ github.run_number }} changelog.txt
+
+      - name: Output manifest to a github output
+        id: manifest
+        run: |
+          echo "manifest=$(cat manifest.json | jq -c .)" >> $GITHUB_OUTPUT

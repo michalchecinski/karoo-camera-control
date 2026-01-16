@@ -50,9 +50,7 @@ fun ConnectedScreen(
     onSetMode: (Int) -> Unit,
     onDisconnect: () -> Unit,
     onForget: () -> Unit,
-    onFinish: () -> Unit,
-    isConnecting: Boolean, // New parameter
-    onCancelConnecting: () -> Unit // New parameter
+    onFinish: () -> Unit
 ) {
     var showForgetConfirmation by remember { mutableStateOf(false) }
 
@@ -62,143 +60,121 @@ fun ConnectedScreen(
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
-        if (isConnecting) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(modifier = Modifier.size(48.dp))
-                Spacer(modifier = Modifier.height(16.dp))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Status Row
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
                 Text(
-                    text = "Connecting to ${deviceName ?: "device"}...",
-                    style = MaterialTheme.typography.headlineMedium
+                    text = "Battery: $batteryLevel%",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+
+                val hours = remainingTime / 3600
+                val minutes = (remainingTime % 3600) / 60
+                val seconds = remainingTime % 60
+
+                val timeText = if (hours > 0) {
+                    "%dh %02dm".format(hours, minutes)
+                } else {
+                    "%02dm %02ds".format(minutes, seconds)
+                }
+
+                Text(
+                    text = "Storage: $timeText",
+                    style = MaterialTheme.typography.bodyLarge
                 )
             }
-            Image(
-                painter = painterResource(id = R.drawable.back),
-                contentDescription = "Cancel",
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(bottom = 10.dp)
-                    .size(54.dp)
-                    .clickable {
-                        onCancelConnecting()
-                    }
-            )
-        } else {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+
+            // Mode Selection
+            Row(
+                modifier = Modifier.padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Status Row
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
+
+                Button(
+                    onClick = { onSetMode(0) }, // Video
+                    enabled = !isProcessing && !isRecording,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (current == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    )
                 ) {
-                    Text(
-                        text = "Battery: $batteryLevel%",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-
-                    val hours = remainingTime / 3600
-                    val minutes = (remainingTime % 3600) / 60
-                    val seconds = remainingTime % 60
-
-                    val timeText = if (hours > 0) {
-                        "%dh %02dm".format(hours, minutes)
-                    } else {
-                        "%02dm %02ds".format(minutes, seconds)
-                    }
-
-                    Text(
-                        text = "Storage: $timeText",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-
-                // Mode Selection
-                Row(
-                    modifier = Modifier.padding(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
-
-                    Button(
-                        onClick = { onSetMode(0) }, // Video
-                        enabled = !isProcessing && !isRecording,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (current == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                        )
-                    ) {
-                        Text("Video")
-                    }
-
-                    Button(
-                        onClick = { onSetMode(1) }, // Photo
-                        enabled = !isProcessing && !isRecording,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (current == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                        )
-                    ) {
-                        Text("Photo")
-                    }
-
-                    Button(
-                        onClick = { onSetMode(2) }, // Timelapse
-                        enabled = !isProcessing && !isRecording,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (current == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                        )
-                    ) {
-                        Text("Timelapse")
-                    }
-                }
-
-                if (isRecording) {
-                    val duration = recordingDuration.seconds
-                    val formattedDuration = duration.toComponents { _, minutes, seconds, _ ->
-                        "%02d:%02d".format(minutes, seconds)
-                    }
-                    Text(
-                        text = formattedDuration,
-                        style = MaterialTheme.typography.displayMedium,
-                        modifier = Modifier.padding(bottom = 24.dp)
-                    )
+                    Text("Video")
                 }
 
                 Button(
-                    onClick = onToggleRecording,
-                    enabled = !isProcessing,
-                    modifier = Modifier
-                        .width(200.dp)
-                        .height(100.dp)
-                        .padding(bottom = 16.dp),
+                    onClick = { onSetMode(1) }, // Photo
+                    enabled = !isProcessing && !isRecording,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                        disabledContainerColor = if (isRecording) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        containerColor = if (current == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                     )
                 ) {
-                    if (isProcessing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(32.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 3.dp
+                    Text("Photo")
+                }
+
+                Button(
+                    onClick = { onSetMode(2) }, // Timelapse
+                    enabled = !isProcessing && !isRecording,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (current == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("Timelapse")
+                }
+            }
+
+            if (isRecording) {
+                val duration = recordingDuration.seconds
+                val formattedDuration = duration.toComponents { _, minutes, seconds, _ ->
+                    "%02d:%02d".format(minutes, seconds)
+                }
+                Text(
+                    text = formattedDuration,
+                    style = MaterialTheme.typography.displayMedium,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+            }
+
+            Button(
+                onClick = onToggleRecording,
+                enabled = !isProcessing,
+                modifier = Modifier
+                    .width(200.dp)
+                    .height(100.dp)
+                    .padding(bottom = 16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = if (isRecording) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                )
+            ) {
+                if (isProcessing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 3.dp
+                    )
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    shape = if (isRecording) RectangleShape else CircleShape
+                                )
                         )
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .background(
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        shape = if (isRecording) RectangleShape else CircleShape
-                                    )
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(
-                                text = if (isRecording) "Stop" else "Record",
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = if (isRecording) "Stop" else "Record",
+                            style = MaterialTheme.typography.titleLarge
+                        )
                     }
                 }
             }

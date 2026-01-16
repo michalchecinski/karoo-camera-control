@@ -181,27 +181,13 @@ fun MainScreen(
                             },
                             onDisconnect = { goProManager.disconnect() },
                             onForget = { goProManager.forgetConnectedDevice() },
-                            onFinish = { onFinish() },
-                            isConnecting = false, // Not connecting, so false
-                            onCancelConnecting = {} // Not applicable here, so empty lambda
+                            onFinish = { onFinish() }
                         )
                     }
                     is ConnectionState.Connecting -> {
-                        ConnectedScreen(
+                        ConnectingScreen(
                             deviceName = state.deviceName,
-                            isRecording = isRecording,
-                            isProcessing = isProcessing,
-                            recordingDuration = recordingDuration,
-                            batteryLevel = batteryLevel,
-                            remainingTime = remainingTime,
-                            cameraMode = cameraMode,
-                            onToggleRecording = {}, // Disabled when connecting
-                            onSetMode = {}, // Disabled when connecting
-                            onDisconnect = { goProManager.disconnect() },
-                            onForget = { goProManager.forgetConnectedDevice() },
-                            onFinish = { onFinish() },
-                            isConnecting = true, // Currently connecting
-                            onCancelConnecting = {
+                            onCancel = {
                                 goProManager.disconnect()
                                 isAutoConnecting = false
                                 showMenu = false
@@ -211,21 +197,9 @@ fun MainScreen(
                     else -> {
                         if (isAutoConnecting && currentState is ConnectionState.Disconnected) {
                              // Still trying to auto-connect, but not yet in Connecting state
-                            ConnectedScreen(
-                                deviceName = null, // Unknown device name during initial auto-connect
-                                isRecording = isRecording,
-                                isProcessing = isProcessing,
-                                recordingDuration = recordingDuration,
-                                batteryLevel = batteryLevel,
-                                remainingTime = remainingTime,
-                                cameraMode = cameraMode,
-                                onToggleRecording = {}, // Disabled when connecting
-                                onSetMode = {}, // Disabled when connecting
-                                onDisconnect = { goProManager.disconnect() },
-                                onForget = { goProManager.forgetConnectedDevice() },
-                                onFinish = { onFinish() },
-                                isConnecting = true, // Still connecting
-                                onCancelConnecting = {
+                            ConnectingScreen(
+                                deviceName = null,
+                                onCancel = {
                                     goProManager.disconnect()
                                     isAutoConnecting = false
                                     showMenu = false

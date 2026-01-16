@@ -677,6 +677,7 @@ class GoProManager private constructor(private val context: Context) {
                     break
 
                 } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     Log.e(TAG, "Connection failed", e)
                     disconnect()
 

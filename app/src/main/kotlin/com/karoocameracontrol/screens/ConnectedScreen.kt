@@ -29,6 +29,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import com.karoocameracontrol.R
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -185,19 +191,36 @@ fun ConnectedScreen(
                     }
                 }
             }
+        }
 
-            Button(onClick = onDisconnect) {
-                Text(text = "Disconnect")
+        var showMenu by remember { mutableStateOf(false) }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            IconButton(onClick = { showMenu = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "More options")
             }
-
-            Button(
-                onClick = { showForgetConfirmation = true },
-                modifier = Modifier.padding(top = 16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                )
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false }
             ) {
-                Text(text = "Unpair / Forget")
+                DropdownMenuItem(
+                    text = { Text("Disconnect") },
+                    onClick = {
+                        onDisconnect()
+                        showMenu = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Unpair / Forget") },
+                    onClick = {
+                        showForgetConfirmation = true
+                        showMenu = false
+                    }
+                )
             }
         }
 

@@ -499,7 +499,7 @@ class GoProManager private constructor(private val context: Context) {
                                 Log.d(TAG, "Recording active, starting duration poll loop.")
                                 while (isActive) {
                                     pollDuration()
-                                    kotlinx.coroutines.delay(1000)
+                                    kotlinx.coroutines.delay(500)
                                 }
                             } else {
                                 Log.d(TAG, "Recording inactive, stopping duration poll loop.")

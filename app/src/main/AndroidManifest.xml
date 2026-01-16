@@ -36,6 +36,13 @@
                 android:name="com.karoocameracontrol.EXTENSION_INFO"
                 android:resource="@xml/extension_info" />
         </service>
+        <receiver
+            android:name=".extension.GoProControlReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.karoocameracontrol.action.TOGGLE_RECORDING" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

@@ -548,6 +548,16 @@ class GoProManager private constructor(private val context: Context) {
         connect(device, isPaired = true)
     }
 
+    fun toggleRecording() {
+        scope.launch {
+            if (_isRecording.value) {
+                stopRecording()
+            } else {
+                startRecording()
+            }
+        }
+    }
+
     suspend fun startRecording() {
         val cmd = byteArrayOf(0x03, 0x01, 0x01, 0x01)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)

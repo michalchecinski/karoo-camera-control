@@ -7,7 +7,7 @@
     <DataType
         description="GoPro Recording Status (1=Rec, 0=Stop)"
         displayName="GoPro Status"
-        graphical="false"
+        graphical="true"
         icon="@drawable/ic_launcher_foreground"
         typeId="gopro-status" />
     <DataType

@@ -1,6 +1,7 @@
 package com.karoocameracontrol.screens
 
 import android.bluetooth.BluetoothDevice
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -148,6 +149,7 @@ fun ScanningScreen(
     }
 }
 
+@SuppressLint("MissingPermission")
 @Composable
 fun DeviceItem(device: BluetoothDevice, onConnectClick: (BluetoothDevice) -> Unit) {
     Row(

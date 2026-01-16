@@ -39,7 +39,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AppTheme {
-                MainScreen(permissionsGranted = permissionsGranted)
+                MainScreen(
+                    permissionsGranted = permissionsGranted,
+                    onFinish = { finish() }
+                )
             }
         }
     }

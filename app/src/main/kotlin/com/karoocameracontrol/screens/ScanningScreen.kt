@@ -34,6 +34,10 @@ import com.karoocameracontrol.components.SimpleAlertDialog
 import com.karoocameracontrol.extension.ConnectionState
 import com.karoocameracontrol.extension.PairedDevice
 
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,7 +53,8 @@ fun ScanningScreen(
     onStopScan: () -> Unit,
     onConnect: (BluetoothDevice) -> Unit,
     onConnectToPaired: (String) -> Unit,
-    onRemovePaired: (String) -> Unit
+    onRemovePaired: (String) -> Unit,
+    onFinish: () -> Unit
 ) {
     var deviceToForget by remember { mutableStateOf<PairedDevice?>(null) }
     LaunchedEffect(permissionsGranted, pairedDevices) {
@@ -171,6 +176,18 @@ fun ScanningScreen(
                 }
             }
         }
+
+        Image(
+            painter = painterResource(id = R.drawable.back),
+            contentDescription = "Back",
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(bottom = 10.dp)
+                .size(54.dp)
+                .clickable {
+                    onFinish()
+                }
+        )
     }
 
     deviceToForget?.let { device ->

@@ -18,7 +18,10 @@ import com.karoocameracontrol.theme.AppTheme
 import kotlinx.coroutines.launch
 
 @Composable
-fun MainScreen(permissionsGranted: Boolean) {
+fun MainScreen(
+    permissionsGranted: Boolean,
+    onFinish: () -> Unit
+) {
     val context = LocalContext.current
     val goProManager = GoProManager.getInstance(context)
     val scope = rememberCoroutineScope()
@@ -85,7 +88,8 @@ fun MainScreen(permissionsGranted: Boolean) {
                     }
                 },
                 onDisconnect = { goProManager.disconnect() },
-                onForget = { goProManager.forgetConnectedDevice() }
+                onForget = { goProManager.forgetConnectedDevice() },
+                onFinish = { goProManager.disconnect() }
             )
         }
         else -> {
@@ -102,10 +106,15 @@ fun MainScreen(permissionsGranted: Boolean) {
                 },
                 onConnect = { device -> goProManager.connect(device) },
                 onConnectToPaired = { address -> goProManager.connectToDevice(address) },
-                onRemovePaired = { address -> goProManager.removePairedDevice(address) }
+                onRemovePaired = { address -> goProManager.removePairedDevice(address) },
+                onFinish = {
+                    goProManager.stopScan()
+                    goProManager.disconnect()
+                }
             )
         }
     }
+
 }
 
 @Preview(
@@ -116,6 +125,6 @@ fun MainScreen(permissionsGranted: Boolean) {
 @Composable
 fun DefaultPreview() {
     AppTheme {
-        MainScreen(permissionsGranted = true)
+        MainScreen(permissionsGranted = true, onFinish = {})
     }
 }

@@ -25,6 +25,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import com.karoocameracontrol.R
+
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,7 +49,8 @@ fun ConnectedScreen(
     onToggleRecording: () -> Unit,
     onSetMode: (Int) -> Unit,
     onDisconnect: () -> Unit,
-    onForget: () -> Unit
+    onForget: () -> Unit,
+    onFinish: () -> Unit
 ) {
     var showForgetConfirmation by remember { mutableStateOf(false) }
     Box(
@@ -206,5 +212,17 @@ fun ConnectedScreen(
                 }
             )
         }
+
+        Image(
+            painter = painterResource(id = R.drawable.back),
+            contentDescription = "Back",
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(bottom = 10.dp)
+                .size(54.dp)
+                .clickable {
+                    onFinish()
+                }
+        )
     }
 }

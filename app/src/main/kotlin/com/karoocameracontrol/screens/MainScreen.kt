@@ -29,11 +29,10 @@ import com.karoocameracontrol.theme.AppTheme
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,148 +53,190 @@ fun MainScreen(
     val remainingTime by goProManager.remainingVideoTime.collectAsState()
     val cameraMode by goProManager.cameraMode.collectAsState()
     
-    var isProcessing by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) } // State for dropdown menu
-
-    // Auto-connect on startup only
-    LaunchedEffect(Unit) {
-        if (connectionState is ConnectionState.Disconnected && pairedDevices.isNotEmpty()) {
-            goProManager.tryAutoConnect()
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            goProManager.stopScan()
-            goProManager.disconnect()
-        }
-    }
-
-    Scaffold(
-        topBar = {
-            val currentState = connectionState // Introduce local variable
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = if (currentState is ConnectionState.Connected) {
-                            "Connected to ${currentState.deviceName ?: "Unknown Device"}"
-                        } else {
-                            "Karoo Camera Control"
-                        }
-                    )
-                },
-                navigationIcon = {
-                    if (currentState is ConnectionState.Connected) {
-                        IconButton(onClick = { onFinish() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    }
-                },
-                actions = {
-                    if (currentState is ConnectionState.Connected) {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Disconnect") },
-                                onClick = {
-                                    goProManager.disconnect()
-                                    showMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Unpair / Forget") },
-                                onClick = {
-                                    goProManager.forgetConnectedDevice()
-                                    showMenu = false
-                                }
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            val currentState = connectionState // Introduce local variable
-            when (val state = currentState) {
-                is ConnectionState.Connected -> {
-                    ConnectedScreen(
-                        deviceName = state.deviceName,
-                        isRecording = isRecording,
-                        isProcessing = isProcessing,
-                        recordingDuration = recordingDuration,
-                        batteryLevel = batteryLevel,
-                        remainingTime = remainingTime,
-                        cameraMode = cameraMode,
-                        onToggleRecording = {
-                            if (isProcessing) return@ConnectedScreen
-                            isProcessing = true
-                            scope.launch {
-                                try {
-                                    if (isRecording) {
-                                        goProManager.stopRecording()
-                                    } else {
-                                        goProManager.startRecording()
-                                    }
-                                } finally {
-                                    isProcessing = false
-                                }
-                            }
-                        },
-                        onSetMode = { mode ->
-                            if (isProcessing) return@ConnectedScreen
-                            isProcessing = true
-                            scope.launch {
-                                try {
-                                    goProManager.setMode(mode)
-                                } finally {
-                                    isProcessing = false
-                                }
-                            }
-                        },
-                        onDisconnect = { goProManager.disconnect() },
-                        onForget = { goProManager.forgetConnectedDevice() },
-                        onFinish = { onFinish() }
-                    )
-                }
-                else -> {
-                    ScanningScreen(
-                        connectionState = connectionState,
-                        scannedDevices = scannedDevices,
-                        pairedDevices = pairedDevices,
-                        permissionsGranted = permissionsGranted,
-                        onStartScan = { goProManager.startScan() },
-                        onStopScan = { 
-                            goProManager.stopScan()
-                            // Also cancel any pending connection if user clicked Stop
-                            goProManager.disconnect()
-                        },
-                        onConnect = { device -> goProManager.connect(device) },
-                        onConnectToPaired = { address -> goProManager.connectToDevice(address) },
-                        onRemovePaired = { address -> goProManager.removePairedDevice(address) },
-                        onFinish = { onFinish() }
-                    )
-                }
+        var isProcessing by remember { mutableStateOf(false) }
+        var showMenu by remember { mutableStateOf(false) } // State for dropdown menu
+        var isAutoConnecting by remember { mutableStateOf(false) } // New state for auto-connecting
+    
+        // Auto-connect on startup only
+        LaunchedEffect(Unit) {
+            if (pairedDevices.isNotEmpty()) {
+                isAutoConnecting = true
+                goProManager.tryAutoConnect()
             }
         }
-    }
-}
+    
+        DisposableEffect(Unit) {
+            onDispose {
+                goProManager.stopScan()
+                goProManager.disconnect()
+            }
+        }
+    
+        Scaffold(
+            topBar = {
+                val currentState = connectionState // Introduce local variable
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            text = if (currentState is ConnectionState.Connected) {
+                                "Connected to ${currentState.deviceName ?: "Unknown Device"}"
+                            } else {
+                                "Karoo Camera Control"
+                            }
+                        )
+                    },
+                    actions = {
+                        if (currentState is ConnectionState.Connected) {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Disconnect") },
+                                    onClick = {
+                                        goProManager.disconnect()
+                                        showMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Unpair / Forget") },
+                                    onClick = {
+                                        goProManager.forgetConnectedDevice()
+                                        showMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+            }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                val currentState = connectionState // Introduce local variable
+                when (val state = currentState) {
+                    is ConnectionState.Connected -> {
+                        isAutoConnecting = false
+                        ConnectedScreen(
+                            deviceName = state.deviceName,
+                            isRecording = isRecording,
+                            isProcessing = isProcessing,
+                            recordingDuration = recordingDuration,
+                            batteryLevel = batteryLevel,
+                            remainingTime = remainingTime,
+                            cameraMode = cameraMode,
+                            onToggleRecording = {
+                                if (isProcessing) return@ConnectedScreen
+                                isProcessing = true
+                                scope.launch {
+                                    try {
+                                        if (isRecording) {
+                                            goProManager.stopRecording()
+                                        } else {
+                                            goProManager.startRecording()
+                                        }
+                                    } finally {
+                                        isProcessing = false
+                                    }
+                                }
+                            },
+                            onSetMode = { mode ->
+                                if (isProcessing) return@ConnectedScreen
+                                isProcessing = true
+                                scope.launch {
+                                    try {
+                                        goProManager.setMode(mode)
+                                    } finally {
+                                        isProcessing = false
+                                    }
+                                }
+                            },
+                            onDisconnect = { goProManager.disconnect() },
+                            onForget = { goProManager.forgetConnectedDevice() },
+                            onFinish = { onFinish() },
+                            isConnecting = false, // Not connecting, so false
+                            onCancelConnecting = {} // Not applicable here, so empty lambda
+                        )
+                    }
+                    is ConnectionState.Connecting -> {
+                        ConnectedScreen(
+                            deviceName = state.deviceName,
+                            isRecording = isRecording,
+                            isProcessing = isProcessing,
+                            recordingDuration = recordingDuration,
+                            batteryLevel = batteryLevel,
+                            remainingTime = remainingTime,
+                            cameraMode = cameraMode,
+                            onToggleRecording = {}, // Disabled when connecting
+                            onSetMode = {}, // Disabled when connecting
+                            onDisconnect = { goProManager.disconnect() },
+                            onForget = { goProManager.forgetConnectedDevice() },
+                            onFinish = { onFinish() },
+                            isConnecting = true, // Currently connecting
+                            onCancelConnecting = {
+                                goProManager.disconnect()
+                                isAutoConnecting = false
+                                showMenu = false
+                            }
+                        )
+                    }
+                    else -> {
+                        if (isAutoConnecting && currentState is ConnectionState.Disconnected) {
+                             // Still trying to auto-connect, but not yet in Connecting state
+                            ConnectedScreen(
+                                deviceName = null, // Unknown device name during initial auto-connect
+                                isRecording = isRecording,
+                                isProcessing = isProcessing,
+                                recordingDuration = recordingDuration,
+                                batteryLevel = batteryLevel,
+                                remainingTime = remainingTime,
+                                cameraMode = cameraMode,
+                                onToggleRecording = {}, // Disabled when connecting
+                                onSetMode = {}, // Disabled when connecting
+                                onDisconnect = { goProManager.disconnect() },
+                                onForget = { goProManager.forgetConnectedDevice() },
+                                onFinish = { onFinish() },
+                                isConnecting = true, // Still connecting
+                                onCancelConnecting = {
+                                    goProManager.disconnect()
+                                    isAutoConnecting = false
+                                    showMenu = false
+                                }
+                            )
+                        } else {
+                            isAutoConnecting = false // Reset if we reach scanning/disconnected normally
+                            ScanningScreen(
+                                connectionState = currentState,
+                                scannedDevices = scannedDevices,
+                                pairedDevices = pairedDevices,
+                                permissionsGranted = permissionsGranted,
+                                onStartScan = { goProManager.startScan() },
+                                onStopScan = {
+                                    goProManager.stopScan()
+                                    // Also cancel any pending connection if user clicked Stop
+                                    goProManager.disconnect()
+                                },
+                                onConnect = { device -> goProManager.connect(device) },
+                                onConnectToPaired = { address -> goProManager.connectToDevice(address) },
+                                onRemovePaired = { address -> goProManager.removePairedDevice(address) },
+                                onFinish = { onFinish() }
+                            )
+                        }
+                    }
+                }
+            }
+        }}
 
 @Preview(
     widthDp = 256,

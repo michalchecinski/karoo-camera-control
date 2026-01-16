@@ -80,12 +80,6 @@ fun ScanningScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = stringResource(id = R.string.app_name),
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
             if (!permissionsGranted) {
                 Text(
                     text = "Bluetooth/Location permissions not granted.",

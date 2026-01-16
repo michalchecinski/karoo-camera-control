@@ -25,16 +25,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import com.karoocameracontrol.R
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -45,7 +35,7 @@ import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun ConnectedScreen(
-    deviceName: String?,
+    deviceName: String?, // Keep deviceName parameter even if not displayed, for consistency.
     isRecording: Boolean,
     isProcessing: Boolean,
     recordingDuration: Int,
@@ -54,11 +44,12 @@ fun ConnectedScreen(
     cameraMode: Int,
     onToggleRecording: () -> Unit,
     onSetMode: (Int) -> Unit,
-    onDisconnect: () -> Unit,
-    onForget: () -> Unit,
-    onFinish: () -> Unit
+    onDisconnect: () -> Unit, // Still needs to be passed, as SimpleAlertDialog uses it.
+    onForget: () -> Unit, // Still needs to be passed, as SimpleAlertDialog uses it.
+    onFinish: () -> Unit // Still needs to be passed, though not explicitly used in this simplified version.
 ) {
     var showForgetConfirmation by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -68,11 +59,7 @@ fun ConnectedScreen(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Connected to ${deviceName ?: "Unknown Device"}",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            // No "Connected to..." Text here, as it's in MainScreen's TopAppBar now.
 
             // Status Row
             Column(
@@ -84,7 +71,6 @@ fun ConnectedScreen(
                     style = MaterialTheme.typography.bodyLarge
                 )
 
-                // Format Seconds to HH:MM or MM:SS
                 val hours = remainingTime / 3600
                 val minutes = (remainingTime % 3600) / 60
                 val seconds = remainingTime % 60
@@ -106,7 +92,6 @@ fun ConnectedScreen(
                 modifier = Modifier.padding(bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Normalize mode (support 0,1,2 or 1000,1001,1002)
                 val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
 
                 Button(
@@ -193,37 +178,6 @@ fun ConnectedScreen(
             }
         }
 
-        var showMenu by remember { mutableStateOf(false) }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-        ) {
-            IconButton(onClick = { showMenu = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More options")
-            }
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Disconnect") },
-                    onClick = {
-                        onDisconnect()
-                        showMenu = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Unpair / Forget") },
-                    onClick = {
-                        showForgetConfirmation = true
-                        showMenu = false
-                    }
-                )
-            }
-        }
-
         if (showForgetConfirmation) {
             SimpleAlertDialog(
                 dialogTitle = "Confirm Unpair",
@@ -235,17 +189,5 @@ fun ConnectedScreen(
                 }
             )
         }
-
-        Image(
-            painter = painterResource(id = R.drawable.back),
-            contentDescription = "Back",
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(bottom = 10.dp)
-                .size(54.dp)
-                .clickable {
-                    onFinish()
-                }
-        )
     }
 }

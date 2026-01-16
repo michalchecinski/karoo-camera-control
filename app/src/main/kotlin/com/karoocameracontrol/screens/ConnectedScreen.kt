@@ -1,17 +1,27 @@
 package com.karoocameracontrol.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
 import kotlin.time.Duration.Companion.seconds
 
@@ -30,7 +40,9 @@ fun ConnectedScreen(
     onForget: () -> Unit
 ) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -51,60 +63,60 @@ fun ConnectedScreen(
                     text = "Battery: $batteryLevel%",
                     style = MaterialTheme.typography.bodyLarge
                 )
-                
+
                 // Format Seconds to HH:MM or MM:SS
                 val hours = remainingTime / 3600
                 val minutes = (remainingTime % 3600) / 60
                 val seconds = remainingTime % 60
-                
+
                 val timeText = if (hours > 0) {
                     "%dh %02dm".format(hours, minutes)
                 } else {
                     "%02dm %02ds".format(minutes, seconds)
                 }
-                
+
                 Text(
                     text = "Storage: $timeText",
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
-            
+
             // Mode Selection
-            androidx.compose.foundation.layout.Row(
+            Row(
                 modifier = Modifier.padding(bottom = 16.dp),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Normalize mode (support 0,1,2 or 1000,1001,1002)
                 val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
-                
+
                 Button(
                     onClick = { onSetMode(0) }, // Video
                     enabled = !isProcessing && !isRecording,
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    colors = ButtonDefaults.buttonColors(
                         containerColor = if (current == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                     )
                 ) {
                     Text("Video")
                 }
-                
+
                 Button(
                     onClick = { onSetMode(1) }, // Photo
                     enabled = !isProcessing && !isRecording,
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    colors = ButtonDefaults.buttonColors(
                         containerColor = if (current == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                     )
                 ) {
                     Text("Photo")
                 }
-                
+
                 Button(
                     onClick = { onSetMode(2) }, // Timelapse
                     enabled = !isProcessing && !isRecording,
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    colors = ButtonDefaults.buttonColors(
                         containerColor = if (current == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                     )
                 ) {
-                    Text("Time")
+                    Text("Timelapse")
                 }
             }
 
@@ -123,31 +135,51 @@ fun ConnectedScreen(
             Button(
                 onClick = onToggleRecording,
                 enabled = !isProcessing,
-                modifier = Modifier.padding(bottom = 16.dp),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                modifier = Modifier
+                    .width(200.dp)
+                    .height(100.dp)
+                    .padding(bottom = 16.dp),
+                colors = ButtonDefaults.buttonColors(
                     containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     disabledContainerColor = if (isRecording) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                 )
             ) {
                 if (isProcessing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(32.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
+                        strokeWidth = 3.dp
                     )
                 } else {
-                    Text(text = if (isRecording) "Stop Recording" else "Start Recording")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    shape = if (isRecording) RectangleShape else CircleShape
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = if (isRecording) "Stop" else "Record",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
                 }
             }
 
             Button(onClick = onDisconnect) {
                 Text(text = "Disconnect")
             }
-            
+
             Button(
                 onClick = onForget,
                 modifier = Modifier.padding(top = 16.dp),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error
                 )
             ) {

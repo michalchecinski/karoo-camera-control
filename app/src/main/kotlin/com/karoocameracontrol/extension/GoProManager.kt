@@ -81,8 +81,11 @@ class GoProManager private constructor(private val context: Context) {
     private val _batteryLevel = MutableStateFlow(0)
     val batteryLevel: StateFlow<Int> = _batteryLevel.asStateFlow()
 
-    private val _remainingRecordingTime = MutableStateFlow<Long>(0L)
-    val remainingRecordingTime: StateFlow<Long> = _remainingRecordingTime.asStateFlow()
+    private val _remainingSpace = MutableStateFlow<Long>(0L)
+    val remainingSpace: StateFlow<Long> = _remainingSpace.asStateFlow()
+
+    private val _remainingVideoTime = MutableStateFlow(0)
+    val remainingVideoTime: StateFlow<Int> = _remainingVideoTime.asStateFlow()
 
     private var scanning = false
     
@@ -310,7 +313,7 @@ class GoProManager private constructor(private val context: Context) {
                                     remSpace = (remSpace shl 8) or (b.toLong() and 0xFF)
                                 }
                                 Log.d(TAG, "Parsed Remaining Space: $remSpace KB")
-                                _remainingRecordingTime.value = remSpace
+                                _remainingSpace.value = remSpace
                             } else if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
                                 // Fallback for 4-byte int if it occurs
                                 val valBytes = value.sliceArray((i+2)..(i+5))
@@ -319,7 +322,23 @@ class GoProManager private constructor(private val context: Context) {
                                               (valBytes[2].toInt() and 0xFF shl 8) or 
                                               (valBytes[3].toInt() and 0xFF)
                                 Log.d(TAG, "Parsed Remaining Space (Int): $remSpace KB")
-                                _remainingRecordingTime.value = remSpace.toLong()
+                                _remainingSpace.value = remSpace.toLong()
+                            }
+                        }
+                    }
+                    
+                    // ID 35 (0x23): Remaining Video Time (Seconds) - Type 0x04 (Int) or 0x03 (Short)
+                    if (id == 0x23.toByte()) {
+                         if (i + 1 < value.size) {
+                            val typeByte = value[i+1]
+                            if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
+                                val valBytes = value.sliceArray((i+2)..(i+5))
+                                val remTime = (valBytes[0].toInt() and 0xFF shl 24) or 
+                                              (valBytes[1].toInt() and 0xFF shl 16) or 
+                                              (valBytes[2].toInt() and 0xFF shl 8) or 
+                                              (valBytes[3].toInt() and 0xFF)
+                                Log.d(TAG, "Parsed Remaining Video Time: $remTime seconds")
+                                _remainingVideoTime.value = remTime
                             }
                         }
                     }
@@ -485,8 +504,12 @@ class GoProManager private constructor(private val context: Context) {
             val batteryCmd = byteArrayOf(0x02, 0x13, 0x46)
             writeCharacteristicSuspend(GoProUUID.QUERY, batteryCmd)
             
-            // Cmd 0x13 (Get Status), Param 0x36 (Remaining Time)
-            val remTimeCmd = byteArrayOf(0x02, 0x13, 0x36)
+            // Cmd 0x13 (Get Status), Param 0x36 (Remaining Space)
+            val remSpaceCmd = byteArrayOf(0x02, 0x13, 0x36)
+            writeCharacteristicSuspend(GoProUUID.QUERY, remSpaceCmd)
+
+            // Cmd 0x13 (Get Status), Param 0x23 (Remaining Video Time)
+            val remTimeCmd = byteArrayOf(0x02, 0x13, 0x23)
             writeCharacteristicSuspend(GoProUUID.QUERY, remTimeCmd)
 
         } catch (e: Exception) {
@@ -592,12 +615,9 @@ class GoProManager private constructor(private val context: Context) {
     
     private suspend fun registerForStatusUpdatesSuspend() {
         try {
-            // Command 0x53 (Register), ID 0x0A (Encoding), ID 0x0D (Duration), ID 0x46 (Battery), ID 0x36 (Remaining Time)
-            // Length: 1 (Cmd) + 4 (IDs) = 5 bytes? No, first byte is usually length or part of header.
-            // The previous code had: val cmd = byteArrayOf(0x03, 0x53, 0x0A, 0x0D)
-            // 0x03 is likely length (3 bytes following).
-            // So for 4 IDs: 0x53, 0x0A, 0x0D, 0x46, 0x36 -> Length is 5.
-            val cmd = byteArrayOf(0x05, 0x53, 0x0A, 0x0D, 0x46, 0x36)
+            // Command 0x53 (Register), ID 0x0A (Encoding), ID 0x0D (Duration), ID 0x46 (Battery), ID 0x36 (Space), ID 0x23 (Rem Time)
+            // Length: 1 (Cmd 0x53) + 5 (IDs) = 6 bytes.
+            val cmd = byteArrayOf(0x06, 0x53, 0x0A, 0x0D, 0x46, 0x36, 0x23)
             writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register for status updates: ${e.message}")

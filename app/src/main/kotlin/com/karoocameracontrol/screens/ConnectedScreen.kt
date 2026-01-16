@@ -22,7 +22,7 @@ fun ConnectedScreen(
     isProcessing: Boolean,
     recordingDuration: Int,
     batteryLevel: Int,
-    remainingSpace: Long, // Changed from remainingTime: Int
+    remainingTime: Int,
     onToggleRecording: () -> Unit,
     onDisconnect: () -> Unit,
     onForget: () -> Unit
@@ -50,17 +50,19 @@ fun ConnectedScreen(
                     style = MaterialTheme.typography.bodyLarge
                 )
                 
-                // Format KB to GB or MB
-                val spaceText = if (remainingSpace > 1024 * 1024) {
-                    "%.1f GB".format(remainingSpace / (1024f * 1024f))
-                } else if (remainingSpace > 1024) {
-                    "%.1f MB".format(remainingSpace / 1024f)
+                // Format Seconds to HH:MM or MM:SS
+                val hours = remainingTime / 3600
+                val minutes = (remainingTime % 3600) / 60
+                val seconds = remainingTime % 60
+                
+                val timeText = if (hours > 0) {
+                    "%dh %02dm".format(hours, minutes)
                 } else {
-                    "$remainingSpace KB"
+                    "%02dm %02ds".format(minutes, seconds)
                 }
                 
                 Text(
-                    text = "Storage: $spaceText",
+                    text = "Storage: $timeText",
                     style = MaterialTheme.typography.bodyLarge
                 )
             }

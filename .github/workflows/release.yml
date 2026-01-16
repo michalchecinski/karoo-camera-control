@@ -20,10 +20,6 @@ on:
 
 
 jobs:
-  build:
-    name: Build
-    uses: ./.github/workflows/ci.yml
-
   setup:
     name: Create GitHub release
     runs-on: ubuntu-24.04
@@ -64,6 +60,14 @@ jobs:
 
           echo "Next Version: $next_version"
           echo "version=$next_version" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build
+    uses: ./.github/workflows/_build.yml
+    needs: setup
+    with:
+      release_version: ${{ needs.setup.outputs.version }}
+    secrets: inherit
 
   release:
     runs-on: ubuntu-24.04

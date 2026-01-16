@@ -21,6 +21,8 @@ fun ConnectedScreen(
     isRecording: Boolean,
     isProcessing: Boolean,
     recordingDuration: Int,
+    batteryLevel: Int,
+    remainingSpace: Long, // Changed from remainingTime: Int
     onToggleRecording: () -> Unit,
     onDisconnect: () -> Unit,
     onForget: () -> Unit
@@ -35,8 +37,33 @@ fun ConnectedScreen(
             Text(
                 text = "Connected to ${deviceName ?: "Unknown Device"}",
                 style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 8.dp)
             )
+
+            // Status Row
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(bottom = 24.dp)
+            ) {
+                Text(
+                    text = "Battery: $batteryLevel%",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                
+                // Format KB to GB or MB
+                val spaceText = if (remainingSpace > 1024 * 1024) {
+                    "%.1f GB".format(remainingSpace / (1024f * 1024f))
+                } else if (remainingSpace > 1024) {
+                    "%.1f MB".format(remainingSpace / 1024f)
+                } else {
+                    "$remainingSpace KB"
+                }
+                
+                Text(
+                    text = "Storage: $spaceText",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
 
             if (isRecording) {
                 val duration = recordingDuration.seconds

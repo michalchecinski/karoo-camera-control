@@ -78,6 +78,12 @@ class GoProManager private constructor(private val context: Context) {
     private val _recordingDuration = MutableStateFlow(0)
     val recordingDuration: StateFlow<Int> = _recordingDuration.asStateFlow()
 
+    private val _batteryLevel = MutableStateFlow(0)
+    val batteryLevel: StateFlow<Int> = _batteryLevel.asStateFlow()
+
+    private val _remainingRecordingTime = MutableStateFlow<Long>(0L)
+    val remainingRecordingTime: StateFlow<Long> = _remainingRecordingTime.asStateFlow()
+
     private var scanning = false
     
     private val prefs by lazy {
@@ -271,29 +277,64 @@ class GoProManager private constructor(private val context: Context) {
                     }
                 }
                 
-                // Parser for Status ID 13 (Video Progress) - 0x0D, Type (0x03 or 0x04), Value (4 bytes)
-                for (i in 0 until value.size) { // Loop through all bytes
-                    if (value[i] == 0x0D.toByte()) { // Found Status ID 13
-                        if (i + 1 < value.size) { // Check if type byte exists
+                // Generic Parser for 4-byte Integers (Type 0x03 or 0x04)
+                // We look for ID 13 (Duration) and ID 54 (Remaining Time)
+                for (i in 0 until value.size) {
+                    val id = value[i]
+                    
+                    // ID 13: Video Progress / Duration
+                    if (id == 0x0D.toByte()) {
+                         if (i + 1 < value.size) {
                             val typeByte = value[i+1]
-                            Log.d(TAG, "Found Status ID 13, Type byte: 0x%02x".format(typeByte))
-                            // Accept type 0x03 (Short/Integer?) or 0x04 (Integer/Long?) - both seem to imply 4 bytes here based on logs
-                            if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) { // Expecting 4 bytes value
-                                val b1 = value[i+2].toInt() and 0xFF
-                                val b2 = value[i+3].toInt() and 0xFF
-                                val b3 = value[i+4].toInt() and 0xFF
-                                val b4 = value[i+5].toInt() and 0xFF
-                                val duration = (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
+                            if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
+                                val valBytes = value.sliceArray((i+2)..(i+5))
+                                val duration = (valBytes[0].toInt() and 0xFF shl 24) or 
+                                               (valBytes[1].toInt() and 0xFF shl 16) or 
+                                               (valBytes[2].toInt() and 0xFF shl 8) or 
+                                               (valBytes[3].toInt() and 0xFF)
                                 Log.d(TAG, "Parsed Recording Duration: $duration seconds")
                                 _recordingDuration.value = duration
-                                // Break from this inner loop if a full ID13-Type-Value sequence is found and parsed
-                                break 
-                            } else {
-                                Log.w(TAG, "Status ID 13: Unexpected type 0x%02x or insufficient bytes for 4-byte integer value (i=$i, size=${value.size})".format(typeByte))
                             }
-                        } else {
-                            Log.w(TAG, "Status ID 13: Insufficient bytes to read type (i=$i, size=${value.size})")
                         }
+                    }
+                    
+                    // ID 54 (0x36): Remaining Space (KB likely) - Type 0x08 (Long)
+                    if (id == 0x36.toByte()) {
+                         if (i + 1 < value.size) {
+                            val typeByte = value[i+1]
+                            // Type 0x08 is 64-bit integer
+                            if (typeByte == 0x08.toByte() && i + 9 < value.size) {
+                                val valBytes = value.sliceArray((i+2)..(i+9))
+                                var remSpace: Long = 0
+                                for (b in valBytes) {
+                                    remSpace = (remSpace shl 8) or (b.toLong() and 0xFF)
+                                }
+                                Log.d(TAG, "Parsed Remaining Space: $remSpace KB")
+                                _remainingRecordingTime.value = remSpace
+                            } else if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
+                                // Fallback for 4-byte int if it occurs
+                                val valBytes = value.sliceArray((i+2)..(i+5))
+                                val remSpace = (valBytes[0].toInt() and 0xFF shl 24) or 
+                                              (valBytes[1].toInt() and 0xFF shl 16) or 
+                                              (valBytes[2].toInt() and 0xFF shl 8) or 
+                                              (valBytes[3].toInt() and 0xFF)
+                                Log.d(TAG, "Parsed Remaining Space (Int): $remSpace KB")
+                                _remainingRecordingTime.value = remSpace.toLong()
+                            }
+                        }
+                    }
+
+                    // ID 70 (0x46): Battery Level - Type 0x01 or 0x02
+                    if (id == 0x46.toByte()) {
+                         if (i + 1 < value.size) {
+                             val typeByte = value[i+1]
+                             // Accept Type 0x01 (Byte) or 0x02 (Short/Byte)
+                             if ((typeByte == 0x01.toByte() || typeByte == 0x02.toByte()) && i + 2 < value.size) {
+                                 val batLevel = value[i+2].toInt() and 0xFF
+                                 Log.d(TAG, "Parsed Battery Level: $batLevel")
+                                 _batteryLevel.value = batLevel
+                             }
+                         }
                     }
                 }
             }
@@ -397,7 +438,7 @@ class GoProManager private constructor(private val context: Context) {
                 Log.d(TAG, "Recording start detected early, stopping poll.")
                 break
             }
-            pollRecordingStatus()
+            pollRecordingState()
         }
     }
 
@@ -414,22 +455,40 @@ class GoProManager private constructor(private val context: Context) {
                 Log.d(TAG, "Recording stopped detected early, stopping poll.")
                 break
             }
-            pollRecordingStatus()
+            pollRecordingState()
         }
     }
     
-    private suspend fun pollRecordingStatus() {
+    private suspend fun pollRecordingState() {
         try {
              // Cmd 0x13 (Get Status), Param 0x0A (Encoding/IsRecording)
             val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
             writeCharacteristicSuspend(GoProUUID.QUERY, statusCmd)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to poll recording state", e)
+        }
+    }
+
+    private suspend fun pollInitialStatus() {
+        try {
+            // Cmd 0x13 (Get Status), Param 0x0A (Encoding/IsRecording)
+            val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
+            writeCharacteristicSuspend(GoProUUID.QUERY, statusCmd)
             
             // Cmd 0x13 (Get Status), Param 0x0D (Video Progress/Duration)
-            // We only care if recording is active, but polling it doesn't hurt.
             if (_isRecording.value) {
                 val durationCmd = byteArrayOf(0x02, 0x13, 0x0D)
                 writeCharacteristicSuspend(GoProUUID.QUERY, durationCmd)
             }
+            
+            // Cmd 0x13 (Get Status), Param 0x46 (Battery Level)
+            val batteryCmd = byteArrayOf(0x02, 0x13, 0x46)
+            writeCharacteristicSuspend(GoProUUID.QUERY, batteryCmd)
+            
+            // Cmd 0x13 (Get Status), Param 0x36 (Remaining Time)
+            val remTimeCmd = byteArrayOf(0x02, 0x13, 0x36)
+            writeCharacteristicSuspend(GoProUUID.QUERY, remTimeCmd)
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to poll status", e)
         }
@@ -484,8 +543,8 @@ class GoProManager private constructor(private val context: Context) {
                     // 5. Register for Status Updates (ID 10 - Encoding, ID 13 - Duration)
                     registerForStatusUpdatesSuspend()
                     
-                    // 6. Get Initial Status (Encoding)
-                    pollRecordingStatus()
+                    // 6. Get Initial Status (Encoding, Battery, Storage)
+                    pollInitialStatus()
                     
                     savedDeviceAddress = device.address
                     savedDeviceName = device.name ?: device.address // Fallback if name is missing
@@ -533,10 +592,12 @@ class GoProManager private constructor(private val context: Context) {
     
     private suspend fun registerForStatusUpdatesSuspend() {
         try {
-            // Command 0x53 (Register), ID 0x0A (Encoding), ID 0x0D (Duration)
-            // Note: Sending multiple IDs in one register command is often supported.
-            // Length 3 bytes payload: 0x53, 0x0A, 0x0D
-            val cmd = byteArrayOf(0x03, 0x53, 0x0A, 0x0D)
+            // Command 0x53 (Register), ID 0x0A (Encoding), ID 0x0D (Duration), ID 0x46 (Battery), ID 0x36 (Remaining Time)
+            // Length: 1 (Cmd) + 4 (IDs) = 5 bytes? No, first byte is usually length or part of header.
+            // The previous code had: val cmd = byteArrayOf(0x03, 0x53, 0x0A, 0x0D)
+            // 0x03 is likely length (3 bytes following).
+            // So for 4 IDs: 0x53, 0x0A, 0x0D, 0x46, 0x36 -> Length is 5.
+            val cmd = byteArrayOf(0x05, 0x53, 0x0A, 0x0D, 0x46, 0x36)
             writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register for status updates: ${e.message}")

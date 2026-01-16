@@ -1,4 +1,8 @@
-# Hammerhead Karoo extension for controlling sports cams
+# Hammerhead Karoo extension for controlling sports cameras
+
+This is an extension to control sports action cameras using Hammerhead Karoo cycling computer.
+
+[![Build](https://github.com/michalchecinski/karoo-camera-control/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/michalchecinski/karoo-camera-control/actions/workflows/ci.yml) [![Latest Release](https://img.shields.io/github/v/release/michalchecinski/karoo-camera-control?label=Latest%20Release)](https://github.com/michalchecinski/karoo-camera-control/releases/latest/) [![GitHub Downloads](https://img.shields.io/github/downloads/michalchecinski/karoo-camera-control/app-release.apk)](https://github.com/michalchecinski/karoo-camera-control/releases)
 
 ## Supported devices
 

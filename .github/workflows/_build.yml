@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "GH_USER=${GH_USER}" >> $GITHUB_ENV
           echo "GH_TOKEN=${GH_TOKEN}" >> $GITHUB_ENV
-          echo "BUILD_NUMBER=${{ github.run_id }}" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=${{ github.run_number }}" >> $GITHUB_ENV
           echo "RELEASE_VERSION=${{ github.event.inputs.release_version }}" >> $GITHUB_ENV
 
       - name: Grant execute permission for gradlew

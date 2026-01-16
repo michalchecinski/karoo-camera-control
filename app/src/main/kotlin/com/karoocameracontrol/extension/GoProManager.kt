@@ -67,6 +67,9 @@ class GoProManager private constructor(private val context: Context) {
     private val _scannedDevices = MutableStateFlow<List<BluetoothDevice>>(emptyList())
     val scannedDevices: StateFlow<List<BluetoothDevice>> = _scannedDevices.asStateFlow()
 
+    private val _savedDeviceNameFlow = MutableStateFlow<String?>(null)
+    val savedDeviceNameFlow: StateFlow<String?> = _savedDeviceNameFlow.asStateFlow()
+
     private var scanning = false
     
     private val prefs by lazy {
@@ -76,6 +79,18 @@ class GoProManager private constructor(private val context: Context) {
     private var savedDeviceAddress: String?
         get() = prefs.getString("saved_device_address", null)
         set(value) = prefs.edit().putString("saved_device_address", value).apply()
+        
+    private var savedDeviceName: String?
+        get() = prefs.getString("saved_device_name", null)
+        set(value) {
+            prefs.edit().putString("saved_device_name", value).apply()
+            _savedDeviceNameFlow.value = value // Update the StateFlow
+        }
+    
+    init {
+        // Initialize the StateFlow with the current saved device name from preferences
+        _savedDeviceNameFlow.value = prefs.getString("saved_device_name", null)
+    }
 
     // Coroutine scope for BLE operations
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -326,6 +341,7 @@ class GoProManager private constructor(private val context: Context) {
                 enableNotificationSuspend(GoProUUID.QUERY_RESPONSE)
                 
                 savedDeviceAddress = device.address
+                savedDeviceName = device.name
                 _connectionState.value = ConnectionState.Connected(device.name)
                 Log.d(TAG, "GoPro Connection Fully Established!")
                 
@@ -347,6 +363,7 @@ class GoProManager private constructor(private val context: Context) {
     
     fun forgetPairedDevice() {
         savedDeviceAddress = null
+        savedDeviceName = null
         disconnect()
     }
 

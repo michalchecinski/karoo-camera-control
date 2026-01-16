@@ -18,6 +18,7 @@ fun MainScreen(permissionsGranted: Boolean) {
 
     val connectionState by goProManager.connectionState.collectAsState()
     val scannedDevices by goProManager.scannedDevices.collectAsState()
+    val savedDeviceName by goProManager.savedDeviceNameFlow.collectAsState()
 
     DisposableEffect(Unit) {
         onDispose {
@@ -44,7 +45,8 @@ fun MainScreen(permissionsGranted: Boolean) {
                 permissionsGranted = permissionsGranted,
                 onStartScan = { goProManager.startScan() },
                 onStopScan = { goProManager.stopScan() },
-                onConnect = { device -> goProManager.connect(device) }
+                onConnect = { device -> goProManager.connect(device) },
+                savedDeviceName = savedDeviceName
             )
         }
     }

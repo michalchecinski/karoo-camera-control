@@ -35,7 +35,8 @@ fun ScanningScreen(
     permissionsGranted: Boolean,
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
-    onConnect: (BluetoothDevice) -> Unit
+    onConnect: (BluetoothDevice) -> Unit,
+    savedDeviceName: String?
 ) {
     LaunchedEffect(permissionsGranted) {
         if (permissionsGranted && connectionState !is ConnectionState.Scanning) {
@@ -81,14 +82,26 @@ fun ScanningScreen(
                     CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
                 }
                 is ConnectionState.Scanning -> {
-                    Text(text = "Scanning for devices...")
+                    if (savedDeviceName != null) {
+                        Text(text = "Waiting for device $savedDeviceName to be connected...")
+                    } else {
+                        Text(text = "Scanning for devices...")
+                    }
                     CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
                 }
                 is ConnectionState.Error -> {
                     val errorMessage = (connectionState as ConnectionState.Error).message
                     Text(text = "Error: $errorMessage", color = MaterialTheme.colorScheme.error)
                 }
-                else -> { /* Do nothing for Disconnected */ }
+                is ConnectionState.Disconnected -> {
+                    if (savedDeviceName != null) {
+                         Text(text = "Waiting for device $savedDeviceName to be connected...")
+                         CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
+                    } else {
+                         // Fall through to show "Start Scan" button if no saved device
+                    }
+                }
+                else -> { /* Do nothing for Connected */ }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -123,7 +136,7 @@ fun ScanningScreen(
                         }
                     }
                 }
-            } else if (connectionState != ConnectionState.Scanning && permissionsGranted) {
+            } else if (connectionState != ConnectionState.Scanning && permissionsGranted && savedDeviceName == null) {
                 Text("No devices found. Start scan to discover devices.")
             }
         }

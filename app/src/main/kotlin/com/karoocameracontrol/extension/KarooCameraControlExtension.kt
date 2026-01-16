@@ -15,6 +15,14 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var connectionStateJob: Job? = null
 
+    override val types by lazy {
+        listOf(
+            GoProStatusDataType(extension, applicationContext),
+            GoProRecTimeDataType(extension, applicationContext),
+            GoProBatteryDataType(extension, applicationContext)
+        )
+    }
+
     override fun onCreate() {
         super.onCreate()
         goProManager = GoProManager.getInstance(applicationContext)
@@ -24,7 +32,6 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
             goProManager.connectionState.collectLatest { state ->
                 when (state) {
                     is ConnectionState.Connected -> {
-                        // TODO: Update Karoo data fields (e.g., battery, recording status)
                         Log.d(TAG, "GoPro is Connected! Ready to send commands.")
                     }
                     is ConnectionState.Disconnected -> {

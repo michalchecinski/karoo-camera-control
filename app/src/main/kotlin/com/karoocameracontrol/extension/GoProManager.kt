@@ -749,7 +749,7 @@ class GoProManager private constructor(private val context: Context) {
             // Command 0x53 (Register), IDs...
             // Length: 1 (Cmd 0x53) + 7 (IDs) = 8 bytes.
             val cmd = byteArrayOf(0x08, 0x53, 0x0A, 0x0D, 0x46, 0x36, 0x23, 0x2B, 0x60)
-            writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, cmd)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register for status updates: ${e.message}")
             // Don't fail the connection for this, but log it

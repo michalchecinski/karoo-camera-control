@@ -648,16 +648,6 @@ class GoProManager private constructor(private val context: Context) {
         }
     }
 
-    private suspend fun pollDuration() {
-        try {
-            // Cmd 0x13 (Get Status), Param 0x0D (Video Progress/Duration)
-            val durationCmd = byteArrayOf(0x02, 0x13, 0x0D)
-            writeCharacteristicSuspend(GoProUUID.QUERY, durationCmd)
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to poll duration: ${e.message}")
-        }
-    }
-
     fun connect(device: BluetoothDevice) {
         if (!hasPermissions()) {
              _connectionState.value = ConnectionState.Error("Permissions not granted")
@@ -704,21 +694,6 @@ class GoProManager private constructor(private val context: Context) {
                     savedDeviceName = device.name ?: device.address // Fallback if name is missing
                     _connectionState.value = ConnectionState.Connected(savedDeviceName)
                     Log.d(TAG, "GoPro Connection Fully Established!")
-                    
-                    // Launch a separate coroutine to manage duration polling based on recording state
-                    launch {
-                        _isRecording.collectLatest { recording ->
-                            if (recording) {
-                                Log.d(TAG, "Recording active, starting duration poll loop.")
-                                while (isActive) {
-                                    pollDuration()
-                                    kotlinx.coroutines.delay(500)
-                                }
-                            } else {
-                                Log.d(TAG, "Recording inactive, stopping duration poll loop.")
-                            }
-                        }
-                    }
                     
                     // Exit the retry loop on success
                     break

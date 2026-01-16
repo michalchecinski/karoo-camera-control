@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - 'patch'
+          - 'minor'
+          - 'major'
+
+      beta:
+        description: 'Is beta release'
+        required: true
+        type: boolean
+        default: false
+
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/ci.yml
+
+  setup:
+    name: Create GitHub release
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.calculate.outputs.version }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Calculate next version
+        id: calculate
+        env:
+          VERSION_TYPE: ${{ inputs.release_type }}
+        run: |
+          echo -e "\nCalculating next version..."
+
+          latest_tag_version=$(git tag --sort=committerdate --list | tail -1)
+          latest_version=${latest_tag_version:1}  # remove 'v' from tag version
+
+          latest_major_version=$(echo $latest_version | cut -d "." -f 1)
+          latest_minor_version=$(echo $latest_version | cut -d "." -f 2)
+          latest_patch_version=$(echo $latest_version | cut -d "." -f 3)
+
+          echo "  latest_version:  $latest_version"
+          echo "  latest_major_version: $latest_major_version"
+          echo "  latest_minor_version: $latest_minor_version"
+          echo "  latest_patch_version: $latest_patch_version"
+
+          if [[ "$VERSION_TYPE" == "major" ]]; then
+              next_version="$(($latest_major_version + 1)).0.0"
+          elif [[ "$VERSION_TYPE" == "minor" ]]; then
+              next_version="${latest_major_version}.$(($latest_minor_version + 1)).0"
+          elif [[ "$VERSION_TYPE" == "patch" ]]; then
+              next_version="${latest_major_version}.${latest_minor_version}.$(($latest_patch_version + 1))"
+          fi
+
+          echo "Next Version: $next_version"
+          echo "version=$next_version" >> $GITHUB_OUTPUT
+
+  release:
+    runs-on: ubuntu-24.04
+    needs:
+      - build
+      - setup
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: app-release.apk
+
+      - name: Build Changelog
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@439f79b5b5428107c7688c1d2b0e8bacc9b8792c # v6.0.1

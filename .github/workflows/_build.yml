@@ -2,7 +2,7 @@ name: _build
 run-name: Build
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
         release_version:
             description: 'Release version'

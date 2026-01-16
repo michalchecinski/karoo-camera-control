@@ -51,3 +51,5 @@ The possibilities of the Open GoPro API can be found here: https://gopro.github.
 *   Keeping project aligned with DRY and clean code rules.
 *   Separate the business logic with app screens.
 *  Keep the code logically separated, e.g. Hammerhead Karoo integration should be separate of GoPro integration. Each functionality should have it's ow class (e.g. for connectiong with camera and for controlling it).
+
+Do not commit the code unless stated clearly to do so.

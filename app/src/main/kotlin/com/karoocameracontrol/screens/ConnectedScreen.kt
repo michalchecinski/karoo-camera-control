@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,6 +18,7 @@ import androidx.compose.ui.unit.dp
 fun ConnectedScreen(
     deviceName: String?,
     isRecording: Boolean,
+    isProcessing: Boolean,
     onToggleRecording: () -> Unit,
     onDisconnect: () -> Unit,
     onForget: () -> Unit
@@ -35,12 +38,22 @@ fun ConnectedScreen(
 
             Button(
                 onClick = onToggleRecording,
+                enabled = !isProcessing,
                 modifier = Modifier.padding(bottom = 16.dp),
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = if (isRecording) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                 )
             ) {
-                Text(text = if (isRecording) "Stop Recording" else "Start Recording")
+                if (isProcessing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(text = if (isRecording) "Stop Recording" else "Start Recording")
+                }
             }
 
             Button(onClick = onDisconnect) {

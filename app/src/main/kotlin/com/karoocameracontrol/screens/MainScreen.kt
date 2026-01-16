@@ -4,7 +4,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
@@ -23,6 +26,8 @@ fun MainScreen(permissionsGranted: Boolean) {
     val scannedDevices by goProManager.scannedDevices.collectAsState()
     val savedDeviceName by goProManager.savedDeviceNameFlow.collectAsState()
     val isRecording by goProManager.isRecording.collectAsState()
+    
+    var isProcessing by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -39,12 +44,19 @@ fun MainScreen(permissionsGranted: Boolean) {
             ConnectedScreen(
                 deviceName = state.deviceName,
                 isRecording = isRecording,
+                isProcessing = isProcessing,
                 onToggleRecording = {
+                    if (isProcessing) return@ConnectedScreen
+                    isProcessing = true
                     scope.launch {
-                        if (isRecording) {
-                            goProManager.stopRecording()
-                        } else {
-                            goProManager.startRecording()
+                        try {
+                            if (isRecording) {
+                                goProManager.stopRecording()
+                            } else {
+                                goProManager.startRecording()
+                            }
+                        } finally {
+                            isProcessing = false
                         }
                     }
                 },

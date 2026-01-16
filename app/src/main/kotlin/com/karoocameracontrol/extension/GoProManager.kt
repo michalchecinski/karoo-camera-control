@@ -357,9 +357,17 @@ class GoProManager private constructor(private val context: Context) {
         // Note: Length 3, Cmd 01, Params 01 01. Works for user.
         val cmd = byteArrayOf(0x03, 0x01, 0x01, 0x01)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
-        // Poll status to ensure UI updates
-        kotlinx.coroutines.delay(500)
-        pollRecordingStatus()
+        
+        // Polling sequence to ensure we catch the "Recording" state.
+        // We poll up to 10 times (every 500ms). If state becomes true, we stop polling.
+        for (i in 1..10) {
+            kotlinx.coroutines.delay(500)
+            if (_isRecording.value) {
+                Log.d(TAG, "Recording start detected early, stopping poll.")
+                break
+            }
+            pollRecordingStatus()
+        }
     }
 
     suspend fun stopRecording() {

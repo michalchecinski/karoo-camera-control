@@ -311,7 +311,8 @@ class GoProManager private constructor(private val context: Context) {
             
             try {
                 // 1. Connect
-                connectGattSuspend(device)
+                val isReconnect = device.address == savedDeviceAddress
+                connectGattSuspend(device, autoConnect = isReconnect)
                 
                 // 2. Discover Services
                 discoverServicesSuspend()
@@ -351,15 +352,24 @@ class GoProManager private constructor(private val context: Context) {
 
     // Suspend Functions
 
-    private suspend fun connectGattSuspend(device: BluetoothDevice) = operationMutex.withLock {
-        // We use a timeout to ensure we don't hang forever
-        withTimeout(10000) {
+    private suspend fun connectGattSuspend(device: BluetoothDevice, autoConnect: Boolean) = operationMutex.withLock {
+        // If autoConnect is true, we wait indefinitely (no timeout) for the device to appear
+        if (autoConnect) {
             suspendCancellableCoroutine<Unit> { cont ->
                 currentOperationType = BleOperationType.CONNECT
                 @Suppress("UNCHECKED_CAST")
                 activeContinuation = cont as CancellableContinuation<Any?>
-                // autoConnect = false for direct connection
-                connectedGatt = device.connectGatt(context, false, gattCallback)
+                connectedGatt = device.connectGatt(context, true, gattCallback)
+            }
+        } else {
+            // For direct connection, we use a timeout
+            withTimeout(10000) {
+                suspendCancellableCoroutine<Unit> { cont ->
+                    currentOperationType = BleOperationType.CONNECT
+                    @Suppress("UNCHECKED_CAST")
+                    activeContinuation = cont as CancellableContinuation<Any?>
+                    connectedGatt = device.connectGatt(context, false, gattCallback)
+                }
             }
         }
     }

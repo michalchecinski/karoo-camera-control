@@ -2,6 +2,7 @@ package com.karoocameracontrol.screens
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,13 @@ fun MainScreen(permissionsGranted: Boolean) {
     val cameraMode by goProManager.cameraMode.collectAsState()
     
     var isProcessing by remember { mutableStateOf(false) }
+
+    // Auto-connect on startup only
+    LaunchedEffect(Unit) {
+        if (connectionState is ConnectionState.Disconnected && pairedDevices.isNotEmpty()) {
+            goProManager.tryAutoConnect()
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -87,7 +95,11 @@ fun MainScreen(permissionsGranted: Boolean) {
                 pairedDevices = pairedDevices,
                 permissionsGranted = permissionsGranted,
                 onStartScan = { goProManager.startScan() },
-                onStopScan = { goProManager.stopScan() },
+                onStopScan = { 
+                    goProManager.stopScan()
+                    // Also cancel any pending connection if user clicked Stop
+                    goProManager.disconnect()
+                },
                 onConnect = { device -> goProManager.connect(device) },
                 onConnectToPaired = { address -> goProManager.connectToDevice(address) },
                 onRemovePaired = { address -> goProManager.removePairedDevice(address) }

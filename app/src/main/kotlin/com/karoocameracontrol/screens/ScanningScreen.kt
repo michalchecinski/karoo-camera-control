@@ -48,8 +48,8 @@ fun ScanningScreen(
     LaunchedEffect(permissionsGranted, pairedDevices) {
         // Auto-scan only if permissions granted and NO paired devices
         // and not already active
-        if (permissionsGranted && pairedDevices.isEmpty() && 
-            connectionState !is ConnectionState.Scanning && 
+        if (permissionsGranted && pairedDevices.isEmpty() &&
+            connectionState !is ConnectionState.Scanning &&
             connectionState !is ConnectionState.Connecting &&
             connectionState !is ConnectionState.Connected) {
              onStartScan()
@@ -86,7 +86,7 @@ fun ScanningScreen(
                 text = "State: ${connectionState::class.simpleName}",
                 modifier = Modifier.padding(bottom = 8.dp)
             )
-            
+
             if (connectionState is ConnectionState.Connecting) {
                 Text(text = "Connecting to ${(connectionState as ConnectionState.Connecting).deviceName ?: "..."}...")
                 CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
@@ -102,21 +102,24 @@ fun ScanningScreen(
                     if (permissionsGranted) {
                         if (connectionState == ConnectionState.Scanning) {
                             onStopScan()
+                        } else if (connectionState is ConnectionState.Connecting) {
+                            onStopScan()
                         } else {
                             onStartScan()
                         }
                     }
                 },
-                enabled = permissionsGranted && connectionState !is ConnectionState.Connecting
+                // Allow clicking if Scanning OR Connecting (to cancel)
+                enabled = permissionsGranted
             ) {
-                Text(text = if (connectionState == ConnectionState.Scanning) "Stop Scan" else "Scan for new devices")
+                Text(text = if (connectionState == ConnectionState.Scanning || connectionState is ConnectionState.Connecting) "Stop" else "Scan for new devices")
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Device Lists
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                
+
                 // Paired Devices Section
                 if (pairedDevices.isNotEmpty()) {
                     item {
@@ -134,7 +137,7 @@ fun ScanningScreen(
                         )
                     }
                 }
-                
+
                 // Scanned Devices Section
                 if (scannedDevices.isNotEmpty()) {
                     item {
@@ -166,7 +169,7 @@ fun ScanningScreen(
 
 @Composable
 fun PairedDeviceItem(
-    device: PairedDevice, 
+    device: PairedDevice,
     onConnectClick: () -> Unit,
     onForgetClick: () -> Unit
 ) {

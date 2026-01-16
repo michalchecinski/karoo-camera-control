@@ -102,7 +102,15 @@ jobs:
           chmod +x .github/scripts/prepare-manifest.sh
           ./.github/scripts/prepare-manifest.sh ${{ needs.setup.outputs.version }} ${{ github.run_number }} changelog.txt
 
-      - name: Output manifest to a github output
+      - name: Output manifest to a github step summary
         id: manifest
         run: |
-          echo "manifest=$(cat manifest.json | jq -c .)" >> $GITHUB_OUTPUT
+          echo "## Manifest JSON" >> $GITHUB_STEP_SUMMARY
+          cat manifest.txt >> $GITHUB_STEP_SUMMARY
+
+      - name: Output md release notes to github step summary
+        id: release_notes
+        run: |
+          echo "## Release ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          cat changelog.md >> $GITHUB_STEP_SUMMARY
+

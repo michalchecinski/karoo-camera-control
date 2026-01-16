@@ -28,10 +28,10 @@ jobs:
       - name: Inject variables and secrets
         env:
           GH_USER: ${{ github.actor }}
-          GH_KEY: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "GPR_USER=${GH_USER}" >> $GITHUB_ENV
-          echo "GPR_KEY=${GH_KEY}" >> $GITHUB_ENV
+          echo "GH_USER=${GH_USER}" >> $GITHUB_ENV
+          echo "GH_TOKEN=${GH_TOKEN}" >> $GITHUB_ENV
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew

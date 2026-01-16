@@ -12,6 +12,8 @@ The project is built using:
 
 When implementing GoPro functionality please follow guidelines and code samples from the following official GoPro repository: https://github.com/gopro/OpenGoPro/tree/main/demos/kotlin/tutorial. This is the most critical requirement for implementing GoPro integration.
 
+The possibilities of the Open GoPro API can be found here: https://gopro.github.io/OpenGoPro/ble/index.html. Check it before implementing.
+
 ## Building and Running
 
 ### Build Commands

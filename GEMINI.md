@@ -10,9 +10,15 @@ The project is built using:
 -   **Build System:** Gradle (Kotlin DSL)
 -   **Key Library:** `io.hammerhead:karoo-ext` (Hammerhead Karoo Extension SDK)
 
+### GoPro integration
+
 When implementing GoPro functionality please follow guidelines and code samples from the following official GoPro repository: https://github.com/gopro/OpenGoPro/tree/main/demos/kotlin/tutorial. This is the most critical requirement for implementing GoPro integration.
 
 The possibilities of the Open GoPro API can be found here: https://gopro.github.io/OpenGoPro/ble/index.html. Check it before implementing.
+
+### Hammerhead Karoo integration
+
+When implementing Hammerhead Karoo functionality please follow guidelines and code samples from the following official Karoo sdk repository: https://github.com/hammerheadnav/karoo-ext. Especially different data sources, types and extensions are available here: https://github.com/hammerheadnav/karoo-ext/tree/master/app/src/main/kotlin/io/hammerhead/sampleext/extension.
 
 ## Building and Running
 

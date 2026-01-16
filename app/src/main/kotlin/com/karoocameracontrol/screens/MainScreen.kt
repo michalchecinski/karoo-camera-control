@@ -86,7 +86,8 @@ fun MainScreen(
                             "Connected to ${currentState.deviceName ?: "Unknown Device"}"
                         } else {
                             "Karoo Camera Control"
-                        }
+                        },
+                        style = MaterialTheme.typography.titleMedium
                     )
                 },
                 navigationIcon = {

@@ -27,17 +27,16 @@ fun FeedbackScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(8.dp)
         ) {
             Text(
                 text = "Do you like the app? Consider leaving a tip at:",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             Box(
@@ -53,8 +52,8 @@ fun FeedbackScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
-                text = "Do you want to suggest a feature or report a bug? Use the following QR code:",
-                style = MaterialTheme.typography.headlineSmall,
+                text = "Do you want to suggest a feature or report a bug? Use the following qr code:",
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             Box(

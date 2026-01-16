@@ -46,6 +46,7 @@ fun MainScreen(permissionsGranted: Boolean) {
                 onStartScan = { goProManager.startScan() },
                 onStopScan = { goProManager.stopScan() },
                 onConnect = { device -> goProManager.connect(device) },
+                onConnectToSaved = { goProManager.connectToSavedDevice() },
                 savedDeviceName = savedDeviceName
             )
         }

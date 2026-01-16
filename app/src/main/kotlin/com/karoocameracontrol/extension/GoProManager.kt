@@ -29,6 +29,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -307,6 +308,12 @@ class GoProManager private constructor(private val context: Context) {
         }
     }
 
+    fun connectToSavedDevice() {
+        val address = savedDeviceAddress ?: return
+        val device = bluetoothAdapter?.getRemoteDevice(address) ?: return
+        connect(device)
+    }
+
     fun connect(device: BluetoothDevice) {
         if (!hasPermissions()) {
              _connectionState.value = ConnectionState.Error("Permissions not granted")
@@ -322,33 +329,52 @@ class GoProManager private constructor(private val context: Context) {
         
         connectionJob?.cancel()
         connectionJob = scope.launch {
-            _connectionState.value = ConnectionState.Connecting(device.name)
+            _connectionState.value = ConnectionState.Connecting(device.name ?: savedDeviceName)
             
-            try {
-                // 1. Connect
-                val isReconnect = device.address == savedDeviceAddress
-                connectGattSuspend(device, autoConnect = isReconnect)
-                
-                // 2. Discover Services
-                discoverServicesSuspend()
-                
-                // 3. Handshake: Read Password (Pairs device)
-                readCharacteristicSuspend(GoProUUID.WIFI_AP_PASSWORD)
-                
-                // 4. Handshake: Enable Notifications on RESPONSE characteristics
-                enableNotificationSuspend(GoProUUID.COMMAND_RESPONSE)
-                enableNotificationSuspend(GoProUUID.SETTING_RESPONSE)
-                enableNotificationSuspend(GoProUUID.QUERY_RESPONSE)
-                
-                savedDeviceAddress = device.address
-                savedDeviceName = device.name
-                _connectionState.value = ConnectionState.Connected(device.name)
-                Log.d(TAG, "GoPro Connection Fully Established!")
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Connection failed", e)
-                disconnect()
-                _connectionState.value = ConnectionState.Error(e.message ?: "Connection failed")
+            while (isActive) {
+                try {
+                    // 1. Connect
+                    val isReconnect = device.address == savedDeviceAddress
+                    // If it is a saved device, we use autoConnect=true which waits indefinitely.
+                    // If it is a new device, we use autoConnect=false with timeout.
+                    connectGattSuspend(device, autoConnect = isReconnect)
+                    
+                    // 2. Discover Services
+                    discoverServicesSuspend()
+                    
+                    // 3. Handshake: Read Password (Pairs device)
+                    readCharacteristicSuspend(GoProUUID.WIFI_AP_PASSWORD)
+                    
+                    // 4. Handshake: Enable Notifications on RESPONSE characteristics
+                    enableNotificationSuspend(GoProUUID.COMMAND_RESPONSE)
+                    enableNotificationSuspend(GoProUUID.SETTING_RESPONSE)
+                    enableNotificationSuspend(GoProUUID.QUERY_RESPONSE)
+                    
+                    savedDeviceAddress = device.address
+                    savedDeviceName = device.name ?: device.address // Fallback if name is missing
+                    _connectionState.value = ConnectionState.Connected(savedDeviceName)
+                    Log.d(TAG, "GoPro Connection Fully Established!")
+                    
+                    // Exit the retry loop on success
+                    break
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "Connection failed", e)
+                    disconnect() // Close GATT to reset state
+                    
+                    // Check if we should retry
+                    if (device.address == savedDeviceAddress) {
+                        Log.d(TAG, "Retrying connection for saved device in 2 seconds...")
+                        // Update state to reflect we are still trying to connect
+                        _connectionState.value = ConnectionState.Connecting(device.name ?: savedDeviceName)
+                        kotlinx.coroutines.delay(2000)
+                        // Loop continues
+                    } else {
+                        // For non-saved devices, report error and stop
+                        _connectionState.value = ConnectionState.Error(e.message ?: "Connection failed")
+                        break
+                    }
+                }
             }
         }
     }

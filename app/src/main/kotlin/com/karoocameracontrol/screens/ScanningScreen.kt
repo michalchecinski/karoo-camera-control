@@ -36,11 +36,16 @@ fun ScanningScreen(
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
     onConnect: (BluetoothDevice) -> Unit,
+    onConnectToSaved: () -> Unit,
     savedDeviceName: String?
 ) {
-    LaunchedEffect(permissionsGranted) {
-        if (permissionsGranted && connectionState !is ConnectionState.Scanning) {
-            onStartScan()
+    LaunchedEffect(permissionsGranted, savedDeviceName) {
+        if (permissionsGranted && connectionState !is ConnectionState.Scanning && connectionState !is ConnectionState.Connecting) {
+             if (savedDeviceName != null) {
+                 onConnectToSaved()
+             } else {
+                 onStartScan()
+             }
         }
     }
 

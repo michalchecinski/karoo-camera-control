@@ -9,7 +9,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class TemplateExtension : KarooExtension("template-id", "1.0") {
+class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0") {
 
     private lateinit var goProManager: GoProManager
     private val scope = CoroutineScope(Dispatchers.IO + Job())
@@ -18,12 +18,10 @@ class TemplateExtension : KarooExtension("template-id", "1.0") {
     override fun onCreate() {
         super.onCreate()
         goProManager = GoProManager.getInstance(applicationContext)
-        Log.d(TAG, "TemplateExtension onCreate. GoProManager initialized.")
 
         // Observe GoProManager connection state
         connectionStateJob = scope.launch {
             goProManager.connectionState.collectLatest { state ->
-                Log.d(TAG, "GoPro Connection State in Extension: $state")
                 when (state) {
                     is ConnectionState.Connected -> {
                         // TODO: Update Karoo data fields (e.g., battery, recording status)
@@ -39,7 +37,7 @@ class TemplateExtension : KarooExtension("template-id", "1.0") {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "TemplateExtension onStartCommand.")
+        Log.d(TAG, "KarooCameraControlExtension onStartCommand.")
         // If the extension is started manually or by the system,
         // we might want to automatically try to reconnect to a known GoPro.
         // For now, it will just observe the state.
@@ -47,13 +45,12 @@ class TemplateExtension : KarooExtension("template-id", "1.0") {
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "TemplateExtension onDestroy. Disconnecting GoPro.")
         connectionStateJob?.cancel()
         goProManager.disconnect()
         super.onDestroy()
     }
 
     companion object {
-        private const val TAG = "TemplateExtension"
+        private const val TAG = "KarooCameraControlExtension"
     }
 }

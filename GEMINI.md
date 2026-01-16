@@ -36,10 +36,10 @@ The possibilities of the Open GoPro API can be found here: https://gopro.github.
 ## Project Structure
 
 *   **`app/`**: The main application module.
-    *   **`src/main/kotlin/com/karoocameracontrol/extension/TemplateExtension.kt`**: The core Service class that extends `KarooExtension`. This is the entry point for the Karoo system interactions.
+    *   **`src/main/kotlin/com/karoocameracontrol/extension/KarooCameraControlExtension.kt`**: The core Service class that extends `KarooExtension`. This is the entry point for the Karoo system interactions.
     *   **`src/main/kotlin/com/karoocameracontrol/MainActivity.kt`**: The main activity, likely used for configuration or standalone app UI.
     *   **`src/main/res/xml/extension_info.xml`**: Metadata definition for the extension (display name, icon, capabilities).
-    *   **`src/main/AndroidManifest.xml`**: Declares the `TemplateExtension` service and required permissions.
+    *   **`src/main/AndroidManifest.xml`**: Declares the `KarooCameraControlExtension` service and required permissions.
 *   **`gradle/libs.versions.toml`**: Version catalog managing dependencies and plugin versions.
 *   **`settings.gradle.kts`**: Project settings, including the repository configuration for `hammerheadnav/karoo-ext`.
 

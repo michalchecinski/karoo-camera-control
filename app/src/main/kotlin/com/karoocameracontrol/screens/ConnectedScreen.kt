@@ -23,7 +23,9 @@ fun ConnectedScreen(
     recordingDuration: Int,
     batteryLevel: Int,
     remainingTime: Int,
+    cameraMode: Int,
     onToggleRecording: () -> Unit,
+    onSetMode: (Int) -> Unit,
     onDisconnect: () -> Unit,
     onForget: () -> Unit
 ) {
@@ -43,7 +45,7 @@ fun ConnectedScreen(
             // Status Row
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 Text(
                     text = "Battery: $batteryLevel%",
@@ -65,6 +67,45 @@ fun ConnectedScreen(
                     text = "Storage: $timeText",
                     style = MaterialTheme.typography.bodyLarge
                 )
+            }
+            
+            // Mode Selection
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.padding(bottom = 16.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+            ) {
+                // Normalize mode (support 0,1,2 or 1000,1001,1002)
+                val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
+                
+                Button(
+                    onClick = { onSetMode(0) }, // Video
+                    enabled = !isProcessing && !isRecording,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = if (current == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("Video")
+                }
+                
+                Button(
+                    onClick = { onSetMode(1) }, // Photo
+                    enabled = !isProcessing && !isRecording,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = if (current == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("Photo")
+                }
+                
+                Button(
+                    onClick = { onSetMode(2) }, // Timelapse
+                    enabled = !isProcessing && !isRecording,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = if (current == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("Time")
+                }
             }
 
             if (isRecording) {

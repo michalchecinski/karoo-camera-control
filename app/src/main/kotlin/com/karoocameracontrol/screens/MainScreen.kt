@@ -29,6 +29,7 @@ fun MainScreen(permissionsGranted: Boolean) {
     val recordingDuration by goProManager.recordingDuration.collectAsState()
     val batteryLevel by goProManager.batteryLevel.collectAsState()
     val remainingTime by goProManager.remainingVideoTime.collectAsState()
+    val cameraMode by goProManager.cameraMode.collectAsState()
     
     var isProcessing by remember { mutableStateOf(false) }
 
@@ -51,6 +52,7 @@ fun MainScreen(permissionsGranted: Boolean) {
                 recordingDuration = recordingDuration,
                 batteryLevel = batteryLevel,
                 remainingTime = remainingTime,
+                cameraMode = cameraMode,
                 onToggleRecording = {
                     if (isProcessing) return@ConnectedScreen
                     isProcessing = true
@@ -61,6 +63,17 @@ fun MainScreen(permissionsGranted: Boolean) {
                             } else {
                                 goProManager.startRecording()
                             }
+                        } finally {
+                            isProcessing = false
+                        }
+                    }
+                },
+                onSetMode = { mode ->
+                    if (isProcessing) return@ConnectedScreen
+                    isProcessing = true
+                    scope.launch {
+                        try {
+                            goProManager.setMode(mode)
                         } finally {
                             isProcessing = false
                         }

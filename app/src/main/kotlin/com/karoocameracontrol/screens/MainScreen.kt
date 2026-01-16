@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
@@ -53,7 +52,7 @@ fun MainScreen(
     val batteryLevel by goProManager.batteryLevel.collectAsState()
     val remainingTime by goProManager.remainingVideoTime.collectAsState()
     val cameraMode by goProManager.cameraMode.collectAsState()
-    
+
     var isProcessing by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) } // State for dropdown menu
     var isAutoConnecting by remember { mutableStateOf(false) } // New state for auto-connecting
@@ -78,66 +77,59 @@ fun MainScreen(
         topBar = {
             val currentState = connectionState // Introduce local variable
             CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = if (showFeedbackScreen) {
-                            "Feedback" // Title for feedback screen
-                        } else if (currentState is ConnectionState.Connected) {
-                            "Connected to ${currentState.deviceName ?: "Unknown Device"}"
-                        } else {
-                            "Karoo Camera Control"
-                        },
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                },
-                navigationIcon = {
-                    if (showFeedbackScreen) { // Back button for feedback screen
-                        IconButton(onClick = { showFeedbackScreen = false }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showMenu = true }) { // Always show menu icon
-                        Icon(Icons.Default.MoreVert, contentDescription = "More options")
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Disconnect") },
-                            onClick = {
-                                goProManager.disconnect()
-                                showMenu = false
-                            },
-                            enabled = currentState is ConnectionState.Connected // Only enabled when connected
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Unpair / Forget") },
-                            onClick = {
-                                goProManager.forgetConnectedDevice()
-                                showMenu = false
-                            },
-                            enabled = currentState is ConnectionState.Connected // Only enabled when connected
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Leave Feedback") },
-                            onClick = {
-                                showFeedbackScreen = true
-                                showMenu = false
-                            }
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
+                                title = {
+                                    Text(
+                                        text = if (showFeedbackScreen) {
+                                            "Feedback" // Title for feedback screen
+                                        } else if (currentState is ConnectionState.Connected) {
+                                            "Connected to ${currentState.deviceName ?: "Unknown Device"}"
+                                        } else {
+                                            "Karoo Camera Control"
+                                        },
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                },
+                                actions = {
+                                    if (!showFeedbackScreen) { // Always show menu icon when not on feedback screen
+                                        IconButton(onClick = { showMenu = true }) {
+                                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                                        }
+                                        DropdownMenu(
+                                            expanded = showMenu,
+                                            onDismissRequest = { showMenu = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Disconnect") },
+                                                onClick = {
+                                                    goProManager.disconnect()
+                                                    showMenu = false
+                                                },
+                                                enabled = currentState is ConnectionState.Connected // Only enabled when connected
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Unpair / Forget") },
+                                                onClick = {
+                                                    goProManager.forgetConnectedDevice()
+                                                    showMenu = false
+                                                },
+                                                enabled = currentState is ConnectionState.Connected // Only enabled when connected
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Leave Feedback") },
+                                                onClick = {
+                                                    showFeedbackScreen = true
+                                                    showMenu = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                },
+                                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            )        }
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -165,17 +157,17 @@ fun MainScreen(
                                 if (isProcessing) return@ConnectedScreen
                                 isProcessing = true
                                 scope.launch {
-                                    try {
-                                        if (isRecording) {
-                                            goProManager.stopRecording()
-                                        } else {
-                                            goProManager.startRecording()
+                                        try {
+                                            if (isRecording) {
+                                                goProManager.stopRecording()
+                                            } else {
+                                                goProManager.startRecording()
+                                            }
+                                        } finally {
+                                            isProcessing = false
                                         }
-                                    } finally {
-                                        isProcessing = false
                                     }
-                                }
-                            },
+                                },
                             onSetMode = { mode ->
                                 if (isProcessing) return@ConnectedScreen
                                 isProcessing = true

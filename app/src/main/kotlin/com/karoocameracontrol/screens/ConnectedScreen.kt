@@ -1,5 +1,12 @@
 package com.karoocameracontrol.screens
 
+import com.karoocameracontrol.components.SimpleAlertDialog
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +46,7 @@ fun ConnectedScreen(
     onDisconnect: () -> Unit,
     onForget: () -> Unit
 ) {
+    var showForgetConfirmation by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -177,7 +185,7 @@ fun ConnectedScreen(
             }
 
             Button(
-                onClick = onForget,
+                onClick = { showForgetConfirmation = true },
                 modifier = Modifier.padding(top = 16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error
@@ -185,6 +193,18 @@ fun ConnectedScreen(
             ) {
                 Text(text = "Unpair / Forget")
             }
+        }
+
+        if (showForgetConfirmation) {
+            SimpleAlertDialog(
+                dialogTitle = "Confirm Unpair",
+                dialogSubTitle = "Are you sure you want to unpair and forget this device?",
+                onDismissRequest = { showForgetConfirmation = false },
+                onConfirmation = {
+                    onForget()
+                    showForgetConfirmation = false
+                }
+            )
         }
     }
 }

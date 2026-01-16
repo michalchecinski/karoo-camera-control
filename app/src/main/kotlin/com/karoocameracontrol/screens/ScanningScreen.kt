@@ -30,8 +30,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.karoocameracontrol.R
+import com.karoocameracontrol.components.SimpleAlertDialog
 import com.karoocameracontrol.extension.ConnectionState
 import com.karoocameracontrol.extension.PairedDevice
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 @Composable
 fun ScanningScreen(
@@ -45,6 +51,7 @@ fun ScanningScreen(
     onConnectToPaired: (String) -> Unit,
     onRemovePaired: (String) -> Unit
 ) {
+    var deviceToForget by remember { mutableStateOf<PairedDevice?>(null) }
     LaunchedEffect(permissionsGranted, pairedDevices) {
         // Auto-scan only if permissions granted and NO paired devices
         // and not already active
@@ -133,7 +140,7 @@ fun ScanningScreen(
                         PairedDeviceItem(
                             device = device,
                             onConnectClick = { onConnectToPaired(device.address) },
-                            onForgetClick = { onRemovePaired(device.address) }
+                            onForgetClick = { deviceToForget = device }
                         )
                     }
                 }
@@ -164,6 +171,18 @@ fun ScanningScreen(
                 }
             }
         }
+    }
+
+    deviceToForget?.let { device ->
+        SimpleAlertDialog(
+            dialogTitle = "Confirm Unpair",
+            dialogSubTitle = "Are you sure you want to unpair and forget ${device.name} (${device.address})?",
+            onDismissRequest = { deviceToForget = null },
+            onConfirmation = {
+                onRemovePaired(device.address)
+                deviceToForget = null
+            }
+        )
     }
 }
 

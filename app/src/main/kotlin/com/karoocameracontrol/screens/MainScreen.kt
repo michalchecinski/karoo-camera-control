@@ -53,6 +53,7 @@ fun MainScreen(
     val remainingTime by goProManager.remainingVideoTime.collectAsState()
     val cameraMode by goProManager.cameraMode.collectAsState()
     val availablePresets by goProManager.availablePresets.collectAsState()
+    val activePresetName by goProManager.activePresetName.collectAsState()
 
     var isProcessing by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) } // State for dropdown menu
@@ -177,6 +178,7 @@ fun MainScreen(
                             remainingTime = remainingTime,
                             cameraMode = cameraMode,
                             availablePresets = availablePresets,
+                            activePresetName = activePresetName,
                             onToggleRecording = {
                                 if (isProcessing) return@ConnectedScreen
                                 isProcessing = true

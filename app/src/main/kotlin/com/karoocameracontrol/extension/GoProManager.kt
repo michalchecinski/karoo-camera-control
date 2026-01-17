@@ -93,6 +93,11 @@ class GoProManager private constructor(private val context: Context) {
     private val _availablePresets = MutableStateFlow<List<PresetGroup>>(emptyList())
     val availablePresets: StateFlow<List<PresetGroup>> = _availablePresets.asStateFlow()
 
+    private val _activePresetName = MutableStateFlow<String?>(null)
+    val activePresetName: StateFlow<String?> = _activePresetName.asStateFlow()
+
+    private var activePresetId: Int? = null
+
     private var scanning = false
 
     // Packet Reassembly
@@ -456,7 +461,7 @@ class GoProManager private constructor(private val context: Context) {
                     }
                 }
 
-                // ID 96 (0x60): Flat Mode / Preset
+                // ID 96 (0x60): Flat Mode / Preset Group
                 if (id == 0x60.toByte()) {
                     if (i + 1 < value.size) {
                         val typeByte = value[i+1]
@@ -467,6 +472,23 @@ class GoProManager private constructor(private val context: Context) {
                              val b4 = value[i+5].toInt() and 0xFF
                              val modeVal = (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
                              _cameraMode.value = modeVal
+                        }
+                    }
+                }
+
+                // ID 97 (0x61): Active Preset ID
+                if (id == 0x61.toByte()) {
+                    if (i + 1 < value.size) {
+                        val typeByte = value[i+1]
+                        if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
+                             val valBytes = value.sliceArray((i+2)..(i+5))
+                             val presetId = (valBytes[0].toInt() and 0xFF shl 24) or
+                                            (valBytes[1].toInt() and 0xFF shl 16) or
+                                            (valBytes[2].toInt() and 0xFF shl 8) or
+                                            (valBytes[3].toInt() and 0xFF)
+                             
+                             activePresetId = presetId
+                             updateActivePresetName()
                         }
                     }
                 }
@@ -503,11 +525,31 @@ class GoProManager private constructor(private val context: Context) {
                     if (groups.isNotEmpty()) {
                         _availablePresets.value = groups
                         Log.d(TAG, "Parsed ${groups.size} preset groups")
+                        updateActivePresetName()
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to parse protobuf data", e)
                 }
             }
+        }
+    }
+
+    private fun updateActivePresetName() {
+        val currentId = activePresetId ?: return
+        val currentPresets = _availablePresets.value
+
+        if (currentPresets.isNotEmpty()) {
+             val loadedPreset = currentPresets
+                .flatMap { it.presets }
+                .find { it.id == currentId }
+
+             if (loadedPreset != null) {
+                _activePresetName.value = if (!loadedPreset.customName.isNullOrEmpty()) {
+                    loadedPreset.customName
+                } else {
+                    PresetTitle.getTitle(loadedPreset.titleId)
+                }
+             }
         }
     }
 
@@ -650,6 +692,15 @@ class GoProManager private constructor(private val context: Context) {
 
         val cmd = byteArrayOf(0x06, 0x40, 0x04, v1, v2, v3, v4)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
+
+        // Optimistically update the active preset name
+        val loadedPreset = _availablePresets.value
+            .flatMap { it.presets }
+            .find { it.id == presetId }
+
+        _activePresetName.value = loadedPreset?.let {
+            if (!it.customName.isNullOrEmpty()) it.customName else PresetTitle.getTitle(it.titleId)
+        }
     }
 
     private suspend fun pollRecordingState() {
@@ -702,6 +753,11 @@ class GoProManager private constructor(private val context: Context) {
             writeCharacteristicSuspend(GoProUUID.QUERY, mode96Cmd)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll mode 96: ${e.message}") }
 
+        try {
+            val activePresetCmd = byteArrayOf(0x02, 0x13, 0x61)
+            writeCharacteristicSuspend(GoProUUID.QUERY, activePresetCmd)
+        } catch (e: Exception) { Log.w(TAG, "Failed to poll active preset 97: ${e.message}") }
+
         // Fetch presets - Critical for UI
         try {
             kotlinx.coroutines.delay(200) // Small delay to avoid congestion
@@ -753,6 +809,7 @@ class GoProManager private constructor(private val context: Context) {
                     savePairedDevice(device)
                     _connectionState.value = ConnectionState.Connected(device.name ?: device.address)
                     Log.d(TAG, "GoPro Connection Fully Established!")
+                    _activePresetName.value = null // Clear when connected, will be set on loadPreset or by camera update
 
                     break
 
@@ -776,7 +833,8 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun registerForStatusUpdatesSuspend() {
         try {
-            val cmd = byteArrayOf(0x08, 0x53, 0x0A, 0x0D, 0x46, 0x36, 0x23, 0x2B, 0x60)
+            // Added 0x61 (97) for Active Preset
+            val cmd = byteArrayOf(0x08, 0x53, 0x0A, 0x0D, 0x46, 0x36, 0x23, 0x2B, 0x60, 0x61)
             writeCharacteristicSuspend(GoProUUID.QUERY, cmd)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register for status updates: ${e.message}")

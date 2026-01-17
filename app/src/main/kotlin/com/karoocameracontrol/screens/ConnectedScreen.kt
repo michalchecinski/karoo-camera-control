@@ -58,6 +58,8 @@ fun ConnectedScreen(
 
     availablePresets: List<PresetGroup>,
 
+    activePresetName: String?,
+
     onToggleRecording: () -> Unit,
 
     onSetMode: (Int) -> Unit,
@@ -222,6 +224,22 @@ fun ConnectedScreen(
 
 
 
+            activePresetName?.let {
+
+                Text(
+
+                    text = "Preset: $it",
+
+                    style = MaterialTheme.typography.titleMedium,
+
+                    modifier = Modifier.padding(bottom = 8.dp)
+
+                )
+
+            }
+
+
+
             val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
 
             val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
@@ -246,11 +264,13 @@ fun ConnectedScreen(
 
                 ) {
 
-                    Text("Select Preset")
+                    Text("Change Preset")
 
                 }
 
             }
+
+
 
 
 

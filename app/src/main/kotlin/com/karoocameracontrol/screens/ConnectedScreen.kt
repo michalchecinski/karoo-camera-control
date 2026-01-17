@@ -1,6 +1,8 @@
 package com.karoocameracontrol.screens
 
 import com.karoocameracontrol.components.SimpleAlertDialog
+import com.karoocameracontrol.components.PresetSelectionDialog
+import com.karoocameracontrol.extension.PresetGroup
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,13 +48,16 @@ fun ConnectedScreen(
     batteryLevel: Int,
     remainingTime: Int,
     cameraMode: Int,
+    availablePresets: List<PresetGroup>,
     onToggleRecording: () -> Unit,
     onSetMode: (Int) -> Unit,
+    onLoadPreset: (Int) -> Unit,
     onDisconnect: () -> Unit,
     onForget: () -> Unit,
     onFinish: () -> Unit
 ) {
     var showForgetConfirmation by remember { mutableStateOf(false) }
+    var showPresetDialog by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -127,6 +132,22 @@ fun ConnectedScreen(
                 }
             }
 
+            val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
+            val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
+
+            if (currentPresets.isNotEmpty()) {
+                Button(
+                    onClick = { showPresetDialog = true },
+                    enabled = !isProcessing && !isRecording,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary
+                    )
+                ) {
+                    Text("Select Preset")
+                }
+            }
+
             if (isRecording) {
                 val duration = recordingDuration.seconds
                 val formattedDuration = duration.toComponents { _, minutes, seconds, _ ->
@@ -189,6 +210,20 @@ fun ConnectedScreen(
                     onForget()
                     showForgetConfirmation = false
                 }
+            )
+        }
+
+        if (showPresetDialog) {
+            val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
+            val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
+
+            PresetSelectionDialog(
+                presets = currentPresets,
+                onPresetSelected = { preset ->
+                    onLoadPreset(preset.id)
+                    showPresetDialog = false
+                },
+                onDismiss = { showPresetDialog = false }
             )
         }
 

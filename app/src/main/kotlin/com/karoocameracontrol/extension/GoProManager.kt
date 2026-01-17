@@ -637,6 +637,21 @@ class GoProManager private constructor(private val context: Context) {
         }
     }
 
+    suspend fun loadPreset(presetId: Int) {
+        // Cmd: 40 (Load Preset)
+        // Length: 4 (32-bit int)
+        // Val: presetId (4 bytes)
+        // Total Pkt Len: 1 (Cmd) + 1 (Len) + 4 (Val) = 6
+
+        val v1 = (presetId shr 24).toByte()
+        val v2 = (presetId shr 16).toByte()
+        val v3 = (presetId shr 8).toByte()
+        val v4 = (presetId and 0xFF).toByte()
+
+        val cmd = byteArrayOf(0x06, 0x40, 0x04, v1, v2, v3, v4)
+        writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
+    }
+
     private suspend fun pollRecordingState() {
         try {
             val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
@@ -647,32 +662,52 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     private suspend fun pollInitialStatus() {
+        // We wrap each command in try-catch so one failure doesn't stop the rest.
+        // especially important because timeouts can happen if the camera is busy.
+
         try {
             val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
             writeCharacteristicSuspend(GoProUUID.QUERY, statusCmd)
+        } catch (e: Exception) { Log.w(TAG, "Failed to poll recording state: ${e.message}") }
 
-            if (_isRecording.value) {
+        if (_isRecording.value) {
+            try {
                 val durationCmd = byteArrayOf(0x02, 0x13, 0x0D)
                 writeCharacteristicSuspend(GoProUUID.QUERY, durationCmd)
-            }
+            } catch (e: Exception) { Log.w(TAG, "Failed to poll duration: ${e.message}") }
+        }
 
+        try {
             val batteryCmd = byteArrayOf(0x02, 0x13, 0x46)
             writeCharacteristicSuspend(GoProUUID.QUERY, batteryCmd)
+        } catch (e: Exception) { Log.w(TAG, "Failed to poll battery: ${e.message}") }
 
+        try {
             val remSpaceCmd = byteArrayOf(0x02, 0x13, 0x36)
             writeCharacteristicSuspend(GoProUUID.QUERY, remSpaceCmd)
+        } catch (e: Exception) { Log.w(TAG, "Failed to poll space: ${e.message}") }
 
+        try {
             val remTimeCmd = byteArrayOf(0x02, 0x13, 0x23)
             writeCharacteristicSuspend(GoProUUID.QUERY, remTimeCmd)
+        } catch (e: Exception) { Log.w(TAG, "Failed to poll remaining time: ${e.message}") }
 
+        try {
             val modeCmd = byteArrayOf(0x02, 0x13, 0x2B)
             writeCharacteristicSuspend(GoProUUID.QUERY, modeCmd)
+        } catch (e: Exception) { Log.w(TAG, "Failed to poll mode: ${e.message}") }
 
+        try {
             val mode96Cmd = byteArrayOf(0x02, 0x13, 0x60)
             writeCharacteristicSuspend(GoProUUID.QUERY, mode96Cmd)
+        } catch (e: Exception) { Log.w(TAG, "Failed to poll mode 96: ${e.message}") }
 
+        // Fetch presets - Critical for UI
+        try {
+            kotlinx.coroutines.delay(200) // Small delay to avoid congestion
+            getAvailablePresets()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to poll status", e)
+            Log.e(TAG, "Failed to get available presets", e)
         }
     }
 

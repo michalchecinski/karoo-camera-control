@@ -52,6 +52,7 @@ fun MainScreen(
     val batteryLevel by goProManager.batteryLevel.collectAsState()
     val remainingTime by goProManager.remainingVideoTime.collectAsState()
     val cameraMode by goProManager.cameraMode.collectAsState()
+    val availablePresets by goProManager.availablePresets.collectAsState()
 
     var isProcessing by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) } // State for dropdown menu
@@ -153,6 +154,7 @@ fun MainScreen(
                             batteryLevel = batteryLevel,
                             remainingTime = remainingTime,
                             cameraMode = cameraMode,
+                            availablePresets = availablePresets,
                             onToggleRecording = {
                                 if (isProcessing) return@ConnectedScreen
                                 isProcessing = true
@@ -174,6 +176,17 @@ fun MainScreen(
                                 scope.launch {
                                     try {
                                         goProManager.setMode(mode)
+                                    } finally {
+                                        isProcessing = false
+                                    }
+                                }
+                            },
+                            onLoadPreset = { presetId ->
+                                if (isProcessing) return@ConnectedScreen
+                                isProcessing = true
+                                scope.launch {
+                                    try {
+                                        goProManager.loadPreset(presetId)
                                     } finally {
                                         isProcessing = false
                                     }

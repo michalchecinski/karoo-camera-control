@@ -66,6 +66,12 @@ fun FeedbackScreen(
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "Presets use icons from Material Design by Google",
+                style = MaterialTheme.typography.bodySmall
+            )
         }
 
         Image(

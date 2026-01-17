@@ -761,7 +761,7 @@ class GoProManager private constructor(private val context: Context) {
         try {
             val activePresetCmd = byteArrayOf(0x02, 0x13, 0x61)
             writeCharacteristicSuspend(GoProUUID.QUERY, activePresetCmd)
-        } catch (e: Exception) { Log.w(TAG, "Failed to poll active preset 97: ${e.message}") }
+        } catch (e: Exception) { Log.w(TAG, "Failed to poll active preset ID 0x61: ${e.message}") }
 
         // Fetch presets - Critical for UI
         try {

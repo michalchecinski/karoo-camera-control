@@ -41,6 +41,9 @@ object PresetIcon {
             32 -> Icons.Filled.Water // Water
             33 -> Icons.Filled.Loop // Looping
             34 -> Icons.Filled.Star // Stars
+            76 -> Icons.Filled.AutoAwesome // Star Trails (Moving Star)
+            77 -> Icons.Filled.FlashlightOn // Light Painting
+            78 -> Icons.Filled.DirectionsCar // Light Trail (Car Headlights/Vehicle Light)
             else -> Icons.Filled.Circle // Default
         }
     }

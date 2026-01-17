@@ -90,6 +90,9 @@ class GoProManager private constructor(private val context: Context) {
     private val _cameraMode = MutableStateFlow(0)
     val cameraMode: StateFlow<Int> = _cameraMode.asStateFlow()
 
+    private val _availablePresets = MutableStateFlow<List<PresetGroup>>(emptyList())
+    val availablePresets: StateFlow<List<PresetGroup>> = _availablePresets.asStateFlow()
+
     private var scanning = false
 
     // Packet Reassembly
@@ -362,6 +365,11 @@ class GoProManager private constructor(private val context: Context) {
             val hexValue = value.joinToString(" ") { "%02x".format(it) }
             Log.d(TAG, "Process Data: $hexValue")
 
+            if (value.isNotEmpty() && value[0] == 0xF5.toByte()) {
+                processProtobufData(value)
+                return
+            }
+
             // Parser for Status ID 10 (Encoding)
             for (i in 0 until value.size - 2) {
                 if (value[i] == 0x0A.toByte() && value[i+1] == 0x01.toByte()) {
@@ -472,6 +480,32 @@ class GoProManager private constructor(private val context: Context) {
                              _batteryLevel.value = batLevel
                          }
                      }
+                }
+            }
+        }
+
+        private fun processProtobufData(value: ByteArray) {
+            // Feature ID 0xF5
+            if (value.size < 2) return
+            val actionId = value[1]
+
+            // We assume Action ID 0x72 or similar corresponds to NotifyPresetStatus
+            // Since we only requested one thing via F5, we try to parse it as presets.
+            // Ideally we check Action ID.
+            // Request: F5 72. Response Action ID: ?? (Likely 72 or 73)
+            // For now, let's try parsing regardless of Action ID if it's F5.
+            
+            // Payload is from index 2
+            if (value.size > 2) {
+                val protoData = value.sliceArray(2 until value.size)
+                try {
+                    val groups = GoProProtobuf.parseNotifyPresetStatus(protoData)
+                    if (groups.isNotEmpty()) {
+                        _availablePresets.value = groups
+                        Log.d(TAG, "Parsed ${groups.size} preset groups")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to parse protobuf data", e)
                 }
             }
         }
@@ -590,6 +624,17 @@ class GoProManager private constructor(private val context: Context) {
 
         kotlinx.coroutines.delay(200)
         pollInitialStatus()
+    }
+
+    suspend fun getAvailablePresets() {
+        // Feature F5, Action 72, Proto: 08 01 (register_preset_status=true)
+        // Length: 4 (F5, 72, 08, 01)
+        val cmd = byteArrayOf(0x04, 0xF5.toByte(), 0x72.toByte(), 0x08, 0x01)
+        try {
+            writeCharacteristicSuspend(GoProUUID.QUERY, cmd)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get available presets", e)
+        }
     }
 
     private suspend fun pollRecordingState() {

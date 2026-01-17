@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.karoocameracontrol.extension.Preset
+import com.karoocameracontrol.extension.PresetTitle
 
 @Composable
 fun PresetSelectionDialog(
@@ -81,7 +82,13 @@ fun PresetItem(preset: Preset, onClick: () -> Unit) {
             .padding(vertical = 12.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val name = if (!preset.customName.isNullOrEmpty()) preset.customName else getPresetTitle(preset.titleId)
+        // Use custom_name if available (from Proto field 10), otherwise map title_id
+        val name = if (!preset.customName.isNullOrEmpty()) {
+            preset.customName
+        } else {
+            PresetTitle.getTitle(preset.titleId)
+        }
+        
         Text(
             text = name,
             style = MaterialTheme.typography.bodyLarge
@@ -89,15 +96,4 @@ fun PresetItem(preset: Preset, onClick: () -> Unit) {
     }
 }
 
-fun getPresetTitle(id: Int): String {
-    return when (id) {
-        0 -> "Activity"
-        1 -> "Standard"
-        2 -> "Cinematic"
-        3 -> "Photo"
-        10 -> "Video"
-        11 -> "Slo-Mo"
-        18 -> "Custom"
-        else -> "Preset $id"
-    }
-}
+// Removed local getPresetTitle function in favor of PresetTitle.kt

@@ -96,7 +96,8 @@ class GoProManager private constructor(private val context: Context) {
     private val _activePresetName = MutableStateFlow<String?>(null)
     val activePresetName: StateFlow<String?> = _activePresetName.asStateFlow()
 
-    private var activePresetId: Int? = null
+    private val _activePresetId = MutableStateFlow<Int?>(null)
+    val activePresetId: StateFlow<Int?> = _activePresetId.asStateFlow()
 
     private var scanning = false
 
@@ -482,18 +483,17 @@ class GoProManager private constructor(private val context: Context) {
                         val typeByte = value[i+1]
                         if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
                              val valBytes = value.sliceArray((i+2)..(i+5))
-                             val presetId = (valBytes[0].toInt() and 0xFF shl 24) or
-                                            (valBytes[1].toInt() and 0xFF shl 16) or
-                                            (valBytes[2].toInt() and 0xFF shl 8) or
-                                            (valBytes[3].toInt() and 0xFF)
-
-                             activePresetId = presetId
-                             updateActivePresetName()
-                        }
-                    }
-                }
-
-                // ID 70 (0x46): Battery Level
+                                                          val presetId = (valBytes[0].toInt() and 0xFF shl 24) or
+                                                                         (valBytes[1].toInt() and 0xFF shl 16) or
+                                                                         (valBytes[2].toInt() and 0xFF shl 8) or
+                                                                         (valBytes[3].toInt() and 0xFF)
+                                                          
+                                                          _activePresetId.value = presetId
+                                                          updateActivePresetName()
+                                                     }
+                                                 }
+                                             }
+                                             // ID 70 (0x46): Battery Level
                 if (id == 0x46.toByte()) {
                      if (i + 1 < value.size) {
                          val typeByte = value[i+1]
@@ -535,7 +535,7 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     private fun updateActivePresetName() {
-        val currentId = activePresetId ?: return
+        val currentId = _activePresetId.value ?: return
         val currentPresets = _availablePresets.value
 
         if (currentPresets.isNotEmpty()) {

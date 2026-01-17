@@ -27,6 +27,7 @@ import com.karoocameracontrol.extension.PresetTitle
 @Composable
 fun PresetSelectionScreen(
     presets: List<Preset>,
+    activePresetId: Int?,
     onPresetSelected: (Preset) -> Unit,
     onBack: () -> Unit
 ) {
@@ -50,7 +51,8 @@ fun PresetSelectionScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth()
             ) {
                 items(presets) { preset ->
-                    PresetItem(preset = preset, onClick = { onPresetSelected(preset) })
+                    val isActive = preset.id == activePresetId
+                    PresetItem(preset = preset, isActive = isActive, onClick = { onPresetSelected(preset) })
                     HorizontalDivider()
                 }
             }
@@ -71,11 +73,12 @@ fun PresetSelectionScreen(
 }
 
 @Composable
-fun PresetItem(preset: Preset, onClick: () -> Unit) {
+fun PresetItem(preset: Preset, isActive: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .background(if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface)
             .padding(vertical = 12.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -85,7 +88,7 @@ fun PresetItem(preset: Preset, onClick: () -> Unit) {
         } else {
             PresetTitle.getTitle(preset.titleId)
         }
-
+        
         Text(
             text = name,
             style = MaterialTheme.typography.bodyLarge

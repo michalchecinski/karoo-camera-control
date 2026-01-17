@@ -52,11 +52,16 @@ fun MainScreen(
     val batteryLevel by goProManager.batteryLevel.collectAsState()
     val remainingTime by goProManager.remainingVideoTime.collectAsState()
     val cameraMode by goProManager.cameraMode.collectAsState()
+    val availablePresets by goProManager.availablePresets.collectAsState()
+    val activePresetName by goProManager.activePresetName.collectAsState()
+    val activePresetId by goProManager.activePresetId.collectAsState()
+    val activePresetIcon by goProManager.activePresetIcon.collectAsState()
 
     var isProcessing by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) } // State for dropdown menu
     var isAutoConnecting by remember { mutableStateOf(false) } // New state for auto-connecting
     var showFeedbackScreen by remember { mutableStateOf(false) } // New state for FeedbackScreen
+    var showPresetScreen by remember { mutableStateOf(false) } // New state for PresetSelectionScreen
 
     // Auto-connect on startup only
     LaunchedEffect(Unit) {
@@ -141,6 +146,28 @@ fun MainScreen(
 
             if (showFeedbackScreen) {
                 FeedbackScreen(onFinish = { showFeedbackScreen = false })
+            } else if (showPresetScreen) {
+                val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
+                val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
+
+                PresetSelectionScreen(
+                    presets = currentPresets,
+                    activePresetId = activePresetId,
+                    onPresetSelected = { preset ->
+                        if (!isProcessing) {
+                            isProcessing = true
+                            scope.launch {
+                                try {
+                                    goProManager.loadPreset(preset.id)
+                                    showPresetScreen = false
+                                } finally {
+                                    isProcessing = false
+                                }
+                            }
+                        }
+                    },
+                    onBack = { showPresetScreen = false }
+                )
             } else {
                 when (val state = currentState) {
                     is ConnectionState.Connected -> {
@@ -153,6 +180,9 @@ fun MainScreen(
                             batteryLevel = batteryLevel,
                             remainingTime = remainingTime,
                             cameraMode = cameraMode,
+                            availablePresets = availablePresets,
+                            activePresetName = activePresetName,
+                            activePresetIcon = activePresetIcon,
                             onToggleRecording = {
                                 if (isProcessing) return@ConnectedScreen
                                 isProcessing = true
@@ -178,6 +208,9 @@ fun MainScreen(
                                         isProcessing = false
                                     }
                                 }
+                            },
+                            onOpenPresetSelection = {
+                                showPresetScreen = true
                             },
                             onDisconnect = { goProManager.disconnect() },
                             onForget = { goProManager.forgetConnectedDevice() },

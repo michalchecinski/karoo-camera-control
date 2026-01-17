@@ -99,6 +99,9 @@ class GoProManager private constructor(private val context: Context) {
     private val _activePresetId = MutableStateFlow<Int?>(null)
     val activePresetId: StateFlow<Int?> = _activePresetId.asStateFlow()
 
+    private val _activePresetIcon = MutableStateFlow<Int?>(null)
+    val activePresetIcon: StateFlow<Int?> = _activePresetIcon.asStateFlow()
+
     private var scanning = false
 
     // Packet Reassembly
@@ -549,6 +552,7 @@ class GoProManager private constructor(private val context: Context) {
                 } else {
                     PresetTitle.getTitle(loadedPreset.titleId)
                 }
+                _activePresetIcon.value = loadedPreset.iconId
              }
         }
     }
@@ -701,6 +705,7 @@ class GoProManager private constructor(private val context: Context) {
         _activePresetName.value = loadedPreset?.let {
             if (!it.customName.isNullOrEmpty()) it.customName else PresetTitle.getTitle(it.titleId)
         }
+        _activePresetIcon.value = loadedPreset?.iconId
     }
 
     private suspend fun pollRecordingState() {
@@ -810,6 +815,7 @@ class GoProManager private constructor(private val context: Context) {
                     _connectionState.value = ConnectionState.Connected(device.name ?: device.address)
                     Log.d(TAG, "GoPro Connection Fully Established!")
                     _activePresetName.value = null // Clear when connected, will be set on loadPreset or by camera update
+                    _activePresetIcon.value = null
 
                     break
 

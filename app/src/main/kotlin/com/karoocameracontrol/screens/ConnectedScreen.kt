@@ -2,6 +2,8 @@ package com.karoocameracontrol.screens
 
 import com.karoocameracontrol.components.SimpleAlertDialog
 import com.karoocameracontrol.extension.PresetGroup
+import com.karoocameracontrol.extension.PresetIcon
+import androidx.compose.material3.Icon
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +51,7 @@ fun ConnectedScreen(
     cameraMode: Int,
     availablePresets: List<PresetGroup>,
     activePresetName: String?,
+    activePresetIcon: Int?, // Added Icon ID
     onToggleRecording: () -> Unit,
     onSetMode: (Int) -> Unit,
     onOpenPresetSelection: () -> Unit,
@@ -61,8 +64,9 @@ fun ConnectedScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
+            .background(MaterialTheme.colorScheme.background)
+            .padding(top = 16.dp),
+        contentAlignment = Alignment.TopCenter
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally
@@ -132,11 +136,22 @@ fun ConnectedScreen(
             }
 
             activePresetName?.let {
-                Text(
-                    text = "Preset: $it",
-                    style = MaterialTheme.typography.titleMedium,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(bottom = 8.dp)
-                )
+                ) {
+                    activePresetIcon?.let { iconId ->
+                        Icon(
+                            imageVector = PresetIcon.getIcon(iconId),
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 8.dp).size(24.dp)
+                        )
+                    }
+                    Text(
+                        text = "Preset: $it",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
             }
 
             val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode

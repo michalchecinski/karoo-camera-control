@@ -22,7 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
 import com.karoocameracontrol.R
 import com.karoocameracontrol.extension.Preset
+import com.karoocameracontrol.extension.PresetIcon
 import com.karoocameracontrol.extension.PresetTitle
+import androidx.compose.material3.Icon
 
 @Composable
 fun PresetSelectionScreen(
@@ -82,6 +84,13 @@ fun PresetItem(preset: Preset, isActive: Boolean, onClick: () -> Unit) {
             .padding(vertical = 12.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        val icon = PresetIcon.getIcon(preset.iconId)
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.padding(end = 16.dp).size(24.dp)
+        )
+
         // Use custom_name if available (from Proto field 10), otherwise map title_id
         val name = if (!preset.customName.isNullOrEmpty()) {
             preset.customName

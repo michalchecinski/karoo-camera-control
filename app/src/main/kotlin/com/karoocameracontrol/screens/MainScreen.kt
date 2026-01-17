@@ -58,6 +58,7 @@ fun MainScreen(
     var showMenu by remember { mutableStateOf(false) } // State for dropdown menu
     var isAutoConnecting by remember { mutableStateOf(false) } // New state for auto-connecting
     var showFeedbackScreen by remember { mutableStateOf(false) } // New state for FeedbackScreen
+    var showPresetScreen by remember { mutableStateOf(false) } // New state for PresetSelectionScreen
 
     // Auto-connect on startup only
     LaunchedEffect(Unit) {
@@ -142,6 +143,27 @@ fun MainScreen(
 
             if (showFeedbackScreen) {
                 FeedbackScreen(onFinish = { showFeedbackScreen = false })
+            } else if (showPresetScreen) {
+                val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
+                val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
+
+                PresetSelectionScreen(
+                    presets = currentPresets,
+                    onPresetSelected = { preset ->
+                        if (!isProcessing) {
+                            isProcessing = true
+                            scope.launch {
+                                try {
+                                    goProManager.loadPreset(preset.id)
+                                    showPresetScreen = false
+                                } finally {
+                                    isProcessing = false
+                                }
+                            }
+                        }
+                    },
+                    onBack = { showPresetScreen = false }
+                )
             } else {
                 when (val state = currentState) {
                     is ConnectionState.Connected -> {
@@ -181,16 +203,8 @@ fun MainScreen(
                                     }
                                 }
                             },
-                            onLoadPreset = { presetId ->
-                                if (isProcessing) return@ConnectedScreen
-                                isProcessing = true
-                                scope.launch {
-                                    try {
-                                        goProManager.loadPreset(presetId)
-                                    } finally {
-                                        isProcessing = false
-                                    }
-                                }
+                            onOpenPresetSelection = {
+                                showPresetScreen = true
                             },
                             onDisconnect = { goProManager.disconnect() },
                             onForget = { goProManager.forgetConnectedDevice() },

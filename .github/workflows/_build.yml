@@ -13,12 +13,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-
-    env:
-      GH_USER: ${{ github.actor }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      BUILD_NUMBER: ${{ github.run_number }}
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -37,13 +31,11 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build
-        if: inputs.release_version == ''
         run: ./gradlew --no-daemon build
-
-      - name: Build release
-        if: inputs.release_version != ''
-        run: ./gradlew --no-daemon assembleRelease
         env:
+          GH_USER: ${{ github.actor }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILD_NUMBER: ${{ github.run_number }}
           RELEASE_VERSION: ${{ inputs.release_version }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -52,7 +44,6 @@ jobs:
 
       - name: Upload artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        if: inputs.release_version != ''
         with:
           name: app-release.apk
           path: app/build/outputs/apk/release/app-release.apk

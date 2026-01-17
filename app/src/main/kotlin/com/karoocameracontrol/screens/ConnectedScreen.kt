@@ -39,329 +39,166 @@ import androidx.compose.ui.unit.dp
 import kotlin.time.Duration.Companion.seconds
 
 @Composable
-
 fun ConnectedScreen(
-
     deviceName: String?,
-
     isRecording: Boolean,
-
     isProcessing: Boolean,
-
     recordingDuration: Int,
-
     batteryLevel: Int,
-
     remainingTime: Int,
-
     cameraMode: Int,
-
     availablePresets: List<PresetGroup>,
-
     activePresetName: String?,
-
     onToggleRecording: () -> Unit,
-
     onSetMode: (Int) -> Unit,
-
-    onOpenPresetSelection: () -> Unit, // Changed from onLoadPreset logic inside dialog
-
+    onOpenPresetSelection: () -> Unit,
     onDisconnect: () -> Unit,
-
     onForget: () -> Unit,
-
     onFinish: () -> Unit
-
 ) {
-
     var showForgetConfirmation by remember { mutableStateOf(false) }
 
-
-
     Box(
-
         modifier = Modifier
-
             .fillMaxSize()
-
             .background(MaterialTheme.colorScheme.background),
-
         contentAlignment = Alignment.Center
-
     ) {
-
         Column(
-
             horizontalAlignment = Alignment.CenterHorizontally
-
         ) {
-
             // Status Row
-
             Column(
-
                 horizontalAlignment = Alignment.CenterHorizontally,
-
                 modifier = Modifier.padding(bottom = 16.dp)
-
             ) {
-
                 Text(
-
                     text = "Battery: $batteryLevel%",
-
                     style = MaterialTheme.typography.bodyLarge
-
                 )
-
-
 
                 val hours = remainingTime / 3600
-
                 val minutes = (remainingTime % 3600) / 60
-
                 val seconds = remainingTime % 60
 
-
-
                 val timeText = if (hours > 0) {
-
                     "%dh %02dm".format(hours, minutes)
-
                 } else {
-
                     "%02dm %02ds".format(minutes, seconds)
-
                 }
 
-
-
                 Text(
-
                     text = "Storage: $timeText",
-
                     style = MaterialTheme.typography.bodyLarge
-
                 )
-
             }
-
-
 
             // Mode Selection
-
             Row(
-
                 modifier = Modifier.padding(bottom = 16.dp),
-
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
-
             ) {
-
                 val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
 
-
-
                 Button(
-
                     onClick = { onSetMode(0) }, // Video
-
                     enabled = !isProcessing && !isRecording,
-
                     colors = ButtonDefaults.buttonColors(
-
                         containerColor = if (current == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-
                     )
-
                 ) {
-
                     Text("Video")
-
                 }
 
-
-
                 Button(
-
                     onClick = { onSetMode(1) }, // Photo
-
                     enabled = !isProcessing && !isRecording,
-
                     colors = ButtonDefaults.buttonColors(
-
                         containerColor = if (current == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-
                     )
-
                 ) {
-
                     Text("Photo")
-
                 }
-
-
 
                 Button(
-
                     onClick = { onSetMode(2) }, // Timelapse
-
                     enabled = !isProcessing && !isRecording,
-
                     colors = ButtonDefaults.buttonColors(
-
                         containerColor = if (current == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-
                     )
-
                 ) {
-
                     Text("Timelapse")
-
                 }
-
             }
-
-
 
             activePresetName?.let {
-
                 Text(
-
                     text = "Preset: $it",
-
                     style = MaterialTheme.typography.titleMedium,
-
                     modifier = Modifier.padding(bottom = 8.dp)
-
                 )
-
             }
-
-
 
             val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
-
             val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
 
-
-
             if (currentPresets.isNotEmpty()) {
-
                 Button(
-
                     onClick = onOpenPresetSelection,
-
                     enabled = !isProcessing && !isRecording,
-
                     modifier = Modifier.padding(bottom = 16.dp),
-
                     colors = ButtonDefaults.buttonColors(
-
                         containerColor = MaterialTheme.colorScheme.tertiary
-
                     )
-
                 ) {
-
                     Text("Change Preset")
-
                 }
-
             }
-
-
-
-
 
             if (isRecording) {
-
                 val duration = recordingDuration.seconds
-
                 val formattedDuration = duration.toComponents { _, minutes, seconds, _ ->
-
                     "%02d:%02d".format(minutes, seconds)
-
                 }
-
                 Text(
-
                     text = formattedDuration,
-
                     style = MaterialTheme.typography.displayMedium,
-
                     modifier = Modifier.padding(bottom = 24.dp)
-
                 )
-
             }
 
-
-
             Button(
-
                 onClick = onToggleRecording,
-
                 enabled = !isProcessing,
-
                 modifier = Modifier
-
                     .width(200.dp)
-
                     .height(100.dp)
-
                     .padding(bottom = 16.dp),
-
                 colors = ButtonDefaults.buttonColors(
-
                     containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-
                     disabledContainerColor = if (isRecording) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-
                 )
-
             ) {
-
                 if (isProcessing) {
-
                     CircularProgressIndicator(
-
                         modifier = Modifier.size(32.dp),
-
                         color = MaterialTheme.colorScheme.onPrimary,
-
                         strokeWidth = 3.dp
-
                     )
-
                 } else {
-
                     Row(
-
                         verticalAlignment = Alignment.CenterVertically,
-
                         horizontalArrangement = Arrangement.Center
-
                     ) {
-
                         Box(
-
                             modifier = Modifier
-
                                 .size(24.dp)
-
                                 .background(
-
                                     color = MaterialTheme.colorScheme.onPrimary,
-
                                     shape = if (isRecording) RectangleShape else CircleShape
-
                                 )
-
                         )
-
                         Spacer(modifier = Modifier.width(16.dp))
-
                         Text(
                             text = if (isRecording) "Stop" else "Record",
                             style = MaterialTheme.typography.titleLarge
@@ -382,8 +219,6 @@ fun ConnectedScreen(
                 }
             )
         }
-
-
 
         Image(
             painter = painterResource(id = R.drawable.back),

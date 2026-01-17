@@ -486,7 +486,7 @@ class GoProManager private constructor(private val context: Context) {
                                             (valBytes[1].toInt() and 0xFF shl 16) or
                                             (valBytes[2].toInt() and 0xFF shl 8) or
                                             (valBytes[3].toInt() and 0xFF)
-                             
+
                              activePresetId = presetId
                              updateActivePresetName()
                         }
@@ -516,7 +516,7 @@ class GoProManager private constructor(private val context: Context) {
             // Ideally we check Action ID.
             // Request: F5 72. Response Action ID: ?? (Likely 72 or 73)
             // For now, let's try parsing regardless of Action ID if it's F5.
-            
+
             // Payload is from index 2
             if (value.size > 2) {
                 val protoData = value.sliceArray(2 until value.size)
@@ -833,8 +833,7 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun registerForStatusUpdatesSuspend() {
         try {
-            // Added 0x61 (97) for Active Preset
-            val cmd = byteArrayOf(0x08, 0x53, 0x0A, 0x0D, 0x46, 0x36, 0x23, 0x2B, 0x60, 0x61)
+            val cmd = byteArrayOf(0x09, 0x53, 0x0A, 0x0D, 0x46, 0x36, 0x23, 0x2B, 0x60, 0x61)
             writeCharacteristicSuspend(GoProUUID.QUERY, cmd)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register for status updates: ${e.message}")

@@ -1,0 +1,26 @@
+name: enforce version label
+
+on:
+    pull_request:
+        types:
+          - labeled
+          - unlabeled
+          - opened
+          - synchronize
+
+jobs:
+  enforce-version-label:
+    if: >
+      !contains(github.event.pull_request.labels.*.name, 'version:major')
+      && !contains(github.event.pull_request.labels.*.name, 'version:minor')
+      && !contains(github.event.pull_request.labels.*.name, 'version:patch')
+      && !contains(github.event.pull_request.labels.*.name, 'version:skip')
+    name: Enforce version label
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check for label
+        run: |
+          echo "PR without the version label cannot be merged."
+          echo "### :x: PR without the version label cannot be merged" >> $GITHUB_STEP_SUMMARY
+          exit 1

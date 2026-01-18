@@ -3,15 +3,6 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      release_type:
-        description: 'Release type'
-        required: true
-        type: choice
-        options:
-          - 'patch'
-          - 'minor'
-          - 'major'
-
       beta:
         description: 'Is beta release'
         required: true
@@ -21,7 +12,7 @@ on:
 
 jobs:
   setup:
-    name: Create GitHub release
+    name: Setup
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.calculate.outputs.version }}
@@ -31,31 +22,66 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Get release type
+        id: get-release-type
+        run: |
+          RELEASE_TYPE=$(cat .github/release-type.txt | tr -d '[:space:]')
+          echo "Release type: $RELEASE_TYPE"
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+
       - name: Calculate next version
         id: calculate
         env:
-          VERSION_TYPE: ${{ inputs.release_type }}
+          VERSION_TYPE: ${{ steps.get-release-type.outputs.release_type }}
+          IS_BETA: ${{ inputs.beta }}
         run: |
           echo -e "\nCalculating next version..."
 
-          latest_tag_version=$(git tag --sort=committerdate --list | tail -1)
-          latest_version=${latest_tag_version:1}  # remove 'v' from tag version
-
-          latest_major_version=$(echo $latest_version | cut -d "." -f 1)
-          latest_minor_version=$(echo $latest_version | cut -d "." -f 2)
-          latest_patch_version=$(echo $latest_version | cut -d "." -f 3)
+          latest_version=$(git tag --sort=committerdate --list | tail -1)
 
           echo "  latest_version:  $latest_version"
-          echo "  latest_major_version: $latest_major_version"
-          echo "  latest_minor_version: $latest_minor_version"
-          echo "  latest_patch_version: $latest_patch_version"
+
+          if [[ "$latest_version" == *"-beta"* ]]; then
+              has_beta=true
+              base_version=${latest_version%%-beta*}
+              beta_suffix=${latest_version#*-beta}
+              if [[ -z "$beta_suffix" ]]; then
+                  beta_num=0
+              else
+                  beta_num=$beta_suffix
+              fi
+          else
+              has_beta=false
+              base_version=$latest_version
+          fi
+
+          latest_major_version=$(echo $base_version | cut -d "." -f 1)
+          latest_minor_version=$(echo $base_version | cut -d "." -f 2)
+          latest_patch_version=$(echo $base_version | cut -d "." -f 3)
+
+          echo "  base_version: $base_version"
 
           if [[ "$VERSION_TYPE" == "major" ]]; then
-              next_version="$(($latest_major_version + 1)).0.0"
+              incremented_version="$(($latest_major_version + 1)).0.0"
           elif [[ "$VERSION_TYPE" == "minor" ]]; then
-              next_version="${latest_major_version}.$(($latest_minor_version + 1)).0"
+              incremented_version="${latest_major_version}.$(($latest_minor_version + 1)).0"
           elif [[ "$VERSION_TYPE" == "patch" ]]; then
-              next_version="${latest_major_version}.${latest_minor_version}.$(($latest_patch_version + 1))"
+              incremented_version="${latest_major_version}.${latest_minor_version}.$(($latest_patch_version + 1))"
+          fi
+
+          if [[ "$IS_BETA" == "true" ]]; then
+              if [[ "$has_beta" == "true" ]]; then
+                  next_beta_num=$((beta_num + 1))
+                  next_version="${base_version}-beta${next_beta_num}"
+              else
+                  next_version="${incremented_version}-beta"
+              fi
+          else
+              if [[ "$has_beta" == "true" ]]; then
+                  next_version="${base_version}"
+              else
+                  next_version="${incremented_version}"
+              fi
           fi
 
           echo "Next Version: $next_version"
@@ -83,7 +109,7 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          name: app-release-unsigned.apk
+          name: app-release.apk
 
       - name: Build Changelog
         id: build_changelog
@@ -106,7 +132,7 @@ jobs:
         id: manifest
         run: |
           echo "## Manifest JSON" >> $GITHUB_STEP_SUMMARY
-          cat manifest.txt >> $GITHUB_STEP_SUMMARY
+          cat manifest.json >> $GITHUB_STEP_SUMMARY
 
       - name: Output md release notes to github step summary
         id: release_notes
@@ -114,3 +140,17 @@ jobs:
           echo "## Release ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           cat changelog.md >> $GITHUB_STEP_SUMMARY
 
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
+        if: github.ref_name == 'main'
+        with:
+          tag: ${{ needs.setup.outputs.version }}
+          name: ${{ needs.setup.outputs.version }}
+          bodyFile: changelog.md
+          draft: false
+          prerelease: ${{ inputs.beta }}
+          artifacts: |
+            app-release.apk
+            manifest.json
+            resources/karoo-camera-control-icon.png
+            resources/camera-controls.png

@@ -1,0 +1,88 @@
+name: Update release type
+
+on:
+  pull_request:
+    types:
+        - closed
+
+jobs:
+  update-release-type:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Detect label on PR
+        id: detect-label
+        run: |
+          LABELS='${{ toJSON(github.event.pull_request.labels.*.name) }}'
+
+          # Determine PR version label
+          PR_VERSION=""
+          if echo "$LABELS" | grep -q "version:major"; then
+            PR_VERSION="major"
+          elif echo "$LABELS" | grep -q "version:minor"; then
+            PR_VERSION="minor"
+          elif echo "$LABELS" | grep -q "version:patch"; then
+            PR_VERSION="patch"
+          else
+            echo "No version label found (or version:skip), skipping update"
+            exit 0
+          fi
+
+          echo "PR version label: $PR_VERSION"
+          echo "pr_version=$PR_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get release type
+        id: get-release-type
+        run: |
+          RELEASE_TYPE=$(cat .github/release-type.txt | tr -d '[:space:]')
+          echo "Release type: $RELEASE_TYPE"
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+
+      - name: Detect current value in file
+        id: detect-current
+        if: steps.detect-label.outputs.pr_version != ''
+        env:
+          PR_VERSION: ${{ steps.detect-label.outputs.pr_version }}
+          CURRENT_TYPE: ${{ steps.get-release-type.outputs.release_type }}
+        run: |
+          # Define priority levels
+          declare -A priority=( ["patch"]=1 ["minor"]=2 ["major"]=3 )
+          CURRENT_PRIORITY=${priority[$CURRENT_TYPE]:-0}
+          PR_PRIORITY=${priority[$PR_VERSION]}
+
+          if [ $PR_PRIORITY -gt $CURRENT_PRIORITY ]; then
+            echo "Update needed: $CURRENT_TYPE → $PR_VERSION"
+            echo "should_update=true" >> $GITHUB_OUTPUT
+          else
+            echo "No update needed: $CURRENT_TYPE >= $PR_VERSION"
+            echo "should_update=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update release type file
+        if: steps.detect-current.outputs.should_update == 'true'
+        env:
+          PR_VERSION: ${{ steps.detect-label.outputs.pr_version }}
+        run: |
+          echo "$PR_VERSION" > .github/release-type.txt
+          echo "Updated release type to $PR_VERSION"
+
+      - name: Setup git
+        if: steps.detect-current.outputs.should_update == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and push changes
+        if: steps.detect-current.outputs.should_update == 'true'
+        run: |
+          git add .github/release-type.txt
+          git commit -m "Update release type to ${{ steps.detect-label.outputs.pr_version }}"
+          git push

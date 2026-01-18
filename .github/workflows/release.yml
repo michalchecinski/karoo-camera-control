@@ -106,10 +106,24 @@ jobs:
         id: manifest
         run: |
           echo "## Manifest JSON" >> $GITHUB_STEP_SUMMARY
-          cat manifest.txt >> $GITHUB_STEP_SUMMARY
+          cat manifest.json >> $GITHUB_STEP_SUMMARY
 
       - name: Output md release notes to github step summary
         id: release_notes
         run: |
           echo "## Release ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           cat changelog.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
+        with:
+          tag: ${{ needs.setup.outputs.version }}
+          name: ${{ needs.setup.outputs.version }}
+          bodyFile: changelog.md
+          draft: false
+          prerelease: ${{ inputs.beta }}
+          artifacts: |
+            app-release.apk
+            manifest.json
+            resources/karoo-camera-control-icon.png
+            resources/camera-controls.png

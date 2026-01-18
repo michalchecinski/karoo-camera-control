@@ -10,7 +10,11 @@ on:
 
 jobs:
   enforce-version-label:
-    if: "!(contains(github.event.pull_request.labels.*.name, 'version:major') || contains(github.event.pull_request.labels.*.name, 'version:minor') || contains(github.event.pull_request.labels.*.name, 'version:patch') || contains(github.event.pull_request.labels.*.name, 'version:skip'))"
+    if: >
+      !contains(github.event.pull_request.labels.*.name, 'version:major')
+      && !contains(github.event.pull_request.labels.*.name, 'version:minor')
+      && !contains(github.event.pull_request.labels.*.name, 'version:patch')
+      && !contains(github.event.pull_request.labels.*.name, 'version:skip')
     name: Enforce version label
     runs-on: ubuntu-22.04
 

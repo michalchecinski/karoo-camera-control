@@ -113,4 +113,3 @@ jobs:
         run: |
           echo "## Release ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           cat changelog.md >> $GITHUB_STEP_SUMMARY
-

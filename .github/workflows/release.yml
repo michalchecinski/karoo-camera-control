@@ -26,12 +26,60 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get release type
+      - name: Determine release type
         id: get-release-type
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_TYPE=$(cat .github/release-type.txt | tr -d '[:space:]')
-          echo "Release type: $RELEASE_TYPE"
-          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          # Find latest tag
+          latest_tag=$(git tag --sort=committerdate --list | tail -1)
+
+          if [ -z "$latest_tag" ]; then
+            echo "No tags found. Defaulting to minor for first release."
+            echo "release_type=minor" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Latest tag: $latest_tag"
+
+          # Get all commit messages since tag
+          commit_msgs=$(git log "$latest_tag..HEAD" --format="%s")
+
+          # Extract PR numbers.
+          # Matches: "Merge pull request #123..." or "Commit message (#123)"
+          pr_numbers=$(echo "$commit_msgs" | grep -oE '#[0-9]+' | tr -d '#' | sort -u)
+
+          if [ -z "$pr_numbers" ]; then
+            echo "No PRs found since $latest_tag. Defaulting to patch."
+            echo "release_type=patch" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Found PRs: $pr_numbers"
+
+          major=false
+          minor=false
+
+          for pr in $pr_numbers; do
+            labels=$(gh pr view "$pr" --json labels -q '.labels[].name')
+            echo "PR #$pr labels: $labels"
+            if echo "$labels" | grep -q "version:major"; then
+              major=true
+            fi
+            if echo "$labels" | grep -qE "version:minor|feat|feature"; then
+              minor=true
+            fi
+          done
+
+          if [ "$major" = "true" ]; then
+            result="major"
+          elif [ "$minor" = "true" ]; then
+            result="minor"
+          else
+            result="patch"
+          fi
+
+          echo "release_type=$result" >> $GITHUB_OUTPUT
 
       - name: Calculate next version
         id: calculate

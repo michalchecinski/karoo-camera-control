@@ -9,6 +9,6 @@
     "description": "Extension that allows control of a connected action camera from the bike computer.",
     "releaseNotes": "__RELEASE_NOTES_PLACEHOLDER__",
     "screenshotUrls": [
-        "https://github.com/michalchecinski/karoo-camera-control/releases/latest/download/karoo-camera-control.png"
+        "https://github.com/michalchecinski/karoo-camera-control/releases/__VERSION_NUMBER_PLACEHOLDER__/download/camera-controls.png"
     ]
 }

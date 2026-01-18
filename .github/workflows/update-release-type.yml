@@ -2,7 +2,8 @@ name: Update release type
 
 on:
   pull_request:
-    types: [closed]
+    types:
+        - closed
 
 jobs:
   update-release-type:

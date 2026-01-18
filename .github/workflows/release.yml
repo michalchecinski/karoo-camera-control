@@ -35,27 +35,55 @@ jobs:
         id: calculate
         env:
           VERSION_TYPE: ${{ inputs.release_type }}
+          IS_BETA: ${{ inputs.beta }}
         run: |
           echo -e "\nCalculating next version..."
 
-          latest_tag_version=$(git tag --sort=committerdate --list | tail -1)
-          latest_version=${latest_tag_version:1}  # remove 'v' from tag version
-
-          latest_major_version=$(echo $latest_version | cut -d "." -f 1)
-          latest_minor_version=$(echo $latest_version | cut -d "." -f 2)
-          latest_patch_version=$(echo $latest_version | cut -d "." -f 3)
+          latest_version=$(git tag --sort=committerdate --list | tail -1)
 
           echo "  latest_version:  $latest_version"
-          echo "  latest_major_version: $latest_major_version"
-          echo "  latest_minor_version: $latest_minor_version"
-          echo "  latest_patch_version: $latest_patch_version"
+
+          if [[ "$latest_version" == *"-beta"* ]]; then
+              has_beta=true
+              base_version=${latest_version%%-beta*}
+              beta_suffix=${latest_version#*-beta}
+              if [[ -z "$beta_suffix" ]]; then
+                  beta_num=0
+              else
+                  beta_num=$beta_suffix
+              fi
+          else
+              has_beta=false
+              base_version=$latest_version
+          fi
+
+          latest_major_version=$(echo $base_version | cut -d "." -f 1)
+          latest_minor_version=$(echo $base_version | cut -d "." -f 2)
+          latest_patch_version=$(echo $base_version | cut -d "." -f 3)
+
+          echo "  base_version: $base_version"
 
           if [[ "$VERSION_TYPE" == "major" ]]; then
-              next_version="$(($latest_major_version + 1)).0.0"
+              incremented_version="$(($latest_major_version + 1)).0.0"
           elif [[ "$VERSION_TYPE" == "minor" ]]; then
-              next_version="${latest_major_version}.$(($latest_minor_version + 1)).0"
+              incremented_version="${latest_major_version}.$(($latest_minor_version + 1)).0"
           elif [[ "$VERSION_TYPE" == "patch" ]]; then
-              next_version="${latest_major_version}.${latest_minor_version}.$(($latest_patch_version + 1))"
+              incremented_version="${latest_major_version}.${latest_minor_version}.$(($latest_patch_version + 1))"
+          fi
+
+          if [[ "$IS_BETA" == "true" ]]; then
+              if [[ "$has_beta" == "true" ]]; then
+                  next_beta_num=$((beta_num + 1))
+                  next_version="${base_version}-beta${next_beta_num}"
+              else
+                  next_version="${incremented_version}-beta"
+              fi
+          else
+              if [[ "$has_beta" == "true" ]]; then
+                  next_version="${base_version}"
+              else
+                  next_version="${incremented_version}"
+              fi
           fi
 
           echo "Next Version: $next_version"

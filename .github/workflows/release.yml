@@ -116,6 +116,26 @@ jobs:
         uses: mikepenz/release-changelog-builder-action@439f79b5b5428107c7688c1d2b0e8bacc9b8792c # v6.0.1
         with:
           outputFile: changelog.md
+          configurationJson: |
+            {
+              "template": "#{{CHANGELOG}}",
+              "categories": [
+                {
+                    "title": "## 🚀 Features",
+                    "labels": ["feat", "feature", "version:major", "version:minor"]
+                },
+                {
+                    "title": "## 🐛 Fixes",
+                    "labels": ["fix", "bug", "bugfix", "version:patch"]
+                }
+              ],
+              "ignore_labels": [
+                "version:skip",
+                "renovate",
+                "dependencies",
+                "skip-changelog"
+              ]
+            }
 
       - name: Convert changelog to txt
         run: |

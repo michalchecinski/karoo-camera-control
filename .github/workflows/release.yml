@@ -21,7 +21,7 @@ on:
 
 jobs:
   setup:
-    name: Create GitHub release
+    name: Setup
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.calculate.outputs.version }}

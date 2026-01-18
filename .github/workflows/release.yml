@@ -142,6 +142,7 @@ jobs:
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
+        if: github.ref_name == 'main'
         with:
           tag: ${{ needs.setup.outputs.version }}
           name: ${{ needs.setup.outputs.version }}

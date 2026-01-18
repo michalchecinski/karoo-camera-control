@@ -1,4 +1,4 @@
-package com.karoocameracontrol.extension
+package com.karoocameracontrol.integrations.gopro
 
 // Mapping based on OpenGoPro EnumPresetTitle
 // Source: https://github.com/gopro/OpenGoPro/blob/main/protobuf/preset_status.proto

@@ -29,8 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
-import com.karoocameracontrol.extension.ConnectionState
-import com.karoocameracontrol.extension.GoProManager
+import com.karoocameracontrol.integrations.gopro.ConnectionState
+import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.theme.AppTheme
 import kotlinx.coroutines.launch
 

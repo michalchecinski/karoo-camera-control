@@ -1,4 +1,4 @@
-package com.karoocameracontrol.extension
+package com.karoocameracontrol.integrations.gopro
 
 import android.content.Context
 import io.hammerhead.karooext.extension.DataTypeImpl
@@ -11,21 +11,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class GoProStatusDataType(
+class GoProRecTimeDataType(
     extension: String,
     private val context: Context
-) : DataTypeImpl(extension, "gopro-status") {
+) : DataTypeImpl(extension, "gopro-rec-time") {
 
     override fun startStream(emitter: Emitter<StreamState>) {
         val job = CoroutineScope(Dispatchers.IO).launch {
             val manager = GoProManager.getInstance(context)
-            manager.isRecording.collectLatest { isRecording ->
-                val value = if (isRecording) 1.0 else 0.0
+            manager.recordingDuration.collectLatest { duration ->
                 emitter.onNext(
                     StreamState.Streaming(
                         DataPoint(
                             dataTypeId,
-                            mapOf(DataType.Field.SINGLE to value)
+                            mapOf(DataType.Field.SINGLE to duration.toDouble())
                         )
                     )
                 )

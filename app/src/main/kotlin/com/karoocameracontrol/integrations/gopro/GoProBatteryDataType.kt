@@ -1,4 +1,4 @@
-package com.karoocameracontrol.extension
+package com.karoocameracontrol.integrations.gopro
 
 import android.content.Context
 import io.hammerhead.karooext.extension.DataTypeImpl

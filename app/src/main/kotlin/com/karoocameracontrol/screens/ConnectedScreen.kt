@@ -1,8 +1,8 @@
 package com.karoocameracontrol.screens
 
 import com.karoocameracontrol.components.SimpleAlertDialog
-import com.karoocameracontrol.extension.PresetGroup
-import com.karoocameracontrol.extension.PresetIcon
+import com.karoocameracontrol.integrations.gopro.PresetGroup
+import com.karoocameracontrol.integrations.gopro.PresetIcon
 import androidx.compose.material3.Icon
 
 import androidx.compose.runtime.getValue

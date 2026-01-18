@@ -1,4 +1,4 @@
-package com.karoocameracontrol.extension
+package com.karoocameracontrol.integrations.gopro
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets

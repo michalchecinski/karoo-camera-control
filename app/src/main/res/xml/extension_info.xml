@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ExtensionInfo
     displayName="Karoo Camera Control"
-    icon="@drawable/karoo-camera-control"
+    icon="@drawable/karoo_camera_control"
     id="karoo-camera-control"
     scansDevices="false">
     <DataType
         description="GoPro Recording Status (1=Rec, 0=Stop)"
         displayName="GoPro Status"
         graphical="false"
-        icon="@drawable/karoo-camera-control"
+        icon="@drawable/karoo_camera_control"
         typeId="gopro-status" />
     <DataType
         description="GoPro Recording Time (s)"
         displayName="GoPro Rec Time"
         graphical="false"
-        icon="@drawable/karoo-camera-control"
+        icon="@drawable/karoo_camera_control"
         typeId="gopro-rec-time" />
     <DataType
         description="GoPro Battery Level (%)"
         displayName="GoPro Battery"
         graphical="false"
-        icon="@drawable/karoo-camera-control"
+        icon="@drawable/karoo_camera_control"
         typeId="gopro-battery" />
 </ExtensionInfo>

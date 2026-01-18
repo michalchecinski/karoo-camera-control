@@ -3,15 +3,6 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      release_type:
-        description: 'Release type'
-        required: true
-        type: choice
-        options:
-          - 'patch'
-          - 'minor'
-          - 'major'
-
       beta:
         description: 'Is beta release'
         required: true
@@ -31,10 +22,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Get release type
+        id: get-release-type
+        run: |
+          RELEASE_TYPE=$(cat .github/release-type.txt | tr -d '[:space:]')
+          echo "Release type: $RELEASE_TYPE"
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+
       - name: Calculate next version
         id: calculate
         env:
-          VERSION_TYPE: ${{ inputs.release_type }}
+          VERSION_TYPE: ${{ steps.get-release-type.outputs.release_type }}
           IS_BETA: ${{ inputs.beta }}
         run: |
           echo -e "\nCalculating next version..."

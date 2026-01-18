@@ -39,17 +39,20 @@ jobs:
           echo "PR version label: $PR_VERSION"
           echo "pr_version=$PR_VERSION" >> $GITHUB_OUTPUT
 
+      - name: Get release type
+        id: get-release-type
+        run: |
+          RELEASE_TYPE=$(cat .github/release-type.txt | tr -d '[:space:]')
+          echo "Release type: $RELEASE_TYPE"
+          echo "release_type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+
       - name: Detect current value in file
         id: detect-current
         if: steps.detect-label.outputs.pr_version != ''
         env:
           PR_VERSION: ${{ steps.detect-label.outputs.pr_version }}
+          CURRENT_TYPE: ${{ steps.get-release-type.outputs.release_type }}
         run: |
-          # Read current release type
-          CURRENT_TYPE=$(cat .github/release-type.txt | tr -d '[:space:]')
-          echo "Current release type: $CURRENT_TYPE"
-          echo "current_type=$CURRENT_TYPE" >> $GITHUB_OUTPUT
-
           # Define priority levels
           declare -A priority=( ["patch"]=1 ["minor"]=2 ["major"]=3 )
           CURRENT_PRIORITY=${priority[$CURRENT_TYPE]:-0}

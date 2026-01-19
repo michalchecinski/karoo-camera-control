@@ -186,7 +186,8 @@ jobs:
                 "renovate",
                 "dependencies",
                 "skip-changelog"
-              ]
+              ],
+              "empty_template": "Enchancements and bug fixes.",
             }
 
       - name: Convert changelog to txt

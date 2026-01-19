@@ -197,13 +197,18 @@ class GoProManager private constructor(private val context: Context) {
     private val operationMutex = Mutex()
 
     // Holds the continuation for the currently active BLE operation (Connect, Read, Write, etc.)
+    // Access must be synchronized via continuationLock
     private var activeContinuation: CancellableContinuation<Any?>? = null
 
     // To distinguish which operation we are waiting for
     private enum class BleOperationType {
         CONNECT, DISCOVER_SERVICES, READ_CHARACTERISTIC, WRITE_DESCRIPTOR, WRITE_CHARACTERISTIC, NONE
     }
+    // Access must be synchronized via continuationLock
     private var currentOperationType = BleOperationType.NONE
+
+    // Lock for thread-safe access to continuation state from callbacks and coroutines
+    private val continuationLock = Any()
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -246,8 +251,10 @@ class GoProManager private constructor(private val context: Context) {
             if (status == BluetoothGatt.GATT_SUCCESS || status == 19) {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     Log.d(TAG, "onConnectionStateChange: Connected to $deviceName")
-                    if (currentOperationType == BleOperationType.CONNECT) {
-                        resumeActiveContinuation(Unit)
+                    synchronized(continuationLock) {
+                        if (currentOperationType == BleOperationType.CONNECT) {
+                            resumeActiveContinuationLocked(Unit)
+                        }
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     Log.d(TAG, "onConnectionStateChange: Disconnected from $deviceName (status=$status)")
@@ -257,8 +264,10 @@ class GoProManager private constructor(private val context: Context) {
                     _isRecording.value = false
                     _recordingDuration.value = 0
                     // If we were waiting for something else, this is an error
-                    if (currentOperationType != BleOperationType.NONE) {
-                        resumeActiveContinuationWithException(Exception("Disconnected unexpectedly (status=$status)"))
+                    synchronized(continuationLock) {
+                        if (currentOperationType != BleOperationType.NONE) {
+                            resumeActiveContinuationWithExceptionLocked(Exception("Disconnected unexpectedly (status=$status)"))
+                        }
                     }
                 }
             } else {
@@ -268,60 +277,70 @@ class GoProManager private constructor(private val context: Context) {
                 _connectionState.value = ConnectionState.Error("Connection error: $status")
                 _isRecording.value = false
                 _recordingDuration.value = 0
-                resumeActiveContinuationWithException(Exception("Connection error: $status"))
+                synchronized(continuationLock) {
+                    resumeActiveContinuationWithExceptionLocked(Exception("Connection error: $status"))
+                }
             }
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             super.onServicesDiscovered(gatt, status)
-            if (currentOperationType == BleOperationType.DISCOVER_SERVICES) {
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d(TAG, "Services discovered successfully.")
-                    resumeActiveContinuation(Unit)
-                } else {
-                    Log.e(TAG, "Service discovery failed: $status")
-                    resumeActiveContinuationWithException(Exception("Service discovery failed: $status"))
+            synchronized(continuationLock) {
+                if (currentOperationType == BleOperationType.DISCOVER_SERVICES) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Log.d(TAG, "Services discovered successfully.")
+                        resumeActiveContinuationLocked(Unit)
+                    } else {
+                        Log.e(TAG, "Service discovery failed: $status")
+                        resumeActiveContinuationWithExceptionLocked(Exception("Service discovery failed: $status"))
+                    }
                 }
             }
         }
 
         override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
             super.onCharacteristicRead(gatt, characteristic, status)
-            if (currentOperationType == BleOperationType.READ_CHARACTERISTIC) {
-                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d(TAG, "Read characteristic ${characteristic.uuid}")
-                    resumeActiveContinuation(Unit)
-                } else {
-                    Log.e(TAG, "Read failed: $status")
-                    resumeActiveContinuationWithException(Exception("Read failed: $status"))
+            synchronized(continuationLock) {
+                if (currentOperationType == BleOperationType.READ_CHARACTERISTIC) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Log.d(TAG, "Read characteristic ${characteristic.uuid}")
+                        resumeActiveContinuationLocked(Unit)
+                    } else {
+                        Log.e(TAG, "Read failed: $status")
+                        resumeActiveContinuationWithExceptionLocked(Exception("Read failed: $status"))
+                    }
                 }
             }
         }
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
             super.onCharacteristicWrite(gatt, characteristic, status)
-             if (currentOperationType == BleOperationType.WRITE_CHARACTERISTIC) {
-                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d(TAG, "Characteristic write success for ${characteristic.uuid}")
-                    resumeActiveContinuation(Unit)
-                } else {
-                    Log.e(TAG, "Characteristic write failed: $status")
-                    resumeActiveContinuationWithException(Exception("Characteristic write failed: $status"))
+            synchronized(continuationLock) {
+                if (currentOperationType == BleOperationType.WRITE_CHARACTERISTIC) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Log.d(TAG, "Characteristic write success for ${characteristic.uuid}")
+                        resumeActiveContinuationLocked(Unit)
+                    } else {
+                        Log.e(TAG, "Characteristic write failed: $status")
+                        resumeActiveContinuationWithExceptionLocked(Exception("Characteristic write failed: $status"))
+                    }
                 }
-             }
+            }
         }
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-             super.onDescriptorWrite(gatt, descriptor, status)
-             if (currentOperationType == BleOperationType.WRITE_DESCRIPTOR) {
-                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d(TAG, "Descriptor write success for ${descriptor.characteristic.uuid}")
-                    resumeActiveContinuation(Unit)
-                } else {
-                    Log.e(TAG, "Descriptor write failed: $status")
-                    resumeActiveContinuationWithException(Exception("Descriptor write failed: $status"))
+            super.onDescriptorWrite(gatt, descriptor, status)
+            synchronized(continuationLock) {
+                if (currentOperationType == BleOperationType.WRITE_DESCRIPTOR) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Log.d(TAG, "Descriptor write success for ${descriptor.characteristic.uuid}")
+                        resumeActiveContinuationLocked(Unit)
+                    } else {
+                        Log.e(TAG, "Descriptor write failed: $status")
+                        resumeActiveContinuationWithExceptionLocked(Exception("Descriptor write failed: $status"))
+                    }
                 }
-             }
+            }
         }
 
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
@@ -521,7 +540,8 @@ class GoProManager private constructor(private val context: Context) {
         }
     }
 
-    private fun resumeActiveContinuation(value: Any?) {
+    // Must be called while holding continuationLock
+    private fun resumeActiveContinuationLocked(value: Any?) {
         activeContinuation?.let {
             if (it.isActive) {
                 it.resume(value)
@@ -531,7 +551,8 @@ class GoProManager private constructor(private val context: Context) {
         currentOperationType = BleOperationType.NONE
     }
 
-    private fun resumeActiveContinuationWithException(exception: Exception) {
+    // Must be called while holding continuationLock
+    private fun resumeActiveContinuationWithExceptionLocked(exception: Exception) {
         activeContinuation?.let {
             if (it.isActive) {
                 it.resumeWithException(exception)
@@ -808,17 +829,21 @@ class GoProManager private constructor(private val context: Context) {
     private suspend fun connectGattSuspend(device: BluetoothDevice, autoConnect: Boolean) = operationMutex.withLock {
         if (autoConnect) {
             suspendCancellableCoroutine<Unit> { cont ->
-                currentOperationType = BleOperationType.CONNECT
-                @Suppress("UNCHECKED_CAST")
-                activeContinuation = cont as CancellableContinuation<Any?>
+                synchronized(continuationLock) {
+                    currentOperationType = BleOperationType.CONNECT
+                    @Suppress("UNCHECKED_CAST")
+                    activeContinuation = cont as CancellableContinuation<Any?>
+                }
                 connectedGatt = device.connectGatt(context, true, gattCallback)
             }
         } else {
             withTimeout(10000) {
                 suspendCancellableCoroutine<Unit> { cont ->
-                    currentOperationType = BleOperationType.CONNECT
-                    @Suppress("UNCHECKED_CAST")
-                    activeContinuation = cont as CancellableContinuation<Any?>
+                    synchronized(continuationLock) {
+                        currentOperationType = BleOperationType.CONNECT
+                        @Suppress("UNCHECKED_CAST")
+                        activeContinuation = cont as CancellableContinuation<Any?>
+                    }
                     connectedGatt = device.connectGatt(context, false, gattCallback)
                 }
             }
@@ -828,10 +853,12 @@ class GoProManager private constructor(private val context: Context) {
     private suspend fun discoverServicesSuspend() = operationMutex.withLock {
         val gatt = connectedGatt ?: throw Exception("Not connected")
         withTimeout(5000) {
-             suspendCancellableCoroutine<Unit> { cont ->
-                currentOperationType = BleOperationType.DISCOVER_SERVICES
-                @Suppress("UNCHECKED_CAST")
-                activeContinuation = cont as CancellableContinuation<Any?>
+            suspendCancellableCoroutine<Unit> { cont ->
+                synchronized(continuationLock) {
+                    currentOperationType = BleOperationType.DISCOVER_SERVICES
+                    @Suppress("UNCHECKED_CAST")
+                    activeContinuation = cont as CancellableContinuation<Any?>
+                }
                 gatt.discoverServices()
             }
         }
@@ -843,10 +870,16 @@ class GoProManager private constructor(private val context: Context) {
 
         withTimeout(5000) {
             suspendCancellableCoroutine<Unit> { cont ->
-                currentOperationType = BleOperationType.READ_CHARACTERISTIC
-                @Suppress("UNCHECKED_CAST")
-                activeContinuation = cont as CancellableContinuation<Any?>
+                synchronized(continuationLock) {
+                    currentOperationType = BleOperationType.READ_CHARACTERISTIC
+                    @Suppress("UNCHECKED_CAST")
+                    activeContinuation = cont as CancellableContinuation<Any?>
+                }
                 if (!gatt.readCharacteristic(char)) {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
                     cont.resumeWithException(Exception("Failed to initiate read"))
                 }
             }
@@ -862,10 +895,16 @@ class GoProManager private constructor(private val context: Context) {
 
         withTimeout(5000) {
             suspendCancellableCoroutine<Unit> { cont ->
-                currentOperationType = BleOperationType.WRITE_CHARACTERISTIC
-                @Suppress("UNCHECKED_CAST")
-                activeContinuation = cont as CancellableContinuation<Any?>
+                synchronized(continuationLock) {
+                    currentOperationType = BleOperationType.WRITE_CHARACTERISTIC
+                    @Suppress("UNCHECKED_CAST")
+                    activeContinuation = cont as CancellableContinuation<Any?>
+                }
                 if (!gatt.writeCharacteristic(char)) {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
                     cont.resumeWithException(Exception("Failed to initiate write to $uuid"))
                 }
             }
@@ -884,10 +923,16 @@ class GoProManager private constructor(private val context: Context) {
 
         withTimeout(5000) {
             suspendCancellableCoroutine<Unit> { cont ->
-                currentOperationType = BleOperationType.WRITE_DESCRIPTOR
-                @Suppress("UNCHECKED_CAST")
-                activeContinuation = cont as CancellableContinuation<Any?>
+                synchronized(continuationLock) {
+                    currentOperationType = BleOperationType.WRITE_DESCRIPTOR
+                    @Suppress("UNCHECKED_CAST")
+                    activeContinuation = cont as CancellableContinuation<Any?>
+                }
                 if (!gatt.writeDescriptor(descriptor)) {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
                     cont.resumeWithException(Exception("Failed to initiate descriptor write"))
                 }
             }

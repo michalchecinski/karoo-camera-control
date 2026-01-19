@@ -247,9 +247,8 @@ class GoProManager private constructor(private val context: Context) {
             super.onConnectionStateChange(gatt, status, newState)
             val deviceName = gatt.device.name
 
-            // Status 19 is GATT_CONN_TERMINATE_PEER_USER (Remote device disconnected)
-            // We should treat it as a normal disconnect event, not an error.
-            if (status == BluetoothGatt.GATT_SUCCESS || status == 19) {
+            // GATT_CONN_TERMINATE_PEER_USER means remote device disconnected - treat as normal disconnect
+            if (status == BluetoothGatt.GATT_SUCCESS || status == GATT_CONN_TERMINATE_PEER_USER) {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     Log.d(TAG, "onConnectionStateChange: Connected to $deviceName")
                     synchronized(continuationLock) {
@@ -556,8 +555,8 @@ class GoProManager private constructor(private val context: Context) {
     suspend fun startRecording() {
         writeCharacteristicSuspend(GoProUUID.COMMAND, GoProCommands.Recording.START)
 
-        for (i in 1..10) {
-            kotlinx.coroutines.delay(500)
+        for (i in 1..RECORDING_START_MAX_POLLS) {
+            kotlinx.coroutines.delay(RECORDING_POLL_DELAY_MS)
             if (_isRecording.value) {
                 break
             }
@@ -568,8 +567,8 @@ class GoProManager private constructor(private val context: Context) {
     suspend fun stopRecording() {
         writeCharacteristicSuspend(GoProUUID.COMMAND, GoProCommands.Recording.STOP)
 
-        for (i in 1..5) {
-            kotlinx.coroutines.delay(1000)
+        for (i in 1..RECORDING_STOP_MAX_POLLS) {
+            kotlinx.coroutines.delay(STOP_RECORDING_POLL_DELAY_MS)
             if (!_isRecording.value) {
                 break
             }
@@ -579,16 +578,16 @@ class GoProManager private constructor(private val context: Context) {
 
     suspend fun setMode(mode: Int) {
         val modeId = when (mode) {
-            0 -> 1000
-            1 -> 1001
-            2 -> 1002
-            else -> 1000
+            0 -> PRESET_MODE_VIDEO
+            1 -> PRESET_MODE_PHOTO
+            2 -> PRESET_MODE_TIMELAPSE
+            else -> PRESET_MODE_VIDEO
         }
 
         val cmd = GoProCommands.Modes.setMode(modeId)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
 
-        kotlinx.coroutines.delay(200)
+        kotlinx.coroutines.delay(MODE_CHANGE_DELAY_MS)
         pollInitialStatus()
     }
 
@@ -662,15 +661,15 @@ class GoProManager private constructor(private val context: Context) {
         } catch (e: Exception) { Log.w(TAG, "Failed to poll active preset ID 0x61: ${e.message}") }
 
         // Fetch presets - Critical for UI, retry on failure
-        for (attempt in 1..3) {
+        for (attempt in 1..PRESET_FETCH_MAX_RETRIES) {
             try {
-                kotlinx.coroutines.delay(300L * attempt) // Increasing delay between retries
+                kotlinx.coroutines.delay(PRESET_FETCH_BASE_DELAY_MS * attempt)
                 getAvailablePresets()
                 break // Success, exit retry loop
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to get available presets (attempt $attempt/3): ${e.message}")
-                if (attempt == 3) {
-                    Log.e(TAG, "Failed to get available presets after 3 attempts", e)
+                Log.w(TAG, "Failed to get available presets (attempt $attempt/$PRESET_FETCH_MAX_RETRIES): ${e.message}")
+                if (attempt == PRESET_FETCH_MAX_RETRIES) {
+                    Log.e(TAG, "Failed to get available presets after $PRESET_FETCH_MAX_RETRIES attempts", e)
                 }
             }
         }
@@ -729,9 +728,9 @@ class GoProManager private constructor(private val context: Context) {
                     disconnect()
 
                     if (isPaired) {
-                        Log.d(TAG, "Retrying connection for saved device in 2 seconds...")
+                        Log.d(TAG, "Retrying connection for saved device...")
                         _connectionState.value = ConnectionState.Connecting(device.name ?: device.address)
-                        kotlinx.coroutines.delay(2000)
+                        kotlinx.coroutines.delay(RECONNECT_DELAY_MS)
                     } else {
                         _connectionState.value = ConnectionState.Error(e.message ?: "Connection failed")
                         break
@@ -792,7 +791,7 @@ class GoProManager private constructor(private val context: Context) {
                 connectedGatt = device.connectGatt(context, true, gattCallback)
             }
         } else {
-            withTimeout(10000) {
+            withTimeout(CONNECT_TIMEOUT_MS) {
                 suspendCancellableCoroutine<Unit> { cont ->
                     synchronized(continuationLock) {
                         currentOperationType = BleOperationType.CONNECT
@@ -815,7 +814,7 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun discoverServicesSuspend() = operationMutex.withLock {
         val gatt = connectedGatt ?: throw Exception("Not connected")
-        withTimeout(5000) {
+        withTimeout(BLE_OPERATION_TIMEOUT_MS) {
             suspendCancellableCoroutine<Unit> { cont ->
                 synchronized(continuationLock) {
                     currentOperationType = BleOperationType.DISCOVER_SERVICES
@@ -837,7 +836,7 @@ class GoProManager private constructor(private val context: Context) {
         val gatt = connectedGatt ?: throw Exception("Not connected")
         val char = findCharacteristic(gatt, uuid) ?: throw Exception("Characteristic $uuid not found in any service")
 
-        withTimeout(5000) {
+        withTimeout(BLE_OPERATION_TIMEOUT_MS) {
             suspendCancellableCoroutine<Unit> { cont ->
                 synchronized(continuationLock) {
                     currentOperationType = BleOperationType.READ_CHARACTERISTIC
@@ -865,7 +864,7 @@ class GoProManager private constructor(private val context: Context) {
         val gatt = connectedGatt ?: throw Exception("Not connected")
         val char = findCharacteristic(gatt, uuid) ?: throw Exception("Characteristic $uuid not found in any service")
 
-        withTimeout(5000) {
+        withTimeout(BLE_OPERATION_TIMEOUT_MS) {
             suspendCancellableCoroutine<Unit> { cont ->
                 synchronized(continuationLock) {
                     currentOperationType = BleOperationType.WRITE_CHARACTERISTIC
@@ -914,7 +913,7 @@ class GoProManager private constructor(private val context: Context) {
         val cccUuid = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
         val descriptor = char.getDescriptor(cccUuid) ?: throw Exception("CCCD Descriptor not found for $uuid")
 
-        withTimeout(5000) {
+        withTimeout(BLE_OPERATION_TIMEOUT_MS) {
             suspendCancellableCoroutine<Unit> { cont ->
                 synchronized(continuationLock) {
                     currentOperationType = BleOperationType.WRITE_DESCRIPTOR
@@ -970,6 +969,30 @@ class GoProManager private constructor(private val context: Context) {
 
     companion object {
         private const val TAG = "GoProManager"
+
+        // Timeout values (milliseconds)
+        private const val CONNECT_TIMEOUT_MS = 10_000L
+        private const val BLE_OPERATION_TIMEOUT_MS = 5_000L
+        private const val RECONNECT_DELAY_MS = 2_000L
+
+        // Polling delays (milliseconds)
+        private const val RECORDING_POLL_DELAY_MS = 500L
+        private const val STOP_RECORDING_POLL_DELAY_MS = 1_000L
+        private const val MODE_CHANGE_DELAY_MS = 200L
+        private const val PRESET_FETCH_BASE_DELAY_MS = 300L
+
+        // Retry configuration
+        private const val RECORDING_START_MAX_POLLS = 10
+        private const val RECORDING_STOP_MAX_POLLS = 5
+        private const val PRESET_FETCH_MAX_RETRIES = 3
+
+        // GATT status codes
+        private const val GATT_CONN_TERMINATE_PEER_USER = 19
+
+        // GoPro preset mode IDs
+        private const val PRESET_MODE_VIDEO = 1000
+        private const val PRESET_MODE_PHOTO = 1001
+        private const val PRESET_MODE_TIMELAPSE = 1002
 
         @Volatile
         private var INSTANCE: GoProManager? = null

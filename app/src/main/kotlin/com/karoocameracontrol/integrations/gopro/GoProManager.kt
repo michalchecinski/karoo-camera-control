@@ -1,4 +1,4 @@
-package com.karoocameracontrol.extension
+package com.karoocameracontrol.integrations.gopro
 
 import android.Manifest
 import android.annotation.SuppressLint

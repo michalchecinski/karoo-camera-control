@@ -31,8 +31,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.karoocameracontrol.R
 import com.karoocameracontrol.components.SimpleAlertDialog
-import com.karoocameracontrol.extension.ConnectionState
-import com.karoocameracontrol.extension.PairedDevice
+import com.karoocameracontrol.integrations.gopro.ConnectionState
+import com.karoocameracontrol.integrations.gopro.PairedDevice
 
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image

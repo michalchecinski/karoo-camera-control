@@ -2,6 +2,11 @@ package com.karoocameracontrol.extension
 
 import android.content.Intent
 import android.util.Log
+import com.karoocameracontrol.integrations.gopro.ConnectionState
+import com.karoocameracontrol.integrations.gopro.GoProBatteryDataType
+import com.karoocameracontrol.integrations.gopro.GoProManager
+import com.karoocameracontrol.integrations.gopro.GoProRecTimeDataType
+import com.karoocameracontrol.integrations.gopro.GoProStatusDataType
 import io.hammerhead.karooext.extension.KarooExtension
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

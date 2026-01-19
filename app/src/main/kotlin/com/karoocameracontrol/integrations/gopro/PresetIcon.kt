@@ -1,4 +1,4 @@
-package com.karoocameracontrol.extension
+package com.karoocameracontrol.integrations.gopro
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*

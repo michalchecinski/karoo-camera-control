@@ -21,9 +21,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
 import com.karoocameracontrol.R
-import com.karoocameracontrol.extension.Preset
-import com.karoocameracontrol.extension.PresetIcon
-import com.karoocameracontrol.extension.PresetTitle
+import com.karoocameracontrol.integrations.gopro.Preset
+import com.karoocameracontrol.integrations.gopro.PresetIcon
+import com.karoocameracontrol.integrations.gopro.PresetTitle
 import androidx.compose.material3.Icon
 
 @Composable

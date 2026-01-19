@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
@@ -298,8 +299,26 @@ class GoProManager private constructor(private val context: Context) {
             }
         }
 
+        // API 33+ callback
+        override fun onCharacteristicRead(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            value: ByteArray,
+            status: Int
+        ) {
+            handleCharacteristicRead(characteristic, status)
+        }
+
+        // Legacy callback for API < 33
+        @Suppress("DEPRECATION")
+        @Deprecated("Deprecated in API 33")
         override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-            super.onCharacteristicRead(gatt, characteristic, status)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                handleCharacteristicRead(characteristic, status)
+            }
+        }
+
+        private fun handleCharacteristicRead(characteristic: BluetoothGattCharacteristic, status: Int) {
             synchronized(continuationLock) {
                 if (currentOperationType == BleOperationType.READ_CHARACTERISTIC) {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -343,11 +362,27 @@ class GoProManager private constructor(private val context: Context) {
             }
         }
 
-        override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-            super.onCharacteristicChanged(gatt, characteristic)
-            val value = characteristic.value ?: return
+        // API 33+ callback
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            value: ByteArray
+        ) {
+            handleCharacteristicChanged(characteristic.uuid, value)
+        }
 
-            val fullData = responseParser.processCharacteristicChange(characteristic.uuid, value)
+        // Legacy callback for API < 33
+        @Suppress("DEPRECATION")
+        @Deprecated("Deprecated in API 33")
+        override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                val value = characteristic.value ?: return
+                handleCharacteristicChanged(characteristic.uuid, value)
+            }
+        }
+
+        private fun handleCharacteristicChanged(uuid: java.util.UUID, value: ByteArray) {
+            val fullData = responseParser.processCharacteristicChange(uuid, value)
             if (fullData != null) {
                 processCharacteristicData(fullData)
             }
@@ -830,9 +865,6 @@ class GoProManager private constructor(private val context: Context) {
         val gatt = connectedGatt ?: throw Exception("Not connected")
         val char = findCharacteristic(gatt, uuid) ?: throw Exception("Characteristic $uuid not found in any service")
 
-        char.value = value
-        char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-
         withTimeout(5000) {
             suspendCancellableCoroutine<Unit> { cont ->
                 synchronized(continuationLock) {
@@ -846,7 +878,23 @@ class GoProManager private constructor(private val context: Context) {
                         currentOperationType = BleOperationType.NONE
                     }
                 }
-                if (!gatt.writeCharacteristic(char)) {
+
+                val writeResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    gatt.writeCharacteristic(
+                        char,
+                        value,
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    ) == BluetoothStatusCodes.SUCCESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    char.value = value
+                    @Suppress("DEPRECATION")
+                    char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    @Suppress("DEPRECATION")
+                    gatt.writeCharacteristic(char)
+                }
+
+                if (!writeResult) {
                     synchronized(continuationLock) {
                         activeContinuation = null
                         currentOperationType = BleOperationType.NONE
@@ -865,7 +913,6 @@ class GoProManager private constructor(private val context: Context) {
 
         val cccUuid = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
         val descriptor = char.getDescriptor(cccUuid) ?: throw Exception("CCCD Descriptor not found for $uuid")
-        descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
 
         withTimeout(5000) {
             suspendCancellableCoroutine<Unit> { cont ->
@@ -880,7 +927,20 @@ class GoProManager private constructor(private val context: Context) {
                         currentOperationType = BleOperationType.NONE
                     }
                 }
-                if (!gatt.writeDescriptor(descriptor)) {
+
+                val writeResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    gatt.writeDescriptor(
+                        descriptor,
+                        BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    ) == BluetoothStatusCodes.SUCCESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    @Suppress("DEPRECATION")
+                    gatt.writeDescriptor(descriptor)
+                }
+
+                if (!writeResult) {
                     synchronized(continuationLock) {
                         activeContinuation = null
                         currentOperationType = BleOperationType.NONE

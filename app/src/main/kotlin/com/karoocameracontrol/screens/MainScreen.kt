@@ -74,7 +74,7 @@ fun MainScreen(
     DisposableEffect(Unit) {
         onDispose {
             goProManager.stopScan()
-            goProManager.disconnect()
+            // Removed goProManager.disconnect() to allow background connection persistence
         }
     }
 

@@ -164,9 +164,9 @@ class GoProManager private constructor(private val context: Context) {
 
         // Fallback: Connect to first paired device if exists
         if (devices.isNotEmpty()) {
-             val firstDevice = devices.first()
-             Log.d(TAG, "Auto-connecting to first paired device: ${firstDevice.address}")
-             connectToDevice(firstDevice.address)
+            val firstDevice = devices.first()
+            Log.d(TAG, "Auto-connecting to first paired device: ${firstDevice.address}")
+            connectToDevice(firstDevice.address)
         }
     }
 
@@ -464,18 +464,18 @@ class GoProManager private constructor(private val context: Context) {
         val currentPresets = _availablePresets.value
 
         if (currentPresets.isNotEmpty()) {
-             val loadedPreset = currentPresets
+            val loadedPreset = currentPresets
                 .flatMap { it.presets }
                 .find { it.id == currentId }
 
-             if (loadedPreset != null) {
+            if (loadedPreset != null) {
                 _activePresetName.value = if (!loadedPreset.customName.isNullOrEmpty()) {
                     loadedPreset.customName
                 } else {
                     PresetTitle.getTitle(loadedPreset.titleId)
                 }
                 _activePresetIcon.value = loadedPreset.iconId
-             }
+            }
         }
     }
 
@@ -511,8 +511,8 @@ class GoProManager private constructor(private val context: Context) {
 
         val scanner = bluetoothLeScanner
         if (scanner == null) {
-             _connectionState.value = ConnectionState.Error("BLE scanner unavailable")
-             return
+            _connectionState.value = ConnectionState.Error("BLE scanner unavailable")
+            return
         }
 
         if (!scanning) {
@@ -677,8 +677,8 @@ class GoProManager private constructor(private val context: Context) {
 
     fun connect(device: BluetoothDevice, isPaired: Boolean = false) {
         if (!hasPermissions()) {
-             _connectionState.value = ConnectionState.Error("Permissions not granted")
-             return
+            _connectionState.value = ConnectionState.Error("Permissions not granted")
+            return
         }
 
         if (_connectionState.value is ConnectionState.Connecting || _connectionState.value is ConnectionState.Connected) {
@@ -960,10 +960,10 @@ class GoProManager private constructor(private val context: Context) {
 
     private fun hasPermissions(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-             ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
-             ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
         } else {
-             ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         }
     }
 

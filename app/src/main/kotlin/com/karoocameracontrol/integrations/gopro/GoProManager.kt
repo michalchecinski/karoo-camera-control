@@ -362,133 +362,38 @@ class GoProManager private constructor(private val context: Context) {
                 return
             }
 
-            // Parser for Status ID 10 (Encoding)
-            for (i in 0 until value.size - 2) {
-                if (value[i] == 0x0A.toByte() && value[i+1] == 0x01.toByte()) {
-                    val isRecording = value[i+2] == 0x01.toByte()
-                    _isRecording.value = isRecording
-                    if (!isRecording) _recordingDuration.value = 0
-                }
+            // Use sequential TLV parser for status responses
+            val status = GoProStatusParser.parse(value)
+
+            // Apply parsed values to state flows (only if present in response)
+            status.isRecording?.let { recording ->
+                _isRecording.value = recording
+                if (!recording) _recordingDuration.value = 0
             }
 
-            // Generic Parser for TLV
-            for (i in 0 until value.size) {
-                val id = value[i]
+            status.recordingDuration?.let { duration ->
+                _recordingDuration.value = duration
+            }
 
-                // ID 13: Video Progress / Duration
-                if (id == 0x0D.toByte()) {
-                     if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
-                            val valBytes = value.sliceArray((i+2)..(i+5))
-                            val duration = (valBytes[0].toInt() and 0xFF shl 24) or
-                                           (valBytes[1].toInt() and 0xFF shl 16) or
-                                           (valBytes[2].toInt() and 0xFF shl 8) or
-                                           (valBytes[3].toInt() and 0xFF)
-                            _recordingDuration.value = duration
-                        }
-                    }
-                }
+            status.batteryLevel?.let { battery ->
+                _batteryLevel.value = battery
+            }
 
-                // ID 54 (0x36): Remaining Space
-                if (id == 0x36.toByte()) {
-                     if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if (typeByte == 0x08.toByte() && i + 9 < value.size) {
-                            val valBytes = value.sliceArray((i+2)..(i+9))
-                            var remSpace: Long = 0
-                            for (b in valBytes) {
-                                remSpace = (remSpace shl 8) or (b.toLong() and 0xFF)
-                            }
-                            _remainingSpace.value = remSpace
-                        } else if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
-                            val valBytes = value.sliceArray((i+2)..(i+5))
-                            val remSpace = (valBytes[0].toInt() and 0xFF shl 24) or
-                                          (valBytes[1].toInt() and 0xFF shl 16) or
-                                          (valBytes[2].toInt() and 0xFF shl 8) or
-                                          (valBytes[3].toInt() and 0xFF)
-                            _remainingSpace.value = remSpace.toLong()
-                        }
-                    }
-                }
+            status.remainingSpace?.let { space ->
+                _remainingSpace.value = space
+            }
 
-                // ID 35 (0x23): Remaining Video Time
-                if (id == 0x23.toByte()) {
-                     if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
-                            val valBytes = value.sliceArray((i+2)..(i+5))
-                            val remTime = (valBytes[0].toInt() and 0xFF shl 24) or
-                                          (valBytes[1].toInt() and 0xFF shl 16) or
-                                          (valBytes[2].toInt() and 0xFF shl 8) or
-                                          (valBytes[3].toInt() and 0xFF)
-                            _remainingVideoTime.value = remTime
-                        }
-                    }
-                }
+            status.remainingVideoTime?.let { time ->
+                _remainingVideoTime.value = time
+            }
 
-                // ID 43 (0x2B): Active Preset Group (Mode)
-                if (id == 0x2B.toByte()) {
-                    if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if ((typeByte == 0x02.toByte() || typeByte == 0x03.toByte()) && i + 3 < value.size) {
-                             val b1 = value[i+2].toInt() and 0xFF
-                             val b2 = value[i+3].toInt() and 0xFF
-                             val modeVal = (b1 shl 8) or b2
-                             _cameraMode.value = modeVal
-                        }
-                        else if (typeByte == 0x04.toByte() && i + 5 < value.size) {
-                             val b1 = value[i+2].toInt() and 0xFF
-                             val b2 = value[i+3].toInt() and 0xFF
-                             val b3 = value[i+4].toInt() and 0xFF
-                             val b4 = value[i+5].toInt() and 0xFF
-                             val modeVal = (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
-                             _cameraMode.value = modeVal
-                        }
-                    }
-                }
+            status.cameraMode?.let { mode ->
+                _cameraMode.value = mode
+            }
 
-                // ID 96 (0x60): Flat Mode / Preset Group
-                if (id == 0x60.toByte()) {
-                    if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if (typeByte == 0x04.toByte() && i + 5 < value.size) {
-                             val b1 = value[i+2].toInt() and 0xFF
-                             val b2 = value[i+3].toInt() and 0xFF
-                             val b3 = value[i+4].toInt() and 0xFF
-                             val b4 = value[i+5].toInt() and 0xFF
-                             val modeVal = (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
-                             _cameraMode.value = modeVal
-                        }
-                    }
-                }
-
-                // ID 97 (0x61): Active Preset ID
-                if (id == 0x61.toByte()) {
-                    if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
-                             val valBytes = value.sliceArray((i+2)..(i+5))
-                                                          val presetId = (valBytes[0].toInt() and 0xFF shl 24) or
-                                                                         (valBytes[1].toInt() and 0xFF shl 16) or
-                                                                         (valBytes[2].toInt() and 0xFF shl 8) or
-                                                                         (valBytes[3].toInt() and 0xFF)
-                                                          
-                                                          _activePresetId.value = presetId
-                                                          updateActivePresetName()
-                                                     }
-                                                 }
-                                             }
-                                             // ID 70 (0x46): Battery Level
-                if (id == 0x46.toByte()) {
-                     if (i + 1 < value.size) {
-                         val typeByte = value[i+1]
-                         if ((typeByte == 0x01.toByte() || typeByte == 0x02.toByte()) && i + 2 < value.size) {
-                             val batLevel = value[i+2].toInt() and 0xFF
-                             _batteryLevel.value = batLevel
-                         }
-                     }
-                }
+            status.activePresetId?.let { presetId ->
+                _activePresetId.value = presetId
+                updateActivePresetName()
             }
         }
 

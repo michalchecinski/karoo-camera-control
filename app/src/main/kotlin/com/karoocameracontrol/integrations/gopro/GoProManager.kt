@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
@@ -105,8 +106,7 @@ class GoProManager private constructor(private val context: Context) {
     private var scanning = false
 
     // Packet Reassembly
-    private val responseBuffer = java.io.ByteArrayOutputStream()
-    private var expectedResponseLength = -1
+    private val responseParser = GoProResponseParser()
 
     private val prefs by lazy {
         context.getSharedPreferences("GoProPrefs", Context.MODE_PRIVATE)
@@ -164,9 +164,9 @@ class GoProManager private constructor(private val context: Context) {
 
         // Fallback: Connect to first paired device if exists
         if (devices.isNotEmpty()) {
-             val firstDevice = devices.first()
-             Log.d(TAG, "Auto-connecting to first paired device: ${firstDevice.address}")
-             connectToDevice(firstDevice.address)
+            val firstDevice = devices.first()
+            Log.d(TAG, "Auto-connecting to first paired device: ${firstDevice.address}")
+            connectToDevice(firstDevice.address)
         }
     }
 
@@ -198,13 +198,18 @@ class GoProManager private constructor(private val context: Context) {
     private val operationMutex = Mutex()
 
     // Holds the continuation for the currently active BLE operation (Connect, Read, Write, etc.)
+    // Access must be synchronized via continuationLock
     private var activeContinuation: CancellableContinuation<Any?>? = null
 
     // To distinguish which operation we are waiting for
     private enum class BleOperationType {
         CONNECT, DISCOVER_SERVICES, READ_CHARACTERISTIC, WRITE_DESCRIPTOR, WRITE_CHARACTERISTIC, NONE
     }
+    // Access must be synchronized via continuationLock
     private var currentOperationType = BleOperationType.NONE
+
+    // Lock for thread-safe access to continuation state from callbacks and coroutines
+    private val continuationLock = Any()
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -242,13 +247,14 @@ class GoProManager private constructor(private val context: Context) {
             super.onConnectionStateChange(gatt, status, newState)
             val deviceName = gatt.device.name
 
-            // Status 19 is GATT_CONN_TERMINATE_PEER_USER (Remote device disconnected)
-            // We should treat it as a normal disconnect event, not an error.
-            if (status == BluetoothGatt.GATT_SUCCESS || status == 19) {
+            // GATT_CONN_TERMINATE_PEER_USER means remote device disconnected - treat as normal disconnect
+            if (status == BluetoothGatt.GATT_SUCCESS || status == GATT_CONN_TERMINATE_PEER_USER) {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     Log.d(TAG, "onConnectionStateChange: Connected to $deviceName")
-                    if (currentOperationType == BleOperationType.CONNECT) {
-                        resumeActiveContinuation(Unit)
+                    synchronized(continuationLock) {
+                        if (currentOperationType == BleOperationType.CONNECT) {
+                            resumeActiveContinuationLocked(Unit)
+                        }
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     Log.d(TAG, "onConnectionStateChange: Disconnected from $deviceName (status=$status)")
@@ -258,8 +264,10 @@ class GoProManager private constructor(private val context: Context) {
                     _isRecording.value = false
                     _recordingDuration.value = 0
                     // If we were waiting for something else, this is an error
-                    if (currentOperationType != BleOperationType.NONE) {
-                        resumeActiveContinuationWithException(Exception("Disconnected unexpectedly (status=$status)"))
+                    synchronized(continuationLock) {
+                        if (currentOperationType != BleOperationType.NONE) {
+                            resumeActiveContinuationWithExceptionLocked(Exception("Disconnected unexpectedly (status=$status)"))
+                        }
                     }
                 }
             } else {
@@ -269,104 +277,113 @@ class GoProManager private constructor(private val context: Context) {
                 _connectionState.value = ConnectionState.Error("Connection error: $status")
                 _isRecording.value = false
                 _recordingDuration.value = 0
-                resumeActiveContinuationWithException(Exception("Connection error: $status"))
+                synchronized(continuationLock) {
+                    resumeActiveContinuationWithExceptionLocked(Exception("Connection error: $status"))
+                }
             }
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             super.onServicesDiscovered(gatt, status)
-            if (currentOperationType == BleOperationType.DISCOVER_SERVICES) {
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d(TAG, "Services discovered successfully.")
-                    resumeActiveContinuation(Unit)
-                } else {
-                    Log.e(TAG, "Service discovery failed: $status")
-                    resumeActiveContinuationWithException(Exception("Service discovery failed: $status"))
+            synchronized(continuationLock) {
+                if (currentOperationType == BleOperationType.DISCOVER_SERVICES) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Log.d(TAG, "Services discovered successfully.")
+                        resumeActiveContinuationLocked(Unit)
+                    } else {
+                        Log.e(TAG, "Service discovery failed: $status")
+                        resumeActiveContinuationWithExceptionLocked(Exception("Service discovery failed: $status"))
+                    }
                 }
             }
         }
 
+        // API 33+ callback
+        override fun onCharacteristicRead(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            value: ByteArray,
+            status: Int
+        ) {
+            handleCharacteristicRead(characteristic, status)
+        }
+
+        // Legacy callback for API < 33
+        @Suppress("DEPRECATION")
+        @Deprecated("Deprecated in API 33")
         override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
-            super.onCharacteristicRead(gatt, characteristic, status)
-            if (currentOperationType == BleOperationType.READ_CHARACTERISTIC) {
-                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d(TAG, "Read characteristic ${characteristic.uuid}")
-                    resumeActiveContinuation(Unit)
-                } else {
-                    Log.e(TAG, "Read failed: $status")
-                    resumeActiveContinuationWithException(Exception("Read failed: $status"))
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                handleCharacteristicRead(characteristic, status)
+            }
+        }
+
+        private fun handleCharacteristicRead(characteristic: BluetoothGattCharacteristic, status: Int) {
+            synchronized(continuationLock) {
+                if (currentOperationType == BleOperationType.READ_CHARACTERISTIC) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Log.d(TAG, "Read characteristic ${characteristic.uuid}")
+                        resumeActiveContinuationLocked(Unit)
+                    } else {
+                        Log.e(TAG, "Read failed: $status")
+                        resumeActiveContinuationWithExceptionLocked(Exception("Read failed: $status"))
+                    }
                 }
             }
         }
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
             super.onCharacteristicWrite(gatt, characteristic, status)
-             if (currentOperationType == BleOperationType.WRITE_CHARACTERISTIC) {
-                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d(TAG, "Characteristic write success for ${characteristic.uuid}")
-                    resumeActiveContinuation(Unit)
-                } else {
-                    Log.e(TAG, "Characteristic write failed: $status")
-                    resumeActiveContinuationWithException(Exception("Characteristic write failed: $status"))
+            synchronized(continuationLock) {
+                if (currentOperationType == BleOperationType.WRITE_CHARACTERISTIC) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Log.d(TAG, "Characteristic write success for ${characteristic.uuid}")
+                        resumeActiveContinuationLocked(Unit)
+                    } else {
+                        Log.e(TAG, "Characteristic write failed: $status")
+                        resumeActiveContinuationWithExceptionLocked(Exception("Characteristic write failed: $status"))
+                    }
                 }
-             }
+            }
         }
 
         override fun onDescriptorWrite(gatt: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-             super.onDescriptorWrite(gatt, descriptor, status)
-             if (currentOperationType == BleOperationType.WRITE_DESCRIPTOR) {
-                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d(TAG, "Descriptor write success for ${descriptor.characteristic.uuid}")
-                    resumeActiveContinuation(Unit)
-                } else {
-                    Log.e(TAG, "Descriptor write failed: $status")
-                    resumeActiveContinuationWithException(Exception("Descriptor write failed: $status"))
+            super.onDescriptorWrite(gatt, descriptor, status)
+            synchronized(continuationLock) {
+                if (currentOperationType == BleOperationType.WRITE_DESCRIPTOR) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        Log.d(TAG, "Descriptor write success for ${descriptor.characteristic.uuid}")
+                        resumeActiveContinuationLocked(Unit)
+                    } else {
+                        Log.e(TAG, "Descriptor write failed: $status")
+                        resumeActiveContinuationWithExceptionLocked(Exception("Descriptor write failed: $status"))
+                    }
                 }
-             }
+            }
         }
 
+        // API 33+ callback
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            value: ByteArray
+        ) {
+            handleCharacteristicChanged(characteristic.uuid, value)
+        }
+
+        // Legacy callback for API < 33
+        @Suppress("DEPRECATION")
+        @Deprecated("Deprecated in API 33")
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
-            super.onCharacteristicChanged(gatt, characteristic)
-            val value = characteristic.value ?: return
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                val value = characteristic.value ?: return
+                handleCharacteristicChanged(characteristic.uuid, value)
+            }
+        }
 
-            if (characteristic.uuid == GoProUUID.QUERY_RESPONSE || characteristic.uuid == GoProUUID.COMMAND_RESPONSE) {
-                val header = value[0].toInt() and 0xFF
-
-                if ((header and 0x80) == 0x80) {
-                    // Continuation packet
-                    responseBuffer.write(value, 1, value.size - 1)
-                } else {
-                    // Start packet
-                    responseBuffer.reset()
-                    var offset = 1
-
-                    if ((header and 0x20) == 0x20) {
-                        // 13-bit length
-                        if (value.size < 2) return
-                        val lenHigh = header and 0x1F
-                        val lenLow = value[1].toInt() and 0xFF
-                        expectedResponseLength = (lenHigh shl 8) or lenLow
-                        offset = 2
-                    } else if ((header and 0x40) == 0x40) {
-                        expectedResponseLength = header and 0x1F
-                    } else {
-                        expectedResponseLength = header and 0x1F
-                    }
-
-                    if (value.size > offset) {
-                        responseBuffer.write(value, offset, value.size - offset)
-                    }
-                }
-
-                // Check if we have the full packet
-                if (expectedResponseLength > 0 && responseBuffer.size() >= expectedResponseLength) {
-                    val fullData = responseBuffer.toByteArray()
-                    processCharacteristicData(fullData)
-
-                    // Reset for next
-                    responseBuffer.reset()
-                    expectedResponseLength = -1
-                }
+        private fun handleCharacteristicChanged(uuid: java.util.UUID, value: ByteArray) {
+            val fullData = responseParser.processCharacteristicChange(uuid, value)
+            if (fullData != null) {
+                processCharacteristicData(fullData)
             }
         }
 
@@ -379,133 +396,38 @@ class GoProManager private constructor(private val context: Context) {
                 return
             }
 
-            // Parser for Status ID 10 (Encoding)
-            for (i in 0 until value.size - 2) {
-                if (value[i] == 0x0A.toByte() && value[i+1] == 0x01.toByte()) {
-                    val isRecording = value[i+2] == 0x01.toByte()
-                    _isRecording.value = isRecording
-                    if (!isRecording) _recordingDuration.value = 0
-                }
+            // Use sequential TLV parser for status responses
+            val status = GoProStatusParser.parse(value)
+
+            // Apply parsed values to state flows (only if present in response)
+            status.isRecording?.let { recording ->
+                _isRecording.value = recording
+                if (!recording) _recordingDuration.value = 0
             }
 
-            // Generic Parser for TLV
-            for (i in 0 until value.size) {
-                val id = value[i]
+            status.recordingDuration?.let { duration ->
+                _recordingDuration.value = duration
+            }
 
-                // ID 13: Video Progress / Duration
-                if (id == 0x0D.toByte()) {
-                     if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
-                            val valBytes = value.sliceArray((i+2)..(i+5))
-                            val duration = (valBytes[0].toInt() and 0xFF shl 24) or
-                                           (valBytes[1].toInt() and 0xFF shl 16) or
-                                           (valBytes[2].toInt() and 0xFF shl 8) or
-                                           (valBytes[3].toInt() and 0xFF)
-                            _recordingDuration.value = duration
-                        }
-                    }
-                }
+            status.batteryLevel?.let { battery ->
+                _batteryLevel.value = battery
+            }
 
-                // ID 54 (0x36): Remaining Space
-                if (id == 0x36.toByte()) {
-                     if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if (typeByte == 0x08.toByte() && i + 9 < value.size) {
-                            val valBytes = value.sliceArray((i+2)..(i+9))
-                            var remSpace: Long = 0
-                            for (b in valBytes) {
-                                remSpace = (remSpace shl 8) or (b.toLong() and 0xFF)
-                            }
-                            _remainingSpace.value = remSpace
-                        } else if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
-                            val valBytes = value.sliceArray((i+2)..(i+5))
-                            val remSpace = (valBytes[0].toInt() and 0xFF shl 24) or
-                                          (valBytes[1].toInt() and 0xFF shl 16) or
-                                          (valBytes[2].toInt() and 0xFF shl 8) or
-                                          (valBytes[3].toInt() and 0xFF)
-                            _remainingSpace.value = remSpace.toLong()
-                        }
-                    }
-                }
+            status.remainingSpace?.let { space ->
+                _remainingSpace.value = space
+            }
 
-                // ID 35 (0x23): Remaining Video Time
-                if (id == 0x23.toByte()) {
-                     if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
-                            val valBytes = value.sliceArray((i+2)..(i+5))
-                            val remTime = (valBytes[0].toInt() and 0xFF shl 24) or
-                                          (valBytes[1].toInt() and 0xFF shl 16) or
-                                          (valBytes[2].toInt() and 0xFF shl 8) or
-                                          (valBytes[3].toInt() and 0xFF)
-                            _remainingVideoTime.value = remTime
-                        }
-                    }
-                }
+            status.remainingVideoTime?.let { time ->
+                _remainingVideoTime.value = time
+            }
 
-                // ID 43 (0x2B): Active Preset Group (Mode)
-                if (id == 0x2B.toByte()) {
-                    if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if ((typeByte == 0x02.toByte() || typeByte == 0x03.toByte()) && i + 3 < value.size) {
-                             val b1 = value[i+2].toInt() and 0xFF
-                             val b2 = value[i+3].toInt() and 0xFF
-                             val modeVal = (b1 shl 8) or b2
-                             _cameraMode.value = modeVal
-                        }
-                        else if (typeByte == 0x04.toByte() && i + 5 < value.size) {
-                             val b1 = value[i+2].toInt() and 0xFF
-                             val b2 = value[i+3].toInt() and 0xFF
-                             val b3 = value[i+4].toInt() and 0xFF
-                             val b4 = value[i+5].toInt() and 0xFF
-                             val modeVal = (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
-                             _cameraMode.value = modeVal
-                        }
-                    }
-                }
+            status.cameraMode?.let { mode ->
+                _cameraMode.value = mode
+            }
 
-                // ID 96 (0x60): Flat Mode / Preset Group
-                if (id == 0x60.toByte()) {
-                    if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if (typeByte == 0x04.toByte() && i + 5 < value.size) {
-                             val b1 = value[i+2].toInt() and 0xFF
-                             val b2 = value[i+3].toInt() and 0xFF
-                             val b3 = value[i+4].toInt() and 0xFF
-                             val b4 = value[i+5].toInt() and 0xFF
-                             val modeVal = (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
-                             _cameraMode.value = modeVal
-                        }
-                    }
-                }
-
-                // ID 97 (0x61): Active Preset ID
-                if (id == 0x61.toByte()) {
-                    if (i + 1 < value.size) {
-                        val typeByte = value[i+1]
-                        if ((typeByte == 0x03.toByte() || typeByte == 0x04.toByte()) && i + 5 < value.size) {
-                             val valBytes = value.sliceArray((i+2)..(i+5))
-                                                          val presetId = (valBytes[0].toInt() and 0xFF shl 24) or
-                                                                         (valBytes[1].toInt() and 0xFF shl 16) or
-                                                                         (valBytes[2].toInt() and 0xFF shl 8) or
-                                                                         (valBytes[3].toInt() and 0xFF)
-                                                          
-                                                          _activePresetId.value = presetId
-                                                          updateActivePresetName()
-                                                     }
-                                                 }
-                                             }
-                                             // ID 70 (0x46): Battery Level
-                if (id == 0x46.toByte()) {
-                     if (i + 1 < value.size) {
-                         val typeByte = value[i+1]
-                         if ((typeByte == 0x01.toByte() || typeByte == 0x02.toByte()) && i + 2 < value.size) {
-                             val batLevel = value[i+2].toInt() and 0xFF
-                             _batteryLevel.value = batLevel
-                         }
-                     }
-                }
+            status.activePresetId?.let { presetId ->
+                _activePresetId.value = presetId
+                updateActivePresetName()
             }
         }
 
@@ -542,22 +464,23 @@ class GoProManager private constructor(private val context: Context) {
         val currentPresets = _availablePresets.value
 
         if (currentPresets.isNotEmpty()) {
-             val loadedPreset = currentPresets
+            val loadedPreset = currentPresets
                 .flatMap { it.presets }
                 .find { it.id == currentId }
 
-             if (loadedPreset != null) {
+            if (loadedPreset != null) {
                 _activePresetName.value = if (!loadedPreset.customName.isNullOrEmpty()) {
                     loadedPreset.customName
                 } else {
                     PresetTitle.getTitle(loadedPreset.titleId)
                 }
                 _activePresetIcon.value = loadedPreset.iconId
-             }
+            }
         }
     }
 
-    private fun resumeActiveContinuation(value: Any?) {
+    // Must be called while holding continuationLock
+    private fun resumeActiveContinuationLocked(value: Any?) {
         activeContinuation?.let {
             if (it.isActive) {
                 it.resume(value)
@@ -567,7 +490,8 @@ class GoProManager private constructor(private val context: Context) {
         currentOperationType = BleOperationType.NONE
     }
 
-    private fun resumeActiveContinuationWithException(exception: Exception) {
+    // Must be called while holding continuationLock
+    private fun resumeActiveContinuationWithExceptionLocked(exception: Exception) {
         activeContinuation?.let {
             if (it.isActive) {
                 it.resumeWithException(exception)
@@ -587,8 +511,8 @@ class GoProManager private constructor(private val context: Context) {
 
         val scanner = bluetoothLeScanner
         if (scanner == null) {
-             _connectionState.value = ConnectionState.Error("BLE scanner unavailable")
-             return
+            _connectionState.value = ConnectionState.Error("BLE scanner unavailable")
+            return
         }
 
         if (!scanning) {
@@ -629,11 +553,10 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun startRecording() {
-        val cmd = byteArrayOf(0x03, 0x01, 0x01, 0x01)
-        writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
+        writeCharacteristicSuspend(GoProUUID.COMMAND, GoProCommands.Recording.START)
 
-        for (i in 1..10) {
-            kotlinx.coroutines.delay(500)
+        for (i in 1..RECORDING_START_MAX_POLLS) {
+            kotlinx.coroutines.delay(RECORDING_POLL_DELAY_MS)
             if (_isRecording.value) {
                 break
             }
@@ -642,11 +565,10 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun stopRecording() {
-        val cmd = byteArrayOf(0x03, 0x01, 0x01, 0x00)
-        writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
+        writeCharacteristicSuspend(GoProUUID.COMMAND, GoProCommands.Recording.STOP)
 
-        for (i in 1..5) {
-            kotlinx.coroutines.delay(1000)
+        for (i in 1..RECORDING_STOP_MAX_POLLS) {
+            kotlinx.coroutines.delay(STOP_RECORDING_POLL_DELAY_MS)
             if (!_isRecording.value) {
                 break
             }
@@ -656,45 +578,29 @@ class GoProManager private constructor(private val context: Context) {
 
     suspend fun setMode(mode: Int) {
         val modeId = when (mode) {
-            0 -> 1000
-            1 -> 1001
-            2 -> 1002
-            else -> 1000
+            0 -> PRESET_MODE_VIDEO
+            1 -> PRESET_MODE_PHOTO
+            2 -> PRESET_MODE_TIMELAPSE
+            else -> PRESET_MODE_VIDEO
         }
 
-        val m1 = (modeId shr 8).toByte()
-        val m2 = (modeId and 0xFF).toByte()
-
-        val cmd = byteArrayOf(0x04, 0x3E, 0x02, m1, m2)
+        val cmd = GoProCommands.Modes.setMode(modeId)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
 
-        kotlinx.coroutines.delay(200)
+        kotlinx.coroutines.delay(MODE_CHANGE_DELAY_MS)
         pollInitialStatus()
     }
 
     suspend fun getAvailablePresets() {
-        // Feature F5, Action 72, Proto: 08 01 (register_preset_status=true)
-        // Length: 4 (F5, 72, 08, 01)
-        val cmd = byteArrayOf(0x04, 0xF5.toByte(), 0x72.toByte(), 0x08, 0x01)
         try {
-            writeCharacteristicSuspend(GoProUUID.QUERY, cmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Presets.GET_AVAILABLE)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get available presets", e)
         }
     }
 
     suspend fun loadPreset(presetId: Int) {
-        // Cmd: 40 (Load Preset)
-        // Length: 4 (32-bit int)
-        // Val: presetId (4 bytes)
-        // Total Pkt Len: 1 (Cmd) + 1 (Len) + 4 (Val) = 6
-
-        val v1 = (presetId shr 24).toByte()
-        val v2 = (presetId shr 16).toByte()
-        val v3 = (presetId shr 8).toByte()
-        val v4 = (presetId and 0xFF).toByte()
-
-        val cmd = byteArrayOf(0x06, 0x40, 0x04, v1, v2, v3, v4)
+        val cmd = GoProCommands.Presets.load(presetId)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
 
         // Optimistically update the active preset name
@@ -710,8 +616,7 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun pollRecordingState() {
         try {
-            val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
-            writeCharacteristicSuspend(GoProUUID.QUERY, statusCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.STATUS)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to poll recording state", e)
         }
@@ -722,60 +627,58 @@ class GoProManager private constructor(private val context: Context) {
         // especially important because timeouts can happen if the camera is busy.
 
         try {
-            val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
-            writeCharacteristicSuspend(GoProUUID.QUERY, statusCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.STATUS)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll recording state: ${e.message}") }
 
         if (_isRecording.value) {
             try {
-                val durationCmd = byteArrayOf(0x02, 0x13, 0x0D)
-                writeCharacteristicSuspend(GoProUUID.QUERY, durationCmd)
+                writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.DURATION)
             } catch (e: Exception) { Log.w(TAG, "Failed to poll duration: ${e.message}") }
         }
 
         try {
-            val batteryCmd = byteArrayOf(0x02, 0x13, 0x46)
-            writeCharacteristicSuspend(GoProUUID.QUERY, batteryCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.BATTERY)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll battery: ${e.message}") }
 
         try {
-            val remSpaceCmd = byteArrayOf(0x02, 0x13, 0x36)
-            writeCharacteristicSuspend(GoProUUID.QUERY, remSpaceCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.REMAINING_SPACE)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll space: ${e.message}") }
 
         try {
-            val remTimeCmd = byteArrayOf(0x02, 0x13, 0x23)
-            writeCharacteristicSuspend(GoProUUID.QUERY, remTimeCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.REMAINING_VIDEO_TIME)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll remaining time: ${e.message}") }
 
         try {
-            val modeCmd = byteArrayOf(0x02, 0x13, 0x2B)
-            writeCharacteristicSuspend(GoProUUID.QUERY, modeCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.MODE)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll mode: ${e.message}") }
 
         try {
-            val mode96Cmd = byteArrayOf(0x02, 0x13, 0x60)
-            writeCharacteristicSuspend(GoProUUID.QUERY, mode96Cmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.PRESET_GROUP)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll mode 96: ${e.message}") }
 
         try {
-            val activePresetCmd = byteArrayOf(0x02, 0x13, 0x61)
-            writeCharacteristicSuspend(GoProUUID.QUERY, activePresetCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.ACTIVE_PRESET)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll active preset ID 0x61: ${e.message}") }
 
-        // Fetch presets - Critical for UI
-        try {
-            kotlinx.coroutines.delay(200) // Small delay to avoid congestion
-            getAvailablePresets()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get available presets", e)
+        // Fetch presets - Critical for UI, retry on failure
+        for (attempt in 1..PRESET_FETCH_MAX_RETRIES) {
+            try {
+                kotlinx.coroutines.delay(PRESET_FETCH_BASE_DELAY_MS * attempt)
+                getAvailablePresets()
+                break // Success, exit retry loop
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to get available presets (attempt $attempt/$PRESET_FETCH_MAX_RETRIES): ${e.message}")
+                if (attempt == PRESET_FETCH_MAX_RETRIES) {
+                    Log.e(TAG, "Failed to get available presets after $PRESET_FETCH_MAX_RETRIES attempts", e)
+                }
+            }
         }
     }
 
     fun connect(device: BluetoothDevice, isPaired: Boolean = false) {
         if (!hasPermissions()) {
-             _connectionState.value = ConnectionState.Error("Permissions not granted")
-             return
+            _connectionState.value = ConnectionState.Error("Permissions not granted")
+            return
         }
 
         if (_connectionState.value is ConnectionState.Connecting || _connectionState.value is ConnectionState.Connected) {
@@ -825,9 +728,9 @@ class GoProManager private constructor(private val context: Context) {
                     disconnect()
 
                     if (isPaired) {
-                        Log.d(TAG, "Retrying connection for saved device in 2 seconds...")
+                        Log.d(TAG, "Retrying connection for saved device...")
                         _connectionState.value = ConnectionState.Connecting(device.name ?: device.address)
-                        kotlinx.coroutines.delay(2000)
+                        kotlinx.coroutines.delay(RECONNECT_DELAY_MS)
                     } else {
                         _connectionState.value = ConnectionState.Error(e.message ?: "Connection failed")
                         break
@@ -839,8 +742,7 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun registerForStatusUpdatesSuspend() {
         try {
-            val cmd = byteArrayOf(0x09, 0x53, 0x0A, 0x0D, 0x46, 0x36, 0x23, 0x2B, 0x60, 0x61)
-            writeCharacteristicSuspend(GoProUUID.QUERY, cmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.REGISTER_UPDATES)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register for status updates: ${e.message}")
         }
@@ -872,17 +774,38 @@ class GoProManager private constructor(private val context: Context) {
     private suspend fun connectGattSuspend(device: BluetoothDevice, autoConnect: Boolean) = operationMutex.withLock {
         if (autoConnect) {
             suspendCancellableCoroutine<Unit> { cont ->
-                currentOperationType = BleOperationType.CONNECT
-                @Suppress("UNCHECKED_CAST")
-                activeContinuation = cont as CancellableContinuation<Any?>
-                connectedGatt = device.connectGatt(context, true, gattCallback)
-            }
-        } else {
-            withTimeout(10000) {
-                suspendCancellableCoroutine<Unit> { cont ->
+                synchronized(continuationLock) {
                     currentOperationType = BleOperationType.CONNECT
                     @Suppress("UNCHECKED_CAST")
                     activeContinuation = cont as CancellableContinuation<Any?>
+                }
+                cont.invokeOnCancellation {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
+                    // Clean up GATT on cancellation
+                    connectedGatt?.close()
+                    connectedGatt = null
+                }
+                connectedGatt = device.connectGatt(context, true, gattCallback)
+            }
+        } else {
+            withTimeout(CONNECT_TIMEOUT_MS) {
+                suspendCancellableCoroutine<Unit> { cont ->
+                    synchronized(continuationLock) {
+                        currentOperationType = BleOperationType.CONNECT
+                        @Suppress("UNCHECKED_CAST")
+                        activeContinuation = cont as CancellableContinuation<Any?>
+                    }
+                    cont.invokeOnCancellation {
+                        synchronized(continuationLock) {
+                            activeContinuation = null
+                            currentOperationType = BleOperationType.NONE
+                        }
+                        connectedGatt?.close()
+                        connectedGatt = null
+                    }
                     connectedGatt = device.connectGatt(context, false, gattCallback)
                 }
             }
@@ -891,11 +814,19 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun discoverServicesSuspend() = operationMutex.withLock {
         val gatt = connectedGatt ?: throw Exception("Not connected")
-        withTimeout(5000) {
-             suspendCancellableCoroutine<Unit> { cont ->
-                currentOperationType = BleOperationType.DISCOVER_SERVICES
-                @Suppress("UNCHECKED_CAST")
-                activeContinuation = cont as CancellableContinuation<Any?>
+        withTimeout(BLE_OPERATION_TIMEOUT_MS) {
+            suspendCancellableCoroutine<Unit> { cont ->
+                synchronized(continuationLock) {
+                    currentOperationType = BleOperationType.DISCOVER_SERVICES
+                    @Suppress("UNCHECKED_CAST")
+                    activeContinuation = cont as CancellableContinuation<Any?>
+                }
+                cont.invokeOnCancellation {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
+                }
                 gatt.discoverServices()
             }
         }
@@ -905,12 +836,24 @@ class GoProManager private constructor(private val context: Context) {
         val gatt = connectedGatt ?: throw Exception("Not connected")
         val char = findCharacteristic(gatt, uuid) ?: throw Exception("Characteristic $uuid not found in any service")
 
-        withTimeout(5000) {
+        withTimeout(BLE_OPERATION_TIMEOUT_MS) {
             suspendCancellableCoroutine<Unit> { cont ->
-                currentOperationType = BleOperationType.READ_CHARACTERISTIC
-                @Suppress("UNCHECKED_CAST")
-                activeContinuation = cont as CancellableContinuation<Any?>
+                synchronized(continuationLock) {
+                    currentOperationType = BleOperationType.READ_CHARACTERISTIC
+                    @Suppress("UNCHECKED_CAST")
+                    activeContinuation = cont as CancellableContinuation<Any?>
+                }
+                cont.invokeOnCancellation {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
+                }
                 if (!gatt.readCharacteristic(char)) {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
                     cont.resumeWithException(Exception("Failed to initiate read"))
                 }
             }
@@ -921,15 +864,40 @@ class GoProManager private constructor(private val context: Context) {
         val gatt = connectedGatt ?: throw Exception("Not connected")
         val char = findCharacteristic(gatt, uuid) ?: throw Exception("Characteristic $uuid not found in any service")
 
-        char.value = value
-        char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-
-        withTimeout(5000) {
+        withTimeout(BLE_OPERATION_TIMEOUT_MS) {
             suspendCancellableCoroutine<Unit> { cont ->
-                currentOperationType = BleOperationType.WRITE_CHARACTERISTIC
-                @Suppress("UNCHECKED_CAST")
-                activeContinuation = cont as CancellableContinuation<Any?>
-                if (!gatt.writeCharacteristic(char)) {
+                synchronized(continuationLock) {
+                    currentOperationType = BleOperationType.WRITE_CHARACTERISTIC
+                    @Suppress("UNCHECKED_CAST")
+                    activeContinuation = cont as CancellableContinuation<Any?>
+                }
+                cont.invokeOnCancellation {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
+                }
+
+                val writeResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    gatt.writeCharacteristic(
+                        char,
+                        value,
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    ) == BluetoothStatusCodes.SUCCESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    char.value = value
+                    @Suppress("DEPRECATION")
+                    char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    @Suppress("DEPRECATION")
+                    gatt.writeCharacteristic(char)
+                }
+
+                if (!writeResult) {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
                     cont.resumeWithException(Exception("Failed to initiate write to $uuid"))
                 }
             }
@@ -944,14 +912,38 @@ class GoProManager private constructor(private val context: Context) {
 
         val cccUuid = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
         val descriptor = char.getDescriptor(cccUuid) ?: throw Exception("CCCD Descriptor not found for $uuid")
-        descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
 
-        withTimeout(5000) {
+        withTimeout(BLE_OPERATION_TIMEOUT_MS) {
             suspendCancellableCoroutine<Unit> { cont ->
-                currentOperationType = BleOperationType.WRITE_DESCRIPTOR
-                @Suppress("UNCHECKED_CAST")
-                activeContinuation = cont as CancellableContinuation<Any?>
-                if (!gatt.writeDescriptor(descriptor)) {
+                synchronized(continuationLock) {
+                    currentOperationType = BleOperationType.WRITE_DESCRIPTOR
+                    @Suppress("UNCHECKED_CAST")
+                    activeContinuation = cont as CancellableContinuation<Any?>
+                }
+                cont.invokeOnCancellation {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
+                }
+
+                val writeResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    gatt.writeDescriptor(
+                        descriptor,
+                        BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    ) == BluetoothStatusCodes.SUCCESS
+                } else {
+                    @Suppress("DEPRECATION")
+                    descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    @Suppress("DEPRECATION")
+                    gatt.writeDescriptor(descriptor)
+                }
+
+                if (!writeResult) {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
                     cont.resumeWithException(Exception("Failed to initiate descriptor write"))
                 }
             }
@@ -968,15 +960,39 @@ class GoProManager private constructor(private val context: Context) {
 
     private fun hasPermissions(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-             ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
-             ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
         } else {
-             ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         }
     }
 
     companion object {
         private const val TAG = "GoProManager"
+
+        // Timeout values (milliseconds)
+        private const val CONNECT_TIMEOUT_MS = 10_000L
+        private const val BLE_OPERATION_TIMEOUT_MS = 5_000L
+        private const val RECONNECT_DELAY_MS = 2_000L
+
+        // Polling delays (milliseconds)
+        private const val RECORDING_POLL_DELAY_MS = 500L
+        private const val STOP_RECORDING_POLL_DELAY_MS = 1_000L
+        private const val MODE_CHANGE_DELAY_MS = 200L
+        private const val PRESET_FETCH_BASE_DELAY_MS = 300L
+
+        // Retry configuration
+        private const val RECORDING_START_MAX_POLLS = 10
+        private const val RECORDING_STOP_MAX_POLLS = 5
+        private const val PRESET_FETCH_MAX_RETRIES = 3
+
+        // GATT status codes
+        private const val GATT_CONN_TERMINATE_PEER_USER = 19
+
+        // GoPro preset mode IDs
+        private const val PRESET_MODE_VIDEO = 1000
+        private const val PRESET_MODE_PHOTO = 1001
+        private const val PRESET_MODE_TIMELAPSE = 1002
 
         @Volatile
         private var INSTANCE: GoProManager? = null

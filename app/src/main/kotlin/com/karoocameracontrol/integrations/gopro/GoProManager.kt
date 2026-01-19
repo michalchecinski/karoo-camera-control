@@ -105,8 +105,7 @@ class GoProManager private constructor(private val context: Context) {
     private var scanning = false
 
     // Packet Reassembly
-    private val responseBuffer = java.io.ByteArrayOutputStream()
-    private var expectedResponseLength = -1
+    private val responseParser = GoProResponseParser()
 
     private val prefs by lazy {
         context.getSharedPreferences("GoProPrefs", Context.MODE_PRIVATE)
@@ -329,44 +328,9 @@ class GoProManager private constructor(private val context: Context) {
             super.onCharacteristicChanged(gatt, characteristic)
             val value = characteristic.value ?: return
 
-            if (characteristic.uuid == GoProUUID.QUERY_RESPONSE || characteristic.uuid == GoProUUID.COMMAND_RESPONSE) {
-                val header = value[0].toInt() and 0xFF
-
-                if ((header and 0x80) == 0x80) {
-                    // Continuation packet
-                    responseBuffer.write(value, 1, value.size - 1)
-                } else {
-                    // Start packet
-                    responseBuffer.reset()
-                    var offset = 1
-
-                    if ((header and 0x20) == 0x20) {
-                        // 13-bit length
-                        if (value.size < 2) return
-                        val lenHigh = header and 0x1F
-                        val lenLow = value[1].toInt() and 0xFF
-                        expectedResponseLength = (lenHigh shl 8) or lenLow
-                        offset = 2
-                    } else if ((header and 0x40) == 0x40) {
-                        expectedResponseLength = header and 0x1F
-                    } else {
-                        expectedResponseLength = header and 0x1F
-                    }
-
-                    if (value.size > offset) {
-                        responseBuffer.write(value, offset, value.size - offset)
-                    }
-                }
-
-                // Check if we have the full packet
-                if (expectedResponseLength > 0 && responseBuffer.size() >= expectedResponseLength) {
-                    val fullData = responseBuffer.toByteArray()
-                    processCharacteristicData(fullData)
-
-                    // Reset for next
-                    responseBuffer.reset()
-                    expectedResponseLength = -1
-                }
+            val fullData = responseParser.processCharacteristicChange(characteristic.uuid, value)
+            if (fullData != null) {
+                processCharacteristicData(fullData)
             }
         }
 

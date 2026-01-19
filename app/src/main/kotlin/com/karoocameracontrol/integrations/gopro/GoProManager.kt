@@ -629,8 +629,7 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun startRecording() {
-        val cmd = byteArrayOf(0x03, 0x01, 0x01, 0x01)
-        writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
+        writeCharacteristicSuspend(GoProUUID.COMMAND, GoProCommands.Recording.START)
 
         for (i in 1..10) {
             kotlinx.coroutines.delay(500)
@@ -642,8 +641,7 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun stopRecording() {
-        val cmd = byteArrayOf(0x03, 0x01, 0x01, 0x00)
-        writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
+        writeCharacteristicSuspend(GoProUUID.COMMAND, GoProCommands.Recording.STOP)
 
         for (i in 1..5) {
             kotlinx.coroutines.delay(1000)
@@ -662,10 +660,7 @@ class GoProManager private constructor(private val context: Context) {
             else -> 1000
         }
 
-        val m1 = (modeId shr 8).toByte()
-        val m2 = (modeId and 0xFF).toByte()
-
-        val cmd = byteArrayOf(0x04, 0x3E, 0x02, m1, m2)
+        val cmd = GoProCommands.Modes.setMode(modeId)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
 
         kotlinx.coroutines.delay(200)
@@ -673,28 +668,15 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun getAvailablePresets() {
-        // Feature F5, Action 72, Proto: 08 01 (register_preset_status=true)
-        // Length: 4 (F5, 72, 08, 01)
-        val cmd = byteArrayOf(0x04, 0xF5.toByte(), 0x72.toByte(), 0x08, 0x01)
         try {
-            writeCharacteristicSuspend(GoProUUID.QUERY, cmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Presets.GET_AVAILABLE)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get available presets", e)
         }
     }
 
     suspend fun loadPreset(presetId: Int) {
-        // Cmd: 40 (Load Preset)
-        // Length: 4 (32-bit int)
-        // Val: presetId (4 bytes)
-        // Total Pkt Len: 1 (Cmd) + 1 (Len) + 4 (Val) = 6
-
-        val v1 = (presetId shr 24).toByte()
-        val v2 = (presetId shr 16).toByte()
-        val v3 = (presetId shr 8).toByte()
-        val v4 = (presetId and 0xFF).toByte()
-
-        val cmd = byteArrayOf(0x06, 0x40, 0x04, v1, v2, v3, v4)
+        val cmd = GoProCommands.Presets.load(presetId)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
 
         // Optimistically update the active preset name
@@ -710,8 +692,7 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun pollRecordingState() {
         try {
-            val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
-            writeCharacteristicSuspend(GoProUUID.QUERY, statusCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.STATUS)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to poll recording state", e)
         }
@@ -722,45 +703,37 @@ class GoProManager private constructor(private val context: Context) {
         // especially important because timeouts can happen if the camera is busy.
 
         try {
-            val statusCmd = byteArrayOf(0x02, 0x13, 0x0A)
-            writeCharacteristicSuspend(GoProUUID.QUERY, statusCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.STATUS)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll recording state: ${e.message}") }
 
         if (_isRecording.value) {
             try {
-                val durationCmd = byteArrayOf(0x02, 0x13, 0x0D)
-                writeCharacteristicSuspend(GoProUUID.QUERY, durationCmd)
+                writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.DURATION)
             } catch (e: Exception) { Log.w(TAG, "Failed to poll duration: ${e.message}") }
         }
 
         try {
-            val batteryCmd = byteArrayOf(0x02, 0x13, 0x46)
-            writeCharacteristicSuspend(GoProUUID.QUERY, batteryCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.BATTERY)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll battery: ${e.message}") }
 
         try {
-            val remSpaceCmd = byteArrayOf(0x02, 0x13, 0x36)
-            writeCharacteristicSuspend(GoProUUID.QUERY, remSpaceCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.REMAINING_SPACE)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll space: ${e.message}") }
 
         try {
-            val remTimeCmd = byteArrayOf(0x02, 0x13, 0x23)
-            writeCharacteristicSuspend(GoProUUID.QUERY, remTimeCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.REMAINING_VIDEO_TIME)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll remaining time: ${e.message}") }
 
         try {
-            val modeCmd = byteArrayOf(0x02, 0x13, 0x2B)
-            writeCharacteristicSuspend(GoProUUID.QUERY, modeCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.MODE)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll mode: ${e.message}") }
 
         try {
-            val mode96Cmd = byteArrayOf(0x02, 0x13, 0x60)
-            writeCharacteristicSuspend(GoProUUID.QUERY, mode96Cmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.PRESET_GROUP)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll mode 96: ${e.message}") }
 
         try {
-            val activePresetCmd = byteArrayOf(0x02, 0x13, 0x61)
-            writeCharacteristicSuspend(GoProUUID.QUERY, activePresetCmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.ACTIVE_PRESET)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll active preset ID 0x61: ${e.message}") }
 
         // Fetch presets - Critical for UI
@@ -839,8 +812,7 @@ class GoProManager private constructor(private val context: Context) {
 
     private suspend fun registerForStatusUpdatesSuspend() {
         try {
-            val cmd = byteArrayOf(0x09, 0x53, 0x0A, 0x0D, 0x46, 0x36, 0x23, 0x2B, 0x60, 0x61)
-            writeCharacteristicSuspend(GoProUUID.QUERY, cmd)
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.REGISTER_UPDATES)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to register for status updates: ${e.message}")
         }

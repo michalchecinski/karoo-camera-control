@@ -626,12 +626,18 @@ class GoProManager private constructor(private val context: Context) {
             writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.ACTIVE_PRESET)
         } catch (e: Exception) { Log.w(TAG, "Failed to poll active preset ID 0x61: ${e.message}") }
 
-        // Fetch presets - Critical for UI
-        try {
-            kotlinx.coroutines.delay(200) // Small delay to avoid congestion
-            getAvailablePresets()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get available presets", e)
+        // Fetch presets - Critical for UI, retry on failure
+        for (attempt in 1..3) {
+            try {
+                kotlinx.coroutines.delay(300L * attempt) // Increasing delay between retries
+                getAvailablePresets()
+                break // Success, exit retry loop
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to get available presets (attempt $attempt/3): ${e.message}")
+                if (attempt == 3) {
+                    Log.e(TAG, "Failed to get available presets after 3 attempts", e)
+                }
+            }
         }
     }
 
@@ -739,6 +745,15 @@ class GoProManager private constructor(private val context: Context) {
                     @Suppress("UNCHECKED_CAST")
                     activeContinuation = cont as CancellableContinuation<Any?>
                 }
+                cont.invokeOnCancellation {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
+                    // Clean up GATT on cancellation
+                    connectedGatt?.close()
+                    connectedGatt = null
+                }
                 connectedGatt = device.connectGatt(context, true, gattCallback)
             }
         } else {
@@ -748,6 +763,14 @@ class GoProManager private constructor(private val context: Context) {
                         currentOperationType = BleOperationType.CONNECT
                         @Suppress("UNCHECKED_CAST")
                         activeContinuation = cont as CancellableContinuation<Any?>
+                    }
+                    cont.invokeOnCancellation {
+                        synchronized(continuationLock) {
+                            activeContinuation = null
+                            currentOperationType = BleOperationType.NONE
+                        }
+                        connectedGatt?.close()
+                        connectedGatt = null
                     }
                     connectedGatt = device.connectGatt(context, false, gattCallback)
                 }
@@ -764,6 +787,12 @@ class GoProManager private constructor(private val context: Context) {
                     @Suppress("UNCHECKED_CAST")
                     activeContinuation = cont as CancellableContinuation<Any?>
                 }
+                cont.invokeOnCancellation {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
+                }
                 gatt.discoverServices()
             }
         }
@@ -779,6 +808,12 @@ class GoProManager private constructor(private val context: Context) {
                     currentOperationType = BleOperationType.READ_CHARACTERISTIC
                     @Suppress("UNCHECKED_CAST")
                     activeContinuation = cont as CancellableContinuation<Any?>
+                }
+                cont.invokeOnCancellation {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
                 }
                 if (!gatt.readCharacteristic(char)) {
                     synchronized(continuationLock) {
@@ -804,6 +839,12 @@ class GoProManager private constructor(private val context: Context) {
                     currentOperationType = BleOperationType.WRITE_CHARACTERISTIC
                     @Suppress("UNCHECKED_CAST")
                     activeContinuation = cont as CancellableContinuation<Any?>
+                }
+                cont.invokeOnCancellation {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
                 }
                 if (!gatt.writeCharacteristic(char)) {
                     synchronized(continuationLock) {
@@ -832,6 +873,12 @@ class GoProManager private constructor(private val context: Context) {
                     currentOperationType = BleOperationType.WRITE_DESCRIPTOR
                     @Suppress("UNCHECKED_CAST")
                     activeContinuation = cont as CancellableContinuation<Any?>
+                }
+                cont.invokeOnCancellation {
+                    synchronized(continuationLock) {
+                        activeContinuation = null
+                        currentOperationType = BleOperationType.NONE
+                    }
                 }
                 if (!gatt.writeDescriptor(descriptor)) {
                     synchronized(continuationLock) {

@@ -1082,8 +1082,8 @@ class GoProManager private constructor(private val context: Context) {
         private var instance: GoProManager? = null
 
         fun getInstance(context: Context): GoProManager {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: GoProManager(context.applicationContext).also { INSTANCE = it }
+            return instance ?: synchronized(this) {
+                instance ?: GoProManager(context.applicationContext).also { instance = it }
             }
         }
     }

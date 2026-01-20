@@ -1,12 +1,12 @@
 package com.karoocameracontrol.integrations.gopro
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BurstMode
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Circle
-import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Face
@@ -20,12 +20,14 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.NightlightRound
 import androidx.compose.material.icons.filled.Panorama
+import androidx.compose.material.icons.filled.PedalBike
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.ShutterSpeed
 import androidx.compose.material.icons.filled.Skateboarding
 import androidx.compose.material.icons.filled.SlowMotionVideo
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.Timelapse
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.TwoWheeler
@@ -54,7 +56,7 @@ object PresetIcon {
             16 -> Icons.Filled.Speed // TimeWarp 2
             18 -> Icons.Filled.Tune // Custom
             19 -> Icons.Filled.Air // Air
-            20 -> Icons.Filled.DirectionsBike // Bike
+            20 -> Icons.Filled.PedalBike // Bike
             21 -> Icons.Filled.Landscape // Epic (Mountain?)
             22 -> Icons.Filled.Home // Indoor
             23 -> Icons.Filled.TwoWheeler // Motor

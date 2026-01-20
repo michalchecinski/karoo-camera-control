@@ -13,23 +13,23 @@ import kotlinx.coroutines.launch
 
 class GoProBatteryDataType(
     extension: String,
-    private val context: Context
+    private val context: Context,
 ) : DataTypeImpl(extension, "gopro-battery") {
-
     override fun startStream(emitter: Emitter<StreamState>) {
-        val job = CoroutineScope(Dispatchers.IO).launch {
-            val manager = GoProManager.getInstance(context)
-            manager.batteryLevel.collectLatest { level ->
-                emitter.onNext(
-                    StreamState.Streaming(
-                        DataPoint(
-                            dataTypeId,
-                            mapOf(DataType.Field.SINGLE to level.toDouble())
-                        )
+        val job =
+            CoroutineScope(Dispatchers.IO).launch {
+                val manager = GoProManager.getInstance(context)
+                manager.batteryLevel.collectLatest { level ->
+                    emitter.onNext(
+                        StreamState.Streaming(
+                            DataPoint(
+                                dataTypeId,
+                                mapOf(DataType.Field.SINGLE to level.toDouble()),
+                            ),
+                        ),
                     )
-                )
+                }
             }
-        }
         emitter.setCancellable {
             job.cancel()
         }

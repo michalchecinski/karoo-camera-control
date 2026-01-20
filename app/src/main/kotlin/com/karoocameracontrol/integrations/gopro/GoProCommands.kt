@@ -1,7 +1,6 @@
 package com.karoocameracontrol.integrations.gopro
 
 object GoProCommands {
-
     // Command UUID actions
     object Recording {
         val START = byteArrayOf(0x03, 0x01, 0x01, 0x01)

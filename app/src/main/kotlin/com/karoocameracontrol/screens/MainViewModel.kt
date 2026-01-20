@@ -31,74 +31,77 @@ data class MainUiState(
     val availablePresets: List<PresetGroup> = emptyList(),
     val activePresetName: String? = null,
     val activePresetId: Int? = null,
-    val activePresetIcon: Int? = null
+    val activePresetIcon: Int? = null,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
-
     private val goProManager = GoProManager.getInstance(application)
 
     private val _uiState = MutableStateFlow(MainUiState())
 
     // 1. Group Connection Data
-    private val connectionInfo = combine(
-        goProManager.connectionState,
-        goProManager.scannedDevices,
-        goProManager.pairedDevices
-    ) { connectionState, scannedDevices, pairedDevices ->
-        Triple(connectionState, scannedDevices, pairedDevices)
-    }
+    private val connectionInfo =
+        combine(
+            goProManager.connectionState,
+            goProManager.scannedDevices,
+            goProManager.pairedDevices,
+        ) { connectionState, scannedDevices, pairedDevices ->
+            Triple(connectionState, scannedDevices, pairedDevices)
+        }
 
     // 2. Group Status Data
-    private val statusInfo = combine(
-        goProManager.isRecording,
-        goProManager.recordingDuration,
-        goProManager.batteryLevel,
-        goProManager.remainingVideoTime,
-        goProManager.cameraMode
-    ) { isRecording, recordingDuration, batteryLevel, remainingVideoTime, cameraMode ->
-        StatusInfo(isRecording, recordingDuration, batteryLevel, remainingVideoTime, cameraMode)
-    }
+    private val statusInfo =
+        combine(
+            goProManager.isRecording,
+            goProManager.recordingDuration,
+            goProManager.batteryLevel,
+            goProManager.remainingVideoTime,
+            goProManager.cameraMode,
+        ) { isRecording, recordingDuration, batteryLevel, remainingVideoTime, cameraMode ->
+            StatusInfo(isRecording, recordingDuration, batteryLevel, remainingVideoTime, cameraMode)
+        }
 
     // 3. Group Preset Data
-    private val presetInfo = combine(
-        goProManager.availablePresets,
-        goProManager.activePresetName,
-        goProManager.activePresetId,
-        goProManager.activePresetIcon
-    ) { availablePresets, activePresetName, activePresetId, activePresetIcon ->
-        PresetInfo(availablePresets, activePresetName, activePresetId, activePresetIcon)
-    }
+    private val presetInfo =
+        combine(
+            goProManager.availablePresets,
+            goProManager.activePresetName,
+            goProManager.activePresetId,
+            goProManager.activePresetIcon,
+        ) { availablePresets, activePresetName, activePresetId, activePresetIcon ->
+            PresetInfo(availablePresets, activePresetName, activePresetId, activePresetIcon)
+        }
 
     // 4. Combine all groups with local UI state
-    val uiState: StateFlow<MainUiState> = combine(
-        _uiState,
-        connectionInfo,
-        statusInfo,
-        presetInfo
-    ) { localState, connInfo, statInfo, presInfo ->
-        localState.copy(
-            // Connection
-            connectionState = connInfo.first,
-            scannedDevices = connInfo.second,
-            pairedDevices = connInfo.third,
-            // Status
-            isRecording = statInfo.isRecording,
-            recordingDuration = statInfo.recordingDuration,
-            batteryLevel = statInfo.batteryLevel,
-            remainingVideoTime = statInfo.remainingVideoTime,
-            cameraMode = statInfo.cameraMode,
-            // Presets
-            availablePresets = presInfo.availablePresets,
-            activePresetName = presInfo.activePresetName,
-            activePresetId = presInfo.activePresetId,
-            activePresetIcon = presInfo.activePresetIcon
+    val uiState: StateFlow<MainUiState> =
+        combine(
+            _uiState,
+            connectionInfo,
+            statusInfo,
+            presetInfo,
+        ) { localState, connInfo, statInfo, presInfo ->
+            localState.copy(
+                // Connection
+                connectionState = connInfo.first,
+                scannedDevices = connInfo.second,
+                pairedDevices = connInfo.third,
+                // Status
+                isRecording = statInfo.isRecording,
+                recordingDuration = statInfo.recordingDuration,
+                batteryLevel = statInfo.batteryLevel,
+                remainingVideoTime = statInfo.remainingVideoTime,
+                cameraMode = statInfo.cameraMode,
+                // Presets
+                availablePresets = presInfo.availablePresets,
+                activePresetName = presInfo.activePresetName,
+                activePresetId = presInfo.activePresetId,
+                activePresetIcon = presInfo.activePresetIcon,
+            )
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = MainUiState(),
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = MainUiState()
-    )
 
     // Helper Data Classes
     private data class StatusInfo(
@@ -106,40 +109,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val recordingDuration: Int,
         val batteryLevel: Int,
         val remainingVideoTime: Int,
-        val cameraMode: Int
+        val cameraMode: Int,
     )
 
     private data class PresetInfo(
         val availablePresets: List<PresetGroup>,
         val activePresetName: String?,
         val activePresetId: Int?,
-        val activePresetIcon: Int?
+        val activePresetIcon: Int?,
     )
 
     init {
         // Trigger auto-connect logic on init
         // We delay slightly or just check paired devices
-        // Note: In the original code, this was in LaunchedEffect. 
+        // Note: In the original code, this was in LaunchedEffect.
         // Ideally we check if we should auto-connect.
         // For now, we mimic the original logic but kept in ViewModel.
-        // However, `pairedDevices` might not be loaded immediately if it's async, 
+        // However, `pairedDevices` might not be loaded immediately if it's async,
         // but GoProManager loads them in init block which is synchronous for SharedPreferences.
-        
-        // We need to wait until we have the paired devices to decide. 
+
+        // We need to wait until we have the paired devices to decide.
         // Since flows are involved, we launch a collection.
         viewModelScope.launch {
             goProManager.pairedDevices.collect { devices ->
                 if (devices.isNotEmpty() && _uiState.value.connectionState is ConnectionState.Disconnected) {
-                     // Only auto-connect once per app session or if explicitly requested?
-                     // The original code did it in LaunchedEffect(Unit) which is once per composition.
-                     // We'll set a flag to avoid infinite loops if we want.
-                     // For now, let's expose a method to trigger it from UI `LaunchedEffect` to keep it simple 
-                     // or handle it here if we track "initial load".
+                    // Only auto-connect once per app session or if explicitly requested?
+                    // The original code did it in LaunchedEffect(Unit) which is once per composition.
+                    // We'll set a flag to avoid infinite loops if we want.
+                    // For now, let's expose a method to trigger it from UI `LaunchedEffect` to keep it simple
+                    // or handle it here if we track "initial load".
                 }
             }
         }
     }
-    
+
     // Explicit AutoConnect trigger
     fun tryAutoConnect() {
         if (goProManager.pairedDevices.value.isNotEmpty()) {
@@ -149,26 +152,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startScan() = goProManager.startScan()
-    
+
     fun stopScan() {
         goProManager.stopScan()
         // We do NOT disconnect here anymore based on previous fix
     }
 
     fun connect(device: android.bluetooth.BluetoothDevice) = goProManager.connect(device)
-    
+
     fun connectToPaired(address: String) = goProManager.connectToDevice(address)
-    
+
     fun disconnect() {
         goProManager.disconnect()
         _uiState.value = _uiState.value.copy(showMenu = false, isAutoConnecting = false)
     }
-    
+
     fun forgetDevice() {
         goProManager.forgetConnectedDevice()
         _uiState.value = _uiState.value.copy(showMenu = false)
     }
-    
+
     fun removePairedDevice(address: String) = goProManager.removePairedDevice(address)
 
     fun toggleRecording() {
@@ -211,7 +214,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    
+
     // UI Navigation / Dialog State Setters
     fun setShowMenu(show: Boolean) {
         _uiState.value = _uiState.value.copy(showMenu = show)
@@ -224,7 +227,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setShowPresetScreen(show: Boolean) {
         _uiState.value = _uiState.value.copy(showPresetScreen = show)
     }
-    
+
     fun cancelAutoConnect() {
         goProManager.disconnect()
         _uiState.value = _uiState.value.copy(isAutoConnecting = false, showMenu = false)

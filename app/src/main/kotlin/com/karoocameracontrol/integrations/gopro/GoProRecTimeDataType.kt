@@ -13,23 +13,23 @@ import kotlinx.coroutines.launch
 
 class GoProRecTimeDataType(
     extension: String,
-    private val context: Context
+    private val context: Context,
 ) : DataTypeImpl(extension, "gopro-rec-time") {
-
     override fun startStream(emitter: Emitter<StreamState>) {
-        val job = CoroutineScope(Dispatchers.IO).launch {
-            val manager = GoProManager.getInstance(context)
-            manager.recordingDuration.collectLatest { duration ->
-                emitter.onNext(
-                    StreamState.Streaming(
-                        DataPoint(
-                            dataTypeId,
-                            mapOf(DataType.Field.SINGLE to duration.toDouble())
-                        )
+        val job =
+            CoroutineScope(Dispatchers.IO).launch {
+                val manager = GoProManager.getInstance(context)
+                manager.recordingDuration.collectLatest { duration ->
+                    emitter.onNext(
+                        StreamState.Streaming(
+                            DataPoint(
+                                dataTypeId,
+                                mapOf(DataType.Field.SINGLE to duration.toDouble()),
+                            ),
+                        ),
                     )
-                )
+                }
             }
-        }
         emitter.setCancellable {
             job.cancel()
         }

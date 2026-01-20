@@ -13,18 +13,17 @@ data class Preset(
     val isModified: Boolean = false,
     val isFixed: Boolean = false,
     val customName: String? = null,
-    val isVisible: Boolean = true
+    val isVisible: Boolean = true,
 )
 
 data class PresetGroup(
     val id: Int = 0,
     val presets: List<Preset> = emptyList(),
     val canAddPreset: Boolean = false,
-    val iconId: Int = 0
+    val iconId: Int = 0,
 )
 
 object GoProProtobuf {
-
     fun parseNotifyPresetStatus(data: ByteArray): List<PresetGroup> {
         val buffer = ByteBuffer.wrap(data)
         val groups = mutableListOf<PresetGroup>()
@@ -125,7 +124,10 @@ object GoProProtobuf {
         return value
     }
 
-    private fun skipField(buffer: ByteBuffer, type: Int) {
+    private fun skipField(
+        buffer: ByteBuffer,
+        type: Int,
+    ) {
         when (type) {
             0 -> readVarint(buffer) // Varint
             1 -> buffer.position(buffer.position() + 8) // 64-bit

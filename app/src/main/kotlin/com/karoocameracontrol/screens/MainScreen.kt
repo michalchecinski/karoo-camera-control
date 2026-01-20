@@ -24,13 +24,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.karoocameracontrol.integrations.gopro.ConnectionState
-import com.karoocameracontrol.theme.AppTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     permissionsGranted: Boolean,
-    onFinish: () -> Unit
+    onFinish: () -> Unit,
 ) {
     val viewModel: MainViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
@@ -55,14 +54,15 @@ fun MainScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = if (uiState.showFeedbackScreen) {
-                            "Feedback"
-                        } else if (currentState is ConnectionState.Connected) {
-                            "Connected to ${currentState.deviceName ?: "Unknown Device"}"
-                        } else {
-                            "Karoo Camera Control"
-                        },
-                        style = MaterialTheme.typography.titleMedium
+                        text =
+                            if (uiState.showFeedbackScreen) {
+                                "Feedback"
+                            } else if (currentState is ConnectionState.Connected) {
+                                "Connected to ${currentState.deviceName ?: "Unknown Device"}"
+                            } else {
+                                "Karoo Camera Control"
+                            },
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 },
                 actions = {
@@ -72,41 +72,43 @@ fun MainScreen(
                         }
                         DropdownMenu(
                             expanded = uiState.showMenu,
-                            onDismissRequest = { viewModel.setShowMenu(false) }
+                            onDismissRequest = { viewModel.setShowMenu(false) },
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Disconnect") },
                                 onClick = { viewModel.disconnect() },
-                                enabled = currentState is ConnectionState.Connected
+                                enabled = currentState is ConnectionState.Connected,
                             )
                             DropdownMenuItem(
                                 text = { Text("Unpair / Forget") },
                                 onClick = { viewModel.forgetDevice() },
-                                enabled = currentState is ConnectionState.Connected
+                                enabled = currentState is ConnectionState.Connected,
                             )
                             DropdownMenuItem(
                                 text = { Text("Leave Feedback") },
                                 onClick = {
                                     viewModel.setShowFeedbackScreen(true)
                                     viewModel.setShowMenu(false)
-                                }
+                                },
                             )
                         }
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                colors =
+                    TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
             )
-        }
+        },
     ) { paddingValues ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .background(MaterialTheme.colorScheme.background),
         ) {
             val currentState = uiState.connectionState
 
@@ -122,7 +124,7 @@ fun MainScreen(
                     onPresetSelected = { preset ->
                         viewModel.loadPreset(preset.id)
                     },
-                    onBack = { viewModel.setShowPresetScreen(false) }
+                    onBack = { viewModel.setShowPresetScreen(false) },
                 )
             } else {
                 when (val state = currentState) {
@@ -143,20 +145,20 @@ fun MainScreen(
                             onOpenPresetSelection = { viewModel.setShowPresetScreen(true) },
                             onDisconnect = { viewModel.disconnect() },
                             onForget = { viewModel.forgetDevice() },
-                            onFinish = { onFinish() }
+                            onFinish = { onFinish() },
                         )
                     }
                     is ConnectionState.Connecting -> {
                         ConnectingScreen(
                             deviceName = state.deviceName,
-                            onCancel = { viewModel.cancelAutoConnect() }
+                            onCancel = { viewModel.cancelAutoConnect() },
                         )
                     }
                     else -> {
                         if (uiState.isAutoConnecting && currentState is ConnectionState.Disconnected) {
                             ConnectingScreen(
                                 deviceName = null,
-                                onCancel = { viewModel.cancelAutoConnect() }
+                                onCancel = { viewModel.cancelAutoConnect() },
                             )
                         } else {
                             ScanningScreen(
@@ -169,7 +171,7 @@ fun MainScreen(
                                 onConnect = { device -> viewModel.connect(device) },
                                 onConnectToPaired = { address -> viewModel.connectToPaired(address) },
                                 onRemovePaired = { address -> viewModel.removePairedDevice(address) },
-                                onFinish = { onFinish() }
+                                onFinish = { onFinish() },
                             )
                         }
                     }

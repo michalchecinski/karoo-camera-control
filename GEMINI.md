@@ -53,4 +53,7 @@ When implementing Hammerhead Karoo functionality please follow guidelines and co
 *   Separate the business logic with app screens.
 *  Keep the code logically separated, e.g. Hammerhead Karoo integration should be separate of GoPro integration. Each functionality should have it's ow class (e.g. for connectiong with camera and for controlling it).
 
-Do not commit the code unless stated clearly to do so.
+## Additional rules
+
+- Do not commit the code unless stated clearly to do so.
+- Plan first, ask for approval and then implement.

@@ -12,6 +12,7 @@ insert_final_newline = true
 # Disable function naming rule for Compose (Composables use PascalCase)
 ktlint_function_naming = disabled
 ktlint_standard_function-naming = disabled
+max_line_length = off
 
 # Optional: disable trailing comma requirements if you don't want them
 # ktlint_standard_trailing-comma-on-call-site = disabled

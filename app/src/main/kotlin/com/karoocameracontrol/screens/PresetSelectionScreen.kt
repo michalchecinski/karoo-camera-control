@@ -1,5 +1,6 @@
 package com.karoocameracontrol.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,38 +21,38 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.Image
 import com.karoocameracontrol.R
 import com.karoocameracontrol.integrations.gopro.Preset
 import com.karoocameracontrol.integrations.gopro.PresetIcon
 import com.karoocameracontrol.integrations.gopro.PresetTitle
-import androidx.compose.material3.Icon
 
 @Composable
 fun PresetSelectionScreen(
     presets: List<Preset>,
     activePresetId: Int?,
     onPresetSelected: (Preset) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier =
+                Modifier
+                    .fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
                 text = "Select Preset",
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 16.dp),
             )
 
             LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth()
+                modifier = Modifier.weight(1f).fillMaxWidth(),
             ) {
                 items(presets) { preset ->
                     val isActive = preset.id == activePresetId
@@ -63,44 +65,51 @@ fun PresetSelectionScreen(
         Image(
             painter = painterResource(id = R.drawable.back),
             contentDescription = "Back",
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(bottom = 10.dp)
-                .size(54.dp)
-                .clickable {
-                    onBack()
-                }
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(bottom = 10.dp)
+                    .size(54.dp)
+                    .clickable {
+                        onBack()
+                    },
         )
     }
 }
 
 @Composable
-fun PresetItem(preset: Preset, isActive: Boolean, onClick: () -> Unit) {
+fun PresetItem(
+    preset: Preset,
+    isActive: Boolean,
+    onClick: () -> Unit,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .background(if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface)
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .background(if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface)
+                .padding(vertical = 12.dp, horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         val icon = PresetIcon.getIcon(preset.iconId)
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.padding(end = 16.dp).size(24.dp)
+            modifier = Modifier.padding(end = 16.dp).size(24.dp),
         )
 
         // Use custom_name if available (from Proto field 10), otherwise map title_id
-        val name = if (!preset.customName.isNullOrEmpty()) {
-            preset.customName
-        } else {
-            PresetTitle.getTitle(preset.titleId)
-        }
-        
+        val name =
+            if (!preset.customName.isNullOrEmpty()) {
+                preset.customName
+            } else {
+                PresetTitle.getTitle(preset.titleId)
+            }
+
         Text(
             text = name,
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
         )
     }
 }

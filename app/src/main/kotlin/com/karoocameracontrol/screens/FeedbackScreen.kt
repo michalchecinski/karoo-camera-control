@@ -18,45 +18,47 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.karoocameracontrol.R
 
 @Composable
-fun FeedbackScreen(
-    onFinish: () -> Unit
-) {
+fun FeedbackScreen(onFinish: () -> Unit) {
     val scrollState = rememberScrollState()
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top,
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(8.dp)
-                .padding(bottom = 80.dp) // Add padding for back button
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(8.dp)
+                    // Add padding for back button
+                    .padding(bottom = 80.dp),
         ) {
             Text(
                 text = "Like the app? Consider leaving a tip at:",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 8.dp),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             Box(
-                modifier = Modifier
-                    .size(150.dp)
-                    .background(MaterialTheme.colorScheme.surface)
+                modifier =
+                    Modifier
+                        .size(150.dp)
+                        .background(MaterialTheme.colorScheme.surface),
             ) {
                 Text(
                     text = "QR Code 1 Placeholder",
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier.align(Alignment.Center),
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -65,16 +67,17 @@ fun FeedbackScreen(
                 text = "Want to suggest a feature or report a bug? Use the following qr code:",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 8.dp),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             Box(
-                modifier = Modifier
-                    .size(150.dp)
-                    .background(MaterialTheme.colorScheme.surface)
+                modifier =
+                    Modifier
+                        .size(150.dp)
+                        .background(MaterialTheme.colorScheme.surface),
             ) {
                 Text(
                     text = "QR Code 2 Placeholder",
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier.align(Alignment.Center),
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -82,7 +85,7 @@ fun FeedbackScreen(
             Text(
                 text = "Presets use icons from Material Design by Google",
                 style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             Spacer(modifier = Modifier.height(5.dp))
@@ -90,7 +93,7 @@ fun FeedbackScreen(
             Text(
                 text = "This product and/or service is not affiliated with, endorsed by or in any way associated with GoPro Inc. or its products and services. GoPro, HERO, and their respective logos are trademarks or registered trademarks of GoPro, Inc.",
                 style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             Spacer(modifier = Modifier.height(5.dp))
@@ -98,21 +101,22 @@ fun FeedbackScreen(
             Text(
                 text = "THIS PROJECT IS NOT OWNED, COMMISSIONED BY OR ASSOCIATED WITH HAMMERHEAD OR SRAM OR GoPro.",
                 style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
 
         Image(
             painter = painterResource(id = R.drawable.back),
             contentDescription = "Back",
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(bottom = 10.dp)
-                .size(54.dp)
-                .zIndex(1f)
-                .clickable {
-                    onFinish()
-                }
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(bottom = 10.dp)
+                    .size(54.dp)
+                    .zIndex(1f)
+                    .clickable {
+                        onFinish()
+                    },
         )
     }
 }

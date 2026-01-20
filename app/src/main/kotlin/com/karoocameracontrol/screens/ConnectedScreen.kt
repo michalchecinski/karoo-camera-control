@@ -1,23 +1,14 @@
 package com.karoocameracontrol.screens
 
-import com.karoocameracontrol.components.SimpleAlertDialog
-import com.karoocameracontrol.integrations.gopro.PresetGroup
-import com.karoocameracontrol.integrations.gopro.PresetIcon
-import androidx.compose.material3.Icon
-
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,18 +17,23 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import com.karoocameracontrol.R
-
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.karoocameracontrol.R
+import com.karoocameracontrol.components.SimpleAlertDialog
+import com.karoocameracontrol.integrations.gopro.PresetGroup
+import com.karoocameracontrol.integrations.gopro.PresetIcon
 import kotlin.time.Duration.Companion.seconds
 
 @Composable
@@ -51,85 +47,94 @@ fun ConnectedScreen(
     cameraMode: Int,
     availablePresets: List<PresetGroup>,
     activePresetName: String?,
-    activePresetIcon: Int?, // Added Icon ID
+    // Added Icon ID
+    activePresetIcon: Int?,
     onToggleRecording: () -> Unit,
     onSetMode: (Int) -> Unit,
     onOpenPresetSelection: () -> Unit,
     onDisconnect: () -> Unit,
     onForget: () -> Unit,
-    onFinish: () -> Unit
+    onFinish: () -> Unit,
 ) {
     var showForgetConfirmation by remember { mutableStateOf(false) }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(top = 16.dp),
-        contentAlignment = Alignment.TopCenter
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(top = 16.dp),
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Status Row
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 16.dp),
             ) {
                 Text(
                     text = "Battery: $batteryLevel%",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
                 )
 
                 val hours = remainingTime / 3600
                 val minutes = (remainingTime % 3600) / 60
                 val seconds = remainingTime % 60
 
-                val timeText = if (hours > 0) {
-                    "%dh %02dm".format(hours, minutes)
-                } else {
-                    "%02dm %02ds".format(minutes, seconds)
-                }
+                val timeText =
+                    if (hours > 0) {
+                        "%dh %02dm".format(hours, minutes)
+                    } else {
+                        "%02dm %02ds".format(minutes, seconds)
+                    }
 
                 Text(
                     text = "Storage: $timeText",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
                 )
             }
 
             // Mode Selection
             Row(
                 modifier = Modifier.padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
 
+                // Video
                 Button(
-                    onClick = { onSetMode(0) }, // Video
+                    onClick = { onSetMode(0) },
                     enabled = !isProcessing && !isRecording,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (current == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                    )
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = if (current == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                        ),
                 ) {
                     Text("Video")
                 }
 
+                // Photo
                 Button(
-                    onClick = { onSetMode(1) }, // Photo
+                    onClick = { onSetMode(1) },
                     enabled = !isProcessing && !isRecording,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (current == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                    )
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = if (current == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                        ),
                 ) {
                     Text("Photo")
                 }
 
+                // Timelapse
                 Button(
-                    onClick = { onSetMode(2) }, // Timelapse
+                    onClick = { onSetMode(2) },
                     enabled = !isProcessing && !isRecording,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (current == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                    )
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = if (current == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                        ),
                 ) {
                     Text("Timelapse")
                 }
@@ -138,18 +143,18 @@ fun ConnectedScreen(
             activePresetName?.let {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 8.dp),
                 ) {
                     activePresetIcon?.let { iconId ->
                         Icon(
                             imageVector = PresetIcon.getIcon(iconId),
                             contentDescription = null,
-                            modifier = Modifier.padding(end = 8.dp).size(24.dp)
+                            modifier = Modifier.padding(end = 8.dp).size(24.dp),
                         )
                     }
                     Text(
                         text = "Preset: $it",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 }
             }
@@ -162,9 +167,10 @@ fun ConnectedScreen(
                     onClick = onOpenPresetSelection,
                     enabled = !isProcessing && !isRecording,
                     modifier = Modifier.padding(bottom = 16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary
-                    )
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary,
+                        ),
                 ) {
                     Text("Change Preset")
                 }
@@ -172,51 +178,62 @@ fun ConnectedScreen(
 
             if (isRecording) {
                 val duration = recordingDuration.seconds
-                val formattedDuration = duration.toComponents { _, minutes, seconds, _ ->
-                    "%02d:%02d".format(minutes, seconds)
-                }
+                val formattedDuration =
+                    duration.toComponents { _, minutes, seconds, _ ->
+                        "%02d:%02d".format(minutes, seconds)
+                    }
                 Text(
                     text = formattedDuration,
                     style = MaterialTheme.typography.displayMedium,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    modifier = Modifier.padding(bottom = 24.dp),
                 )
             }
 
             Button(
                 onClick = onToggleRecording,
                 enabled = !isProcessing,
-                modifier = Modifier
-                    .width(200.dp)
-                    .height(100.dp)
-                    .padding(bottom = 16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = if (isRecording) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                )
+                modifier =
+                    Modifier
+                        .width(200.dp)
+                        .height(100.dp)
+                        .padding(bottom = 16.dp),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        disabledContainerColor =
+                            if (isRecording) {
+                                MaterialTheme.colorScheme.error.copy(
+                                    alpha = 0.5f,
+                                )
+                            } else {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            },
+                    ),
             ) {
                 if (isProcessing) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(32.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 3.dp
+                        strokeWidth = 3.dp,
                     )
                 } else {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.Center,
                     ) {
                         Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    shape = if (isRecording) RectangleShape else CircleShape
-                                )
+                            modifier =
+                                Modifier
+                                    .size(24.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        shape = if (isRecording) RectangleShape else CircleShape,
+                                    ),
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
                             text = if (isRecording) "Stop" else "Record",
-                            style = MaterialTheme.typography.titleLarge
+                            style = MaterialTheme.typography.titleLarge,
                         )
                     }
                 }
@@ -231,20 +248,21 @@ fun ConnectedScreen(
                 onConfirmation = {
                     onForget()
                     showForgetConfirmation = false
-                }
+                },
             )
         }
 
         Image(
             painter = painterResource(id = R.drawable.back),
             contentDescription = "Back",
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(bottom = 10.dp)
-                .size(54.dp)
-                .clickable {
-                    onFinish()
-                }
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(bottom = 10.dp)
+                    .size(54.dp)
+                    .clickable {
+                        onFinish()
+                    },
         )
     }
 }

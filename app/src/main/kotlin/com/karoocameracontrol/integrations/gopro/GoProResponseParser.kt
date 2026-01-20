@@ -4,7 +4,6 @@ import java.io.ByteArrayOutputStream
 import java.util.UUID
 
 class GoProResponseParser {
-
     private val responseBuffer = ByteArrayOutputStream()
     private var expectedResponseLength = -1
 
@@ -13,7 +12,10 @@ class GoProResponseParser {
      * Handles packet reassembly for GoPro's packetized response protocol.
      * Returns the fully reassembled data packet if complete, or null if waiting for more packets.
      */
-    fun processCharacteristicChange(uuid: UUID, value: ByteArray): ByteArray? {
+    fun processCharacteristicChange(
+        uuid: UUID,
+        value: ByteArray,
+    ): ByteArray? {
         if (uuid != GoProUUID.QUERY_RESPONSE && uuid != GoProUUID.COMMAND_RESPONSE) {
             return null
         }

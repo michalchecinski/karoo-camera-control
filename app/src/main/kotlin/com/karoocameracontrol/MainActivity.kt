@@ -8,7 +8,6 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -17,7 +16,6 @@ import com.karoocameracontrol.screens.MainScreen
 import com.karoocameracontrol.theme.AppTheme
 
 class MainActivity : ComponentActivity() {
-
     private var permissionsGranted by mutableStateOf(false)
 
     private val requestPermissionsLauncher =
@@ -41,7 +39,7 @@ class MainActivity : ComponentActivity() {
             AppTheme {
                 MainScreen(
                     permissionsGranted = permissionsGranted,
-                    onFinish = { finish() }
+                    onFinish = { finish() },
                 )
             }
         }

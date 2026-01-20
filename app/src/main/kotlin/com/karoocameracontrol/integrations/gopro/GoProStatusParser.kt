@@ -13,7 +13,7 @@ data class ParsedStatus(
     val remainingSpace: Long? = null,
     val remainingVideoTime: Int? = null,
     val cameraMode: Int? = null,
-    val activePresetId: Int? = null
+    val activePresetId: Int? = null,
 )
 
 /**
@@ -27,14 +27,14 @@ object GoProStatusParser {
     private const val TAG = "GoProStatusParser"
 
     // Status IDs
-    private const val STATUS_ENCODING: Byte = 0x0A           // 10: Recording state
-    private const val STATUS_VIDEO_PROGRESS: Byte = 0x0D     // 13: Recording duration
+    private const val STATUS_ENCODING: Byte = 0x0A // 10: Recording state
+    private const val STATUS_VIDEO_PROGRESS: Byte = 0x0D // 13: Recording duration
     private const val STATUS_REMAINING_VIDEO_TIME: Byte = 0x23 // 35
     private const val STATUS_ACTIVE_PRESET_GROUP: Byte = 0x2B // 43
-    private const val STATUS_REMAINING_SPACE: Byte = 0x36    // 54
-    private const val STATUS_BATTERY_LEVEL: Byte = 0x46      // 70
-    private const val STATUS_FLAT_MODE: Byte = 0x60          // 96
-    private const val STATUS_ACTIVE_PRESET_ID: Byte = 0x61   // 97
+    private const val STATUS_REMAINING_SPACE: Byte = 0x36 // 54
+    private const val STATUS_BATTERY_LEVEL: Byte = 0x46 // 70
+    private const val STATUS_FLAT_MODE: Byte = 0x60 // 96
+    private const val STATUS_ACTIVE_PRESET_ID: Byte = 0x61 // 97
 
     /**
      * Parse a GoPro status response into structured data.
@@ -115,7 +115,7 @@ object GoProStatusParser {
             remainingSpace = remainingSpace,
             remainingVideoTime = remainingVideoTime,
             cameraMode = cameraMode,
-            activePresetId = activePresetId
+            activePresetId = activePresetId,
         )
     }
 
@@ -127,22 +127,25 @@ object GoProStatusParser {
 
         return when (bytes.size) {
             1 -> bytes[0].toInt() and 0xFF
-            2 -> ((bytes[0].toInt() and 0xFF) shl 8) or
-                 (bytes[1].toInt() and 0xFF)
-            3 -> ((bytes[0].toInt() and 0xFF) shl 16) or
-                 ((bytes[1].toInt() and 0xFF) shl 8) or
-                 (bytes[2].toInt() and 0xFF)
-            4 -> ((bytes[0].toInt() and 0xFF) shl 24) or
-                 ((bytes[1].toInt() and 0xFF) shl 16) or
-                 ((bytes[2].toInt() and 0xFF) shl 8) or
-                 (bytes[3].toInt() and 0xFF)
+            2 ->
+                ((bytes[0].toInt() and 0xFF) shl 8) or
+                    (bytes[1].toInt() and 0xFF)
+            3 ->
+                ((bytes[0].toInt() and 0xFF) shl 16) or
+                    ((bytes[1].toInt() and 0xFF) shl 8) or
+                    (bytes[2].toInt() and 0xFF)
+            4 ->
+                ((bytes[0].toInt() and 0xFF) shl 24) or
+                    ((bytes[1].toInt() and 0xFF) shl 16) or
+                    ((bytes[2].toInt() and 0xFF) shl 8) or
+                    (bytes[3].toInt() and 0xFF)
             else -> {
                 // For longer values, read last 4 bytes
                 val start = bytes.size - 4
                 ((bytes[start].toInt() and 0xFF) shl 24) or
-                ((bytes[start + 1].toInt() and 0xFF) shl 16) or
-                ((bytes[start + 2].toInt() and 0xFF) shl 8) or
-                (bytes[start + 3].toInt() and 0xFF)
+                    ((bytes[start + 1].toInt() and 0xFF) shl 16) or
+                    ((bytes[start + 2].toInt() and 0xFF) shl 8) or
+                    (bytes[start + 3].toInt() and 0xFF)
             }
         }
     }

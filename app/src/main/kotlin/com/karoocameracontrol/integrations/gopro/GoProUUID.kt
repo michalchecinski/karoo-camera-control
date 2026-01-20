@@ -4,7 +4,7 @@ import java.util.UUID
 
 object GoProUUID {
     val GOPRO_SERVICE = UUID.fromString("0000FEA6-0000-1000-8000-00805F9B34FB")
-    
+
     // Correct Base UUID: b5f9XXXX-aa8d-11e3-9046-0002a5d5c51b
     val WIFI_AP_PASSWORD = UUID.fromString("b5f90003-aa8d-11e3-9046-0002a5d5c51b")
     val COMMAND = UUID.fromString("b5f90072-aa8d-11e3-9046-0002a5d5c51b")

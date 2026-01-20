@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0") {
-
     private lateinit var goProManager: GoProManager
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var connectionStateJob: Job? = null
@@ -24,7 +23,7 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
         listOf(
             GoProStatusDataType(extension, applicationContext),
             GoProRecTimeDataType(extension, applicationContext),
-            GoProBatteryDataType(extension, applicationContext)
+            GoProBatteryDataType(extension, applicationContext),
         )
     }
 
@@ -33,22 +32,27 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
         goProManager = GoProManager.getInstance(applicationContext)
 
         // Observe GoProManager connection state
-        connectionStateJob = scope.launch {
-            goProManager.connectionState.collectLatest { state ->
-                when (state) {
-                    is ConnectionState.Connected -> {
-                        Log.d(TAG, "GoPro is Connected! Ready to send commands.")
+        connectionStateJob =
+            scope.launch {
+                goProManager.connectionState.collectLatest { state ->
+                    when (state) {
+                        is ConnectionState.Connected -> {
+                            Log.d(TAG, "GoPro is Connected! Ready to send commands.")
+                        }
+                        is ConnectionState.Disconnected -> {
+                            Log.d(TAG, "GoPro is Disconnected.")
+                        }
+                        else -> { /* Handle other states as needed */ }
                     }
-                    is ConnectionState.Disconnected -> {
-                        Log.d(TAG, "GoPro is Disconnected.")
-                    }
-                    else -> { /* Handle other states as needed */ }
                 }
             }
-        }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         Log.d(TAG, "KarooCameraControlExtension onStartCommand.")
         // If the extension is started manually or by the system,
         // we might want to automatically try to reconnect to a known GoPro.

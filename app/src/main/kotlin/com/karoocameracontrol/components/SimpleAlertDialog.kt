@@ -20,12 +20,13 @@ fun SimpleAlertDialog(
 ) {
     AlertDialog(
         modifier = Modifier.fillMaxWidth(0.92f),
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = true,
-            dismissOnClickOutside = true,
-            dismissOnBackPress = true
-        ),
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = true,
+                dismissOnClickOutside = true,
+                dismissOnBackPress = true,
+            ),
         shape = RoundedCornerShape(20.dp),
         onDismissRequest = {
             onDismissRequest()
@@ -45,5 +46,6 @@ fun SimpleAlertDialog(
         },
         text = {
             Text(text = dialogSubTitle)
-        })
+        },
+    )
 }

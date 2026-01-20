@@ -1,6 +1,7 @@
 package com.karoocameracontrol.integrations.gopro
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -8,7 +9,6 @@ import androidx.compose.material.icons.filled.BurstMode
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.Flight
@@ -40,7 +40,7 @@ object PresetIcon {
     fun getIcon(id: Int): ImageVector {
         return when (id) {
             0 -> Icons.Filled.Videocam // Video
-            1 -> Icons.Filled.DirectionsRun // Activity
+            1 -> Icons.AutoMirrored.Filled.DirectionsRun // Activity
             2 -> Icons.Filled.Movie // Cinematic
             3 -> Icons.Filled.PhotoCamera // Photo
             4 -> Icons.Filled.ShutterSpeed // Live Burst (Approximation)

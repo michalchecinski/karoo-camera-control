@@ -18,8 +18,9 @@
     },
     {
       "matchManagers": ["gradle"],
+      "matchUpdateTypes": ["minor", "patch"],
       "automerge": false,
-      "groupName": null
+      "groupName": "all non-major gradle dependencies"
     },
     {
       "matchUpdateTypes": ["major"],

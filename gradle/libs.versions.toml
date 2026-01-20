@@ -2,11 +2,13 @@
 agp = "8.13.2"
 kotlin = "2.3.0"
 
-androidxCore = "1.17.0"
-androidxLifecycle = "2.10.0"
-androidxActivity = "1.12.2"
-androidxComposeUi = "1.10.1"
-androidxComposeMaterial = "1.4.0"
+# Note: These versions are pinned to match Hammerhead's karoo-ext sample app (compileSdk 35)
+# See .github/renovate.json for version constraints
+androidxCore = "1.13.1"
+androidxLifecycle = "2.8.6"
+androidxActivity = "1.9.3"
+androidxComposeUi = "1.7.4"
+androidxComposeMaterial = "1.3.1"
 glance = "1.1.1"
 
 [plugins]

@@ -14,7 +14,7 @@ ktlint {
 
 android {
     namespace = "com.karoocameracontrol"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.karoocameracontrol"

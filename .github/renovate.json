@@ -33,6 +33,30 @@
     {
       "matchUpdateTypes": ["major"],
       "automerge": false
+    },
+    {
+      "description": "Limit AndroidX versions to match karoo-ext sample (compileSdk 35)",
+      "matchManagers": ["gradle"],
+      "matchPackagePrefixes": ["androidx.core"],
+      "allowedVersions": "<1.14.0"
+    },
+    {
+      "description": "Limit AndroidX Lifecycle to match karoo-ext sample",
+      "matchManagers": ["gradle"],
+      "matchPackagePrefixes": ["androidx.lifecycle"],
+      "allowedVersions": "<2.9.0"
+    },
+    {
+      "description": "Limit AndroidX Activity to match karoo-ext sample",
+      "matchManagers": ["gradle"],
+      "matchPackagePrefixes": ["androidx.activity"],
+      "allowedVersions": "<1.10.0"
+    },
+    {
+      "description": "Limit Compose to match karoo-ext sample (compileSdk 35)",
+      "matchManagers": ["gradle"],
+      "matchPackagePrefixes": ["androidx.compose.ui", "androidx.compose.material", "androidx.compose.foundation", "androidx.compose.animation", "androidx.compose.runtime"],
+      "allowedVersions": "<1.8.0"
     }
   ]
 }

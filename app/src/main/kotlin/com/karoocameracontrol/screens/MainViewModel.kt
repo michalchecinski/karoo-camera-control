@@ -163,10 +163,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun startScan() {
         goProManager.startScan()
         scanTimeoutJob?.cancel()
-        scanTimeoutJob = viewModelScope.launch {
-            delay(120_000) // 2 minutes
-            stopScan()
-        }
+        scanTimeoutJob =
+            viewModelScope.launch {
+                delay(120_000) // 2 minutes
+                stopScan()
+            }
     }
 
     fun stopScan() {

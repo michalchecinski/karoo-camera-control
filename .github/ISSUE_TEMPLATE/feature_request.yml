@@ -11,6 +11,6 @@ body:
     id: feature-description
     attributes:
       label: Feature Description
-      description: A clear and concise description of the feature or enhancement you are requesting.
+      description: Description of the feature or enhancement you are requesting.
     validations:
       required: true

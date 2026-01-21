@@ -477,14 +477,12 @@ class GoProManager private constructor(private val context: Context) {
 
             private fun processProtobufData(value: ByteArray) {
                 // Feature ID 0xF5
+                // Format: [F5] [ActionID] [Payload...]
+                // Note: Unlike other commands, F5 responses often assume success or encode status in proto,
+                // and start payload immediately after ActionID.
                 if (value.size < 2) return
-                val actionId = value[1]
 
-                // We assume Action ID 0x72 or similar corresponds to NotifyPresetStatus
-                // Since we only requested one thing via F5, we try to parse it as presets.
-                // Ideally we check Action ID.
-                // Request: F5 72. Response Action ID: ?? (Likely 72 or 73)
-                // For now, let's try parsing regardless of Action ID if it's F5.
+                val actionId = value[1]
 
                 // Payload is from index 2
                 if (value.size > 2) {

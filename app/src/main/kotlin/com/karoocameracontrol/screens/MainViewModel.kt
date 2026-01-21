@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.PresetGroup
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +21,7 @@ data class MainUiState(
     val isProcessing: Boolean = false,
     val showMenu: Boolean = false,
     val showFeedbackScreen: Boolean = false,
+    val showScanningScreen: Boolean = false,
     val showPresetScreen: Boolean = false,
     // Device Data
     val scannedDevices: List<android.bluetooth.BluetoothDevice> = emptyList(),
@@ -38,6 +41,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val goProManager = GoProManager.getInstance(application)
 
     private val _uiState = MutableStateFlow(MainUiState())
+    private var scanTimeoutJob: Job? = null
 
     // 1. Group Connection Data
     private val connectionInfo =
@@ -133,11 +137,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             goProManager.pairedDevices.collect { devices ->
                 if (devices.isNotEmpty() && _uiState.value.connectionState is ConnectionState.Disconnected) {
-                    // Only auto-connect once per app session or if explicitly requested?
-                    // The original code did it in LaunchedEffect(Unit) which is once per composition.
-                    // We'll set a flag to avoid infinite loops if we want.
-                    // For now, let's expose a method to trigger it from UI `LaunchedEffect` to keep it simple
-                    // or handle it here if we track "initial load".
+                    // Logic to handle auto-connect if needed, currently triggered by LaunchedEffect in MainScreen.
+                }
+            }
+
+            // New logic: When connected, automatically dismiss scanning screen
+            goProManager.connectionState.collect { connectionState ->
+                if (connectionState is ConnectionState.Connected) {
+                    _uiState.value = _uiState.value.copy(showScanningScreen = false)
                 }
             }
         }
@@ -151,9 +158,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun startScan() = goProManager.startScan()
+    fun startScan() {
+        goProManager.startScan()
+        scanTimeoutJob?.cancel()
+        scanTimeoutJob = viewModelScope.launch {
+            delay(120_000) // 2 minutes
+            stopScan()
+        }
+    }
 
     fun stopScan() {
+        scanTimeoutJob?.cancel()
         goProManager.stopScan()
         // We do NOT disconnect here anymore based on previous fix
     }
@@ -222,6 +237,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setShowFeedbackScreen(show: Boolean) {
         _uiState.value = _uiState.value.copy(showFeedbackScreen = show)
+    }
+
+    fun setShowScanningScreen(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showScanningScreen = show)
+        if (!show) {
+            stopScan()
+        }
     }
 
     fun setShowPresetScreen(show: Boolean) {

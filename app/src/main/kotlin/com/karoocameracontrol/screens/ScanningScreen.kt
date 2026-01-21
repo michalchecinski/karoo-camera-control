@@ -114,8 +114,6 @@ fun ScanningScreen(
                             }
                         }
                     }
-                } else if (connectionState == ConnectionState.Scanning) {
-                    // "Scanning..." text and spinner are now above the list. No need for this item.
                 }
             }
         }

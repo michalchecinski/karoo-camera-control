@@ -140,7 +140,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // Logic to handle auto-connect if needed, currently triggered by LaunchedEffect in MainScreen.
                 }
             }
+        }
 
+        viewModelScope.launch {
             // New logic: When connected, automatically dismiss scanning screen
             goProManager.connectionState.collect { connectionState ->
                 if (connectionState is ConnectionState.Connected) {
@@ -184,7 +186,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun forgetDevice() {
         goProManager.forgetConnectedDevice()
-        _uiState.value = _uiState.value.copy(showMenu = false)
+        _uiState.value = _uiState.value.copy(showMenu = false, isAutoConnecting = false)
     }
 
     fun removePairedDevice(address: String) = goProManager.removePairedDevice(address)

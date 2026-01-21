@@ -26,61 +26,14 @@
     },
     {
       "matchManagers": ["gradle"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": ["patch"],
       "automerge": false,
       "groupName": "all non-major gradle dependencies"
     },
     {
-      "matchUpdateTypes": ["major"],
-      "automerge": false
-    },
-    {
-      "description": "Limit AndroidX Core to compileSdk 34 compatibility (Karoo)",
       "matchManagers": ["gradle"],
-      "matchPackagePrefixes": ["androidx.core"],
-      "allowedVersions": "<1.14.0"
-    },
-    {
-      "description": "Limit AndroidX Lifecycle to compileSdk 34 compatibility",
-      "matchManagers": ["gradle"],
-      "matchPackagePrefixes": ["androidx.lifecycle"],
-      "allowedVersions": "<2.9.0"
-    },
-    {
-      "description": "Limit AndroidX Activity to compileSdk 34 compatibility",
-      "matchManagers": ["gradle"],
-      "matchPackagePrefixes": ["androidx.activity"],
-      "allowedVersions": "<1.10.0"
-    },
-    {
-      "description": "Limit Compose UI to compileSdk 34 compatibility",
-      "matchManagers": ["gradle"],
-      "matchPackagePrefixes": ["androidx.compose.ui", "androidx.compose.foundation", "androidx.compose.animation", "androidx.compose.runtime"],
-      "allowedVersions": "<1.8.0"
-    },
-    {
-      "description": "Limit Material3 to compileSdk 34 compatibility",
-      "matchManagers": ["gradle"],
-      "matchPackagePrefixes": ["androidx.compose.material3"],
-      "allowedVersions": "<1.4.0"
-    },
-    {
-      "description": "Limit Material (non-M3) to compileSdk 34 compatibility",
-      "matchManagers": ["gradle"],
-      "matchPackagePrefixes": ["androidx.compose.material:"],
-      "allowedVersions": "<1.8.0"
-    },
-    {
-      "description": "Limit Kotlin to 2.0.x for Gradle DSL compatibility",
-      "matchManagers": ["gradle"],
-      "matchPackageNames": ["org.jetbrains.kotlin.android", "org.jetbrains.kotlin.plugin.compose"],
-      "allowedVersions": "<2.1.0"
-    },
-    {
-      "description": "Limit AGP to 8.x for compatibility",
-      "matchManagers": ["gradle"],
-      "matchPackageNames": ["com.android.application"],
-      "allowedVersions": "<9.0.0"
+      "matchUpdateTypes": ["minor", "major"],
+      "enabled": false
     }
   ]
 }

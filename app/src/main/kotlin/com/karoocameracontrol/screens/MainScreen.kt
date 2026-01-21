@@ -47,6 +47,7 @@ fun MainScreen(
 ) {
     val viewModel: MainViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
+    var showUnpairDialog by remember { mutableStateOf(false) }
 
     // Auto-connect trigger
     LaunchedEffect(Unit) {
@@ -94,7 +95,10 @@ fun MainScreen(
                             )
                             DropdownMenuItem(
                                 text = { Text("Unpair / Forget") },
-                                onClick = { viewModel.forgetDevice() },
+                                onClick = {
+                                    showUnpairDialog = true
+                                    viewModel.setShowMenu(false)
+                                },
                                 enabled = currentState is ConnectionState.Connected,
                             )
                             DropdownMenuItem(
@@ -155,7 +159,7 @@ fun MainScreen(
                     onSetMode = { mode -> viewModel.setMode(mode) },
                     onOpenPresetSelection = { viewModel.setShowPresetScreen(true) },
                     onDisconnect = { viewModel.disconnect() },
-                    onForget = { viewModel.forgetDevice() },
+                    onForget = { showUnpairDialog = true },
                     onFinish = { onFinish() },
                 )
             } else if (uiState.showScanningScreen) {
@@ -196,6 +200,20 @@ fun MainScreen(
                 }
             }
         }
+    }
+
+    if (showUnpairDialog) {
+        val currentState = uiState.connectionState
+        val deviceName = (currentState as? ConnectionState.Connected)?.deviceName ?: "this device"
+        SimpleAlertDialog(
+            dialogTitle = "Confirm Unpair",
+            dialogSubTitle = "Are you sure you want to unpair and forget $deviceName?",
+            onDismissRequest = { showUnpairDialog = false },
+            onConfirmation = {
+                viewModel.forgetDevice()
+                showUnpairDialog = false
+            },
+        )
     }
 }
 

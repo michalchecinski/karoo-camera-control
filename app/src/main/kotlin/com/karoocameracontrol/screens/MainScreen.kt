@@ -5,12 +5,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -65,22 +70,24 @@ fun MainScreen(
             val currentState = uiState.connectionState
             CenterAlignedTopAppBar(
                 title = {
-                    Text(
-                        text =
-                            if (uiState.showFeedbackScreen) {
-                                "Feedback"
-                            } else if (uiState.showScanningScreen) {
-                                "Scan Devices"
-                            } else if (currentState is ConnectionState.Connected) {
-                                "Connected to ${currentState.deviceName ?: "Unknown Device"}"
-                            } else {
-                                "Karoo Camera Control"
-                            },
-                        style = MaterialTheme.typography.titleMedium,
-                    )
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text =
+                                if (uiState.showFeedbackScreen) {
+                                    "Feedback"
+                                } else if (uiState.showScanningScreen) {
+                                    "Scan Devices"
+                                } else if (currentState is ConnectionState.Connected) {
+                                    "Connected to ${currentState.deviceName ?: "Unknown Device"}"
+                                } else {
+                                    "Karoo Camera Control"
+                                },
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
                 },
                 actions = {
-                    if (!uiState.showFeedbackScreen && !uiState.showScanningScreen) {
+                    if (!uiState.showFeedbackScreen) {
                         IconButton(onClick = { viewModel.setShowMenu(true) }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More options")
                         }
@@ -92,6 +99,12 @@ fun MainScreen(
                                 text = { Text("Disconnect") },
                                 onClick = { viewModel.disconnect() },
                                 enabled = currentState is ConnectionState.Connected,
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.LinkOff,
+                                        contentDescription = "Disconnect",
+                                    )
+                                },
                             )
                             DropdownMenuItem(
                                 text = { Text("Unpair / Forget") },
@@ -100,6 +113,12 @@ fun MainScreen(
                                     viewModel.setShowMenu(false)
                                 },
                                 enabled = currentState is ConnectionState.Connected,
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Unpair / Forget",
+                                    )
+                                },
                             )
                             DropdownMenuItem(
                                 text = { Text("Leave Feedback") },
@@ -107,6 +126,12 @@ fun MainScreen(
                                     viewModel.setShowFeedbackScreen(true)
                                     viewModel.setShowMenu(false)
                                 },
+                                leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Info,
+                                            contentDescription = "Leave Feedback",
+                                        )
+                                              },
                             )
                         }
                     }
@@ -117,6 +142,7 @@ fun MainScreen(
                         titleContentColor = MaterialTheme.colorScheme.onPrimary,
                         actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
+                modifier = Modifier.height(36.dp)
             )
         },
     ) { paddingValues ->

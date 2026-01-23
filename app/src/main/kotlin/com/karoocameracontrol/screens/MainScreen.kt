@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -82,7 +81,7 @@ fun MainScreen(
                                 } else {
                                     "Karoo Camera Control"
                                 },
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
                         )
                     }
                 },
@@ -127,11 +126,11 @@ fun MainScreen(
                                     viewModel.setShowMenu(false)
                                 },
                                 leadingIcon = {
-                                        Icon(
-                                            Icons.Default.Info,
-                                            contentDescription = "Leave Feedback",
-                                        )
-                                              },
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = "Leave Feedback",
+                                    )
+                                },
                             )
                         }
                     }
@@ -142,7 +141,7 @@ fun MainScreen(
                         titleContentColor = MaterialTheme.colorScheme.onPrimary,
                         actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
-                modifier = Modifier.height(36.dp)
+                modifier = Modifier.height(36.dp),
             )
         },
     ) { paddingValues ->

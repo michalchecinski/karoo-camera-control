@@ -4,7 +4,7 @@
 
 ## Screenshots
 
-<!-- If you update any UI in the app please add screenshots of those changes, prefferably done on the Karoo device. This section can be removed if no UI changes made in the PR.  -->
+<!-- If you update any UI in the app please add screenshots of those changes, preferably done on the Karoo device. This section can be removed if no UI changes made in the PR.  -->
 
 ## To-do
 

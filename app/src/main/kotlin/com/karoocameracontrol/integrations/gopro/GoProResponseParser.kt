@@ -4,8 +4,17 @@ import java.io.ByteArrayOutputStream
 import java.util.UUID
 
 class GoProResponseParser {
-    private val responseBuffer = ByteArrayOutputStream()
-    private var expectedResponseLength = -1
+    private class BufferState {
+        val responseBuffer = ByteArrayOutputStream()
+        var expectedResponseLength = -1
+
+        fun reset() {
+            responseBuffer.reset()
+            expectedResponseLength = -1
+        }
+    }
+
+    private val buffers = mutableMapOf<UUID, BufferState>()
 
     /**
      * Processes a BLE characteristic change event.
@@ -16,26 +25,28 @@ class GoProResponseParser {
         uuid: UUID,
         value: ByteArray,
     ): ByteArray? {
-        if (uuid != GoProUUID.QUERY_RESPONSE && uuid != GoProUUID.COMMAND_RESPONSE) {
+        if (uuid != GoProUUID.QUERY_RESPONSE && uuid != GoProUUID.COMMAND_RESPONSE && uuid != GoProUUID.SETTING_RESPONSE) {
             return null
         }
 
         if (value.isEmpty()) return null
 
+        val state = buffers.getOrPut(uuid) { BufferState() }
         val header = value[0].toInt() and 0xFF
 
         if ((header and 0x80) == 0x80) {
             // Continuation packet
             // Header is 1 byte (0b1xxxxxxx), payload follows.
             // Check if we are expecting a continuation
-            if (expectedResponseLength == -1) {
-                // Unexpected continuation, discard
+            if (state.expectedResponseLength == -1) {
+                // Unexpected continuation, discard or reset
+                // Ideally we should perhaps ignore, but for robustness let's just return null
                 return null
             }
-            responseBuffer.write(value, 1, value.size - 1)
+            state.responseBuffer.write(value, 1, value.size - 1)
         } else {
             // Start packet
-            responseBuffer.reset()
+            state.reset()
             var offset = 1
 
             if ((header and 0x20) == 0x20) {
@@ -43,27 +54,26 @@ class GoProResponseParser {
                 if (value.size < 2) return null
                 val lenHigh = header and 0x1F
                 val lenLow = value[1].toInt() and 0xFF
-                expectedResponseLength = (lenHigh shl 8) or lenLow
+                state.expectedResponseLength = (lenHigh shl 8) or lenLow
                 offset = 2
             } else if ((header and 0x40) == 0x40) {
                 // 5-bit length
-                expectedResponseLength = header and 0x1F
+                state.expectedResponseLength = header and 0x1F
             } else {
                 // Standard length (also 5-bit in this context usually, or implied)
-                expectedResponseLength = header and 0x1F
+                state.expectedResponseLength = header and 0x1F
             }
 
             if (value.size > offset) {
-                responseBuffer.write(value, offset, value.size - offset)
+                state.responseBuffer.write(value, offset, value.size - offset)
             }
         }
 
         // Check if we have the full packet
-        if (expectedResponseLength > 0 && responseBuffer.size() >= expectedResponseLength) {
-            val fullData = responseBuffer.toByteArray()
+        if (state.expectedResponseLength > 0 && state.responseBuffer.size() >= state.expectedResponseLength) {
+            val fullData = state.responseBuffer.toByteArray()
             // Reset for next
-            responseBuffer.reset()
-            expectedResponseLength = -1
+            state.reset()
             return fullData
         }
 

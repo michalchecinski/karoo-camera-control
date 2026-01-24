@@ -36,6 +36,10 @@ Please adhere to the coding standards in the repository:
 - **Documentation**: Update `NOTICES` and `README.md` if adding new integrations, features, or libraries.
 - **AI Usage**: If using AI coding assistants, or LLMs double-check their output.
 
+## Integrations
+
+For details about the current Bluetooth Low Energy (BLE) implementation and future OpenGoPro SDK migration plans used in this project, see the GoPro integration README in this repository.
+
 ## Operating the Project
 
 To operate the project locally, use the following commands:

@@ -28,9 +28,9 @@ More information about sideloading apps using the Hammerhead Companion app can b
 ### Karoo 2
 
 1. Download [the latest release apk file](https://github.com/michalchecinski/karoo-camera-control/releases/download/latest/app-release.apk)
-2. Follow [DCRainmaker's excallent and detailed guide on the sideloading apps for the Hammerhead Karoo](https://www.dcrainmaker.com/2021/02/how-to-sideload-android-apps-on-your-hammerhead-karoo-1-karoo-2.html).
+2. Follow [DCRainmaker's excellent and detailed guide on the sideloading apps for the Hammerhead Karoo](https://www.dcrainmaker.com/2021/02/how-to-sideload-android-apps-on-your-hammerhead-karoo-1-karoo-2.html).
 
-For more info refer to the [DCRainmaker's excallent and detailed guide on the sideloading apps for the Hammerhead Karoo](https://www.dcrainmaker.com/2021/02/how-to-sideload-android-apps-on-your-hammerhead-karoo-1-karoo-2.html).
+For more info refer to the [DCRainmaker's excellent and detailed guide on the sideloading apps for the Hammerhead Karoo](https://www.dcrainmaker.com/2021/02/how-to-sideload-android-apps-on-your-hammerhead-karoo-1-karoo-2.html).
 
 ## Supported cameras
 

@@ -8,7 +8,7 @@
 
 ## To-do
 
-Before requesting a review, please make sure those to-dos are adressed.
+Before requesting a review, please make sure those to-dos are addressed.
 
 - [ ] Remember that the PR title will end up in the public-facing changelog. Its recipients are non-technical people. Keep that in mind when thinking of the PR name.
 - [ ] Changes were tested on actual Karoo and with at least one supported action cam. Those tests included regression testing.

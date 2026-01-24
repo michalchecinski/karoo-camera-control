@@ -18,7 +18,6 @@ Up-to date [supported GoPro cameras list can be found here](https://gopro.github
 ## Credits
 
 - Uses [karoo-ext](https://github.com/hammerheadnav/karoo-ext) (Apache2.0-licensed)
-- Uses [OpenGoPro](https://gopro.github.io/OpenGoPro/)
 - Uses [Material Design Icons](https://github.com/google/material-design-icons)  (Apache2.0-licensed)
 
 _This product and/or service is not affiliated with, endorsed by or in any way associated with GoPro Inc. or its products and services. GoPro, HERO, and their respective logos are trademarks or registered trademarks of GoPro, Inc._

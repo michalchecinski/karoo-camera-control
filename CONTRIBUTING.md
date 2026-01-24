@@ -34,7 +34,7 @@ Please adhere to the coding standards in the repository:
 - **Testing**: Test changes on an actual Karoo device and with at least one supported action cam. Include regression testing.
 - **Formatting**: Adhere to code formatting standards (see "Operating the Project" section of the document).
 - **Documentation**: Update `NOTICES` and `README.md` if adding new integrations, features, or libraries.
-- **AI Usage**: If using AI coding assistants, or LLMs double-check their output.
+- **AI Usage**: If using AI coding assistants or LLMs, double-check their output.
 
 ## Integrations
 

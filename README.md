@@ -38,7 +38,7 @@ For now only GoPro cameras are supported.
 
 ### GoPro
 
-Up-to date [supported GoPro cameras list can be found here](https://gopro.github.io/OpenGoPro/#compatibility).
+Up-to-date [supported GoPro cameras list can be found here](https://gopro.github.io/OpenGoPro/#compatibility).
 
 ## How can I help?
 

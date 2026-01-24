@@ -7,7 +7,7 @@ This is an extension to control sports action cameras using Hammerhead Karoo cyc
 ## Features
 
 - Connect and manage multiple GoPro cameras.
-- Automatically reconnects to your last-used GoPro camera.
+- Automatically reconnects to your last used GoPro camera.
 - Start and stop recording.
 - Change camera modes (Video, Photo, Timelapse).
 - Select specific presets within each mode.

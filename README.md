@@ -45,6 +45,7 @@ Up-to date [supported GoPro cameras list can be found here](https://gopro.github
 Submit a GitHub issue with a feature request or bug report. If you want to help with the extension development please refer to the [contributing docs](https://github.com/michalchecinski/karoo-camera-control/blob/main/CONTRIBUTING.md).
 
 Is this useful for you? [Buy me a coffee](https://ko-fi.com/michalchecinski).
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/michalchecinski)
 
 This project is actively maintained but without any guarantees.
 

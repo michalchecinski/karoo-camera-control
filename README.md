@@ -23,6 +23,8 @@ For New Karoo (aka Karoo 3), you can use Hammerhead's procedure to install the a
 2. Karoo should show an info prompt about the app installation. Press "Install" button.
 3. Open the app from the main menu and allow the Bluetooth usage.
 
+More information about sideloading apps using the Hammerhead Companion app can be found on the [Hammerhead support page](https://support.hammerhead.io/hc/en-us/articles/31576497036827-Companion-App-Sideloading).
+
 ### Karoo 2
 
 1. Download [the latest release apk file](https://github.com/michalchecinski/karoo-camera-control/releases/download/latest/app-release.apk)

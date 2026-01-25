@@ -57,3 +57,5 @@ This project is actively maintained but without any guarantees.
 _This product and/or service is not affiliated with, endorsed by or in any way associated with GoPro Inc. or its products and services. GoPro, HERO, and their respective logos are trademarks or registered trademarks of GoPro, Inc._
 
 _"Hammerhead", "Karoo", "Karoo SDK", "Karoo 2", "Karoo Extensions" and "karoo-ext" may be copyright and/or trademark and/or property of Hammerhead Navigation Inc or a parent or subsidiary company._
+
+Other credits and acknowledgements can be found in the [NOTICES file](https://github.com/michalchecinski/karoo-camera-control/blob/main/NOTICES.md).

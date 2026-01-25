@@ -27,10 +27,10 @@ Before you begin, ensure you have the following installed:
 Please adhere to the coding standards in the repository:
 
 - **Code Splitting**:
-    - Keep screens (UI) and logic separate.
-    - Place reusable UI components in the `components` directory.
-    - Put camera communication code in `integrations/<camera-brand>`.
-    - Put Karoo extension integration code in `extension`.
+  - Keep screens (UI) and logic separate.
+  - Place reusable UI components in the `components` directory.
+  - Put camera communication code in `integrations/<camera-brand>`.
+  - Put Karoo extension integration code in `extension`.
 - **Testing**: Test changes on an actual Karoo device and with at least one supported action cam. Include regression testing.
 - **Formatting**: Adhere to code formatting standards (see "Operating the Project" section of the document).
 - **Documentation**: Update `NOTICES` and `README.md` if adding new integrations, features, or libraries.

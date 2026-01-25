@@ -13,3 +13,8 @@ tasks:
     silent: true
     cmds:
       - ./gradlew build
+
+  installDebug:
+    silent: true
+    cmds:
+      - ./gradlew installDebug

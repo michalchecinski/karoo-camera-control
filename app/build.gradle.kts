@@ -14,12 +14,12 @@ ktlint {
 
 android {
     namespace = "com.karoocameracontrol"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.karoocameracontrol"
         minSdk = 23
-        targetSdk = 34
+        targetSdk = 35
         versionCode = (System.getenv("BUILD_NUMBER")?.toInt() ?: 1)
         versionName = System.getenv("RELEASE_VERSION") ?: "1.0"
     }
@@ -67,4 +67,5 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.bundles.compose.ui)
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.nordic.ble.client)
 }

@@ -197,6 +197,7 @@ class GoProManager private constructor(private val context: Context) {
     // Coroutine scope for BLE operations
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var connectionJob: Job? = null
+    private var recordingTimerJob: Job? = null
 
     // BLE Operation Management
     private var connectedGatt: BluetoothGatt? = null
@@ -282,7 +283,7 @@ class GoProManager private constructor(private val context: Context) {
                         connectedGatt = null
                         _connectionState.value = ConnectionState.Disconnected
                         _isRecording.value = false
-                        _recordingDuration.value = 0
+                        stopRecordingTimer()
                         // If we were waiting for something else, this is an error
                         synchronized(continuationLock) {
                             if (currentOperationType != BleOperationType.NONE) {
@@ -296,7 +297,7 @@ class GoProManager private constructor(private val context: Context) {
                     connectedGatt = null
                     _connectionState.value = ConnectionState.Error("Connection error: $status")
                     _isRecording.value = false
-                    _recordingDuration.value = 0
+                    stopRecordingTimer()
                     synchronized(continuationLock) {
                         resumeActiveContinuationWithExceptionLocked(Exception("Connection error: $status"))
                     }
@@ -445,8 +446,13 @@ class GoProManager private constructor(private val context: Context) {
 
                 // Apply parsed values to state flows (only if present in response)
                 status.isRecording?.let { recording ->
+                    val wasRecording = _isRecording.value
                     _isRecording.value = recording
-                    if (!recording) _recordingDuration.value = 0
+                    if (recording && !wasRecording) {
+                        startRecordingTimer()
+                    } else if (!recording && wasRecording) {
+                        stopRecordingTimer()
+                    }
                 }
 
                 status.recordingDuration?.let { duration ->
@@ -682,11 +688,7 @@ class GoProManager private constructor(private val context: Context) {
         }
 
         if (_isRecording.value) {
-            try {
-                writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.DURATION)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to poll duration: ${e.message}")
-            }
+            pollDuration() // Only poll duration if already recording, timer will start on isRecording update
         }
 
         try {
@@ -738,6 +740,38 @@ class GoProManager private constructor(private val context: Context) {
                 }
             }
         }
+    }
+
+    private suspend fun pollDuration() {
+        try {
+            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.DURATION)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to poll duration: ${e.message}")
+        }
+    }
+
+    private fun startRecordingTimer() {
+        recordingTimerJob?.cancel()
+        recordingTimerJob =
+            scope.launch {
+                var ticksSinceSync = 0
+                while (isActive) {
+                    kotlinx.coroutines.delay(1000)
+                    _recordingDuration.value += 1
+                    ticksSinceSync++
+
+                    if (ticksSinceSync * 1000L >= RECORDING_SYNC_INTERVAL_MS) {
+                        pollDuration()
+                        ticksSinceSync = 0
+                    }
+                }
+            }
+    }
+
+    private fun stopRecordingTimer() {
+        recordingTimerJob?.cancel()
+        recordingTimerJob = null
+        _recordingDuration.value = 0
     }
 
     fun connect(
@@ -834,7 +868,7 @@ class GoProManager private constructor(private val context: Context) {
         connectedGatt = null
         _connectionState.value = ConnectionState.Disconnected
         _isRecording.value = false
-        _recordingDuration.value = 0
+        stopRecordingTimer()
     }
 
     // Suspend Functions
@@ -1059,6 +1093,7 @@ class GoProManager private constructor(private val context: Context) {
 
         // Polling delays (milliseconds)
         private const val RECORDING_POLL_DELAY_MS = 500L
+        private const val RECORDING_SYNC_INTERVAL_MS = 5_000L
         private const val STOP_RECORDING_POLL_DELAY_MS = 1_000L
         private const val MODE_CHANGE_DELAY_MS = 200L
         private const val PRESET_FETCH_BASE_DELAY_MS = 300L

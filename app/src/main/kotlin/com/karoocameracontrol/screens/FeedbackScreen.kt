@@ -56,8 +56,9 @@ fun FeedbackScreen(onFinish: () -> Unit) {
                         .size(150.dp)
                         .background(MaterialTheme.colorScheme.surface),
             ) {
-                Text(
-                    text = "QR Code 1 Placeholder",
+                Image(
+                    painter = painterResource(id = R.drawable.qrcode_tip),
+                    contentDescription = "QR Code with buy a coffee link",
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
@@ -75,8 +76,9 @@ fun FeedbackScreen(onFinish: () -> Unit) {
                         .size(150.dp)
                         .background(MaterialTheme.colorScheme.surface),
             ) {
-                Text(
-                    text = "QR Code 2 Placeholder",
+                Image(
+                    painter = painterResource(id = R.drawable.qrcode_feedback),
+                    contentDescription = "QR Code with feedback link",
                     modifier = Modifier.align(Alignment.Center),
                 )
             }

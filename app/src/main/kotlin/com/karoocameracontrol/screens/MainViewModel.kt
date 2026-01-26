@@ -21,6 +21,7 @@ data class MainUiState(
     val isProcessing: Boolean = false,
     val showMenu: Boolean = false,
     val showFeedbackScreen: Boolean = false,
+    val showSupportScreen: Boolean = false,
     val showScanningScreen: Boolean = false,
     val showPresetScreen: Boolean = false,
     // Device Data
@@ -240,6 +241,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setShowFeedbackScreen(show: Boolean) {
         _uiState.value = _uiState.value.copy(showFeedbackScreen = show)
+    }
+
+    fun setShowSupportScreen(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showSupportScreen = show)
     }
 
     fun setShowScanningScreen(show: Boolean) {

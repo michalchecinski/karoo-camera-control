@@ -25,7 +25,7 @@ import androidx.compose.ui.zIndex
 import com.karoocameracontrol.R
 
 @Composable
-fun FeedbackScreen(onFinish: () -> Unit) {
+fun SupportScreen(onFinish: () -> Unit) {
     val scrollState = rememberScrollState()
     Box(
         modifier =
@@ -45,7 +45,7 @@ fun FeedbackScreen(onFinish: () -> Unit) {
                     .padding(bottom = 80.dp),
         ) {
             Text(
-                text = "Want to suggest a feature or report a bug? Use the following qr code:",
+                text = "Like the app? Consider leaving a tip at:",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 8.dp),
                 textAlign = TextAlign.Center,
@@ -57,16 +57,23 @@ fun FeedbackScreen(onFinish: () -> Unit) {
                         .background(MaterialTheme.colorScheme.surface),
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.qrcode_feedback),
-                    contentDescription = "QR Code with feedback link",
+                    painter = painterResource(id = R.drawable.qrcode_tip),
+                    contentDescription = "QR Code with buy a coffee link",
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
-
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Presets use icons from Material Design by Google",
+                text = "This product and/or service is not affiliated with, endorsed by or in any way associated with GoPro Inc. or its products and services. GoPro, HERO, and their respective logos are trademarks or registered trademarks of GoPro, Inc.",
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(modifier = Modifier.height(5.dp))
+
+            Text(
+                text = "THIS PROJECT IS NOT OWNED, COMMISSIONED BY OR ASSOCIATED WITH HAMMERHEAD OR SRAM OR GoPro.",
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
             )

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.MoreVert
@@ -74,6 +75,8 @@ fun MainScreen(
                             text =
                                 if (uiState.showFeedbackScreen) {
                                     "Feedback"
+                                } else if (uiState.showSupportScreen) {
+                                    "Support Development"
                                 } else if (uiState.showScanningScreen) {
                                     "Scan Devices"
                                 } else if (currentState is ConnectionState.Connected) {
@@ -86,7 +89,7 @@ fun MainScreen(
                     }
                 },
                 actions = {
-                    if (!uiState.showFeedbackScreen) {
+                    if (!uiState.showFeedbackScreen && !uiState.showSupportScreen) {
                         IconButton(onClick = { viewModel.setShowMenu(true) }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More options")
                         }
@@ -116,6 +119,19 @@ fun MainScreen(
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = "Unpair / Forget",
+                                    )
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Support Development") },
+                                onClick = {
+                                    viewModel.setShowSupportScreen(true)
+                                    viewModel.setShowMenu(false)
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Favorite,
+                                        contentDescription = "Support Development",
                                     )
                                 },
                             )
@@ -156,6 +172,8 @@ fun MainScreen(
 
             if (uiState.showFeedbackScreen) {
                 FeedbackScreen(onFinish = { viewModel.setShowFeedbackScreen(false) })
+            } else if (uiState.showSupportScreen) {
+                SupportScreen(onFinish = { viewModel.setShowSupportScreen(false) })
             } else if (uiState.showPresetScreen) {
                 val currentModeId = if (uiState.cameraMode < 1000) uiState.cameraMode + 1000 else uiState.cameraMode
                 val currentPresets = uiState.availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()

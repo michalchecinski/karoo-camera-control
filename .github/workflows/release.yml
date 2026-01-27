@@ -249,6 +249,8 @@ jobs:
           name: app-release.apk
 
       - name: Download draft release body
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release view ${{ needs.setup.outputs.version }} --json body --template '{{.body}}' > changelog.md
 

@@ -18,9 +18,19 @@ This is an extension to control sports action cameras using Hammerhead Karoo cyc
 
 For New Karoo (aka Karoo 3), you can use Hammerhead's procedure to install the app:
 
-1. Using your phone, long-press [the latest release download link](https://github.com/michalchecinski/karoo-camera-control/releases/latest/download/app-release.apk) and share it with the Hammerhead Companion app.
+1. Using your phone, long-press [the latest release download link](https://github.com/michalchecinski/karoo-camera-control/releases/latest/download/app-release.apk) and share it with the Hammerhead Companion app. You can use the QR code below to sent that page to your phone.
 2. Karoo should show an info prompt about the app installation. Press "Install" button.
 3. Open the app from the main menu and allow the Bluetooth usage.
+
+<details>
+
+<summary>QR code to send this page to your phone</summary>
+
+### Use the following QR code to send this page to your phone for easier uploading the app to the Karoo via companion app on the phone
+
+![QR code for this page](https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://github.com/michalchecinski/karoo-camera-control)
+
+</details>
 
 More information about sideloading apps using the Hammerhead Companion app can be found on the [Hammerhead support page](https://support.hammerhead.io/hc/en-us/articles/31576497036827-Companion-App-Sideloading).
 

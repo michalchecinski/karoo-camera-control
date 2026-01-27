@@ -147,21 +147,16 @@ jobs:
       release_version: ${{ needs.setup.outputs.version }}
     secrets: inherit
 
-  release:
+  draft-release:
+    name: Create Draft Release
     runs-on: ubuntu-24.04
     needs:
-      - build
       - setup
     steps:
       - name: Checkout Repo
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-
-      - name: Download build artifact
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: app-release.apk
 
       - name: Build Changelog
         id: build_changelog
@@ -187,8 +182,56 @@ jobs:
                 "dependencies",
                 "skip-changelog"
               ],
-              "empty_template": "Enchancements and bug fixes.",
+              "empty_template": "Enhancements and bug fixes.",
             }
+
+      - name: Output Changelog to github summary
+        run: |
+          echo "## Changelog" >> $GITHUB_STEP_SUMMARY
+          cat changelog.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Create GitHub Draft Release
+        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
+        if: github.ref_name == 'main'
+        with:
+          tag: ${{ needs.setup.outputs.version }}
+          name: ${{ needs.setup.outputs.version }}
+          bodyFile: changelog.md
+          draft: true
+          prerelease: ${{ inputs.beta }}
+
+  approve-release:
+    name: Approve Release
+    needs:
+      - draft-release
+    runs-on: ubuntu-24.04
+    environment: 'production'
+    steps:
+      - name: Wait for approval
+        run: |
+          echo "Waiting for manual approval to proceed with the release..."
+
+  release:
+    name: Release
+    needs:
+      - setup
+      - build
+      - approve-release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: app-release.apk
+
+      - name: Download draft release body
+        run: |
+          gh release view ${{ needs.setup.outputs.version }} --json body --template '{{.body}}' > changelog.md
 
       - name: Convert changelog to txt
         run: |
@@ -207,19 +250,13 @@ jobs:
           echo "## Manifest JSON" >> $GITHUB_STEP_SUMMARY
           cat manifest.json >> $GITHUB_STEP_SUMMARY
 
-      - name: Output md release notes to github step summary
-        id: release_notes
-        run: |
-          echo "## Release ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          cat changelog.md >> $GITHUB_STEP_SUMMARY
-
-      - name: Create GitHub Release
+      - name: Publish Release
         uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1.20.0
         if: github.ref_name == 'main'
         with:
           tag: ${{ needs.setup.outputs.version }}
           name: ${{ needs.setup.outputs.version }}
-          bodyFile: changelog.md
+          allowUpdates: true
           draft: false
           prerelease: ${{ inputs.beta }}
           artifacts: |

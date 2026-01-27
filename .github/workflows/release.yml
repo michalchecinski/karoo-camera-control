@@ -20,19 +20,33 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.calculate.outputs.version }}
+      last_version: ${{ steps.calculate.outputs.last_version }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
+      - name: Get latest release version
+        id: get_latest_release
+        env:
+          IS_BETA: ${{ inputs.beta }}
+        run: |
+          if [[ "$IS_BETA" == "true" ]]; then
+            latest_version=$(git tag --sort=committerdate --list | tail -1)
+          else
+            latest_version=$(git tag --sort=committerdate --list | grep -v -- '-beta' | tail -1)
+          fi
+          echo "Latest version: $latest_version"
+          echo "last_version=$latest_version" >> $GITHUB_OUTPUT
+
       - name: Determine release type
         id: get-release-type
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST_TAG: ${{ steps.get_latest_release.outputs.last_version }}
         run: |
-          # Find latest tag
-          latest_tag=$(git tag --sort=committerdate --list | tail -1)
+          latest_tag=${{ steps.get_latest_release.outputs.last_version }}
 
           if [ -z "$latest_tag" ]; then
             echo "No tags found. Defaulting to minor for first release."
@@ -162,6 +176,9 @@ jobs:
         id: build_changelog
         uses: mikepenz/release-changelog-builder-action@439f79b5b5428107c7688c1d2b0e8bacc9b8792c # v6.0.1
         with:
+          fromTag: ${{ github.ref_name == 'main' && needs.setup.outputs.version != '' && format('v{0}', needs.setup.outputs.version) || '' }}
+          toTag: ${{ github.sha }}
+          ignorePreReleases: ${{ !inputs.beta }}
           outputFile: changelog.md
           configurationJson: |
             {

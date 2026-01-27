@@ -2,7 +2,7 @@
 
 This is an extension to control sports action cameras using Hammerhead Karoo cycling computer.
 
-[![Build](https://github.com/michalchecinski/karoo-camera-control/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/michalchecinski/karoo-camera-control/actions/workflows/ci.yml) [![Latest Release](https://img.shields.io/github/v/release/michalchecinski/karoo-camera-control?label=Latest%20Release)](https://github.com/michalchecinski/karoo-camera-control/releases/latest/) [![GitHub Downloads](https://img.shields.io/github/downloads/michalchecinski/karoo-camera-control/app-release.apk)](https://github.com/michalchecinski/karoo-camera-control/releases)
+[![Build](https://github.com/michalchecinski/karoo-camera-control/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/michalchecinski/karoo-camera-control/actions/workflows/ci.yml) [![Latest Release](https://img.shields.io/github/v/release/michalchecinski/karoo-camera-control?label=Latest%20Release)](https://github.com/michalchecinski/karoo-camera-control/releases/latest/) [![GitHub Downloads](https://img.shields.io/github/downloads/michalchecinski/karoo-camera-control/karoo-camera-control.apk)](https://github.com/michalchecinski/karoo-camera-control/releases)
 
 ## Features
 
@@ -18,7 +18,7 @@ This is an extension to control sports action cameras using Hammerhead Karoo cyc
 
 For New Karoo (aka Karoo 3), you can use Hammerhead's procedure to install the app:
 
-1. Using your phone, long-press [the latest release download link](https://github.com/michalchecinski/karoo-camera-control/releases/latest/download/app-release.apk) and share it with the Hammerhead Companion app. You can use the QR code below to sent that page to your phone.
+1. Using your phone, long-press [the latest release download link](https://github.com/michalchecinski/karoo-camera-control/releases/latest/download/karoo-camera-control.apk) and share it with the Hammerhead Companion app. You can use the QR code below to sent that page to your phone.
 2. Karoo should show an info prompt about the app installation. Press "Install" button.
 3. Open the app from the main menu and allow the Bluetooth usage.
 
@@ -36,7 +36,7 @@ More information about sideloading apps using the Hammerhead Companion app can b
 
 ### Karoo 2
 
-1. Download [the latest release apk file](https://github.com/michalchecinski/karoo-camera-control/releases/download/latest/app-release.apk)
+1. Download [the latest release apk file](https://github.com/michalchecinski/karoo-camera-control/releases/download/latest/karoo-camera-control.apk)
 2. Follow [DCRainmaker's excellent and detailed guide on the sideloading apps for the Hammerhead Karoo](https://www.dcrainmaker.com/2021/02/how-to-sideload-android-apps-on-your-hammerhead-karoo-1-karoo-2.html).
 
 For more info refer to the [DCRainmaker's excellent and detailed guide on the sideloading apps for the Hammerhead Karoo](https://www.dcrainmaker.com/2021/02/how-to-sideload-android-apps-on-your-hammerhead-karoo-1-karoo-2.html).

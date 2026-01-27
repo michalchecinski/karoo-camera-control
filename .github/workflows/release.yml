@@ -246,7 +246,7 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          name: app-release.apk
+          name: karoo-camera-control.apk
 
       - name: Download draft release body
         env:
@@ -263,7 +263,7 @@ jobs:
       - name: Get sha256 checksum
         id: checksum
         run: |
-          sha256sum app-release.apk | awk '{print $1}' > apk.sha256
+          sha256sum karoo-camera-control.apk | awk '{print $1}' > apk.sha256
           checksum=$(cat apk.sha256)
           echo "checksum=$checksum" >> $GITHUB_OUTPUT
 
@@ -288,7 +288,7 @@ jobs:
           draft: false
           prerelease: ${{ inputs.beta }}
           artifacts: |
-            app-release.apk
+            karoo-camera-control.apk
             manifest.json
             resources/karoo-camera-control-icon.png
             resources/camera-controls.png

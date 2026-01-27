@@ -45,6 +45,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: app-release.apk
-          path: app/build/outputs/apk/release/app-release.apk
+          name: karoo-camera-control.apk
+          path: app/build/outputs/apk/release/karoo-camera-control.apk
           if-no-files-found: error

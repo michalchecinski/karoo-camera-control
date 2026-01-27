@@ -182,7 +182,7 @@ jobs:
                 "dependencies",
                 "skip-changelog"
               ],
-              "empty_template": "Enchancements and bug fixes.",
+              "empty_template": "Enhancements and bug fixes.",
             }
 
       - name: Output Changelog to github summary

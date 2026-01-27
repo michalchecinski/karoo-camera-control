@@ -22,7 +22,7 @@ android {
         targetSdk = 34
         versionCode = (System.getenv("BUILD_NUMBER")?.toInt() ?: 1)
         versionName = System.getenv("RELEASE_VERSION") ?: "1.0"
-        manifestPlaceholders["releaseVersion"] = System.getenv("RELEASE_VERSION") ?: "latest"
+
     }
 
     signingConfigs {
@@ -42,11 +42,13 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
+            manifestPlaceholders["releaseVersion"] = "latest"
         }
         release {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            manifestPlaceholders["releaseVersion"] = System.getenv("RELEASE_VERSION") ?: "latest"
         }
     }
     compileOptions {

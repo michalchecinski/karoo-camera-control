@@ -47,7 +47,7 @@ android {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            manifestPlaceholders["releaseVersion"] = System.getenv("RELEASE_VERSION") ?: "latest"
+            manifestPlaceholders["releaseVersion"] = System.getenv("RELEASE_VERSION").takeUnless { it.isNullOrBlank() } ?: "latest"
         }
     }
     compileOptions {

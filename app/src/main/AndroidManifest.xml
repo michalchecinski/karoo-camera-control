@@ -39,7 +39,7 @@
 
         <meta-data
             android:name="io.hammerhead.karooext.MANIFEST_URL"
-            android:value="https://github.com/michalchecinski/karoo-camera-control/releases/$RELEASE_VERSION$/download/manifest.json" />
+            android:value="https://github.com/michalchecinski/karoo-camera-control/releases/download/$RELEASE_VERSION$/manifest.json" />
     </application>
 
 </manifest>

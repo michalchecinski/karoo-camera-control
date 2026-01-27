@@ -22,6 +22,7 @@ android {
         targetSdk = 34
         versionCode = (System.getenv("BUILD_NUMBER")?.toInt() ?: 1)
         versionName = System.getenv("RELEASE_VERSION") ?: "1.0"
+        manifestPlaceholders["releaseVersion"] = System.getenv("RELEASE_VERSION") ?: "latest"
     }
 
     signingConfigs {

@@ -60,13 +60,11 @@ class GoProManager private constructor(private val context: Context) {
         context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     }
 
-    private val bluetoothAdapter: BluetoothAdapter? by lazy {
-        bluetoothManager.adapter
-    }
+    private val bluetoothAdapter: BluetoothAdapter?
+        get() = bluetoothManager.adapter
 
-    private val bluetoothLeScanner by lazy {
-        bluetoothAdapter?.bluetoothLeScanner
-    }
+    private val bluetoothLeScanner
+        get() = bluetoothAdapter?.bluetoothLeScanner
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()

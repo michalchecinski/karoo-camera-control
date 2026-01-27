@@ -239,10 +239,17 @@ jobs:
           sudo apt-get install -y pandoc
           pandoc changelog.md -t plain -o changelog.txt
 
+      - name: Get sha256 checksum
+        id: checksum
+        run: |
+          sha256sum app-release.apk | awk '{print $1}' > apk.sha256
+          checksum=$(cat apk.sha256)
+          echo "checksum=$checksum" >> $GITHUB_OUTPUT
+
       - name: Prepare manifest
         run: |
           chmod +x .github/scripts/prepare-manifest.sh
-          ./.github/scripts/prepare-manifest.sh ${{ needs.setup.outputs.version }} ${{ github.run_number }} changelog.txt
+          ./.github/scripts/prepare-manifest.sh ${{ needs.setup.outputs.version }} ${{ github.run_number }} changelog.txt ${{ steps.checksum.outputs.checksum }}
 
       - name: Output manifest to a github step summary
         id: manifest

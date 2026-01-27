@@ -19,6 +19,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelUuid
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.CancellableContinuation
@@ -198,6 +199,7 @@ class GoProManager private constructor(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var connectionJob: Job? = null
     private var recordingTimerJob: Job? = null
+    private var recordingStartTimeMs: Long = 0L
 
     // BLE Operation Management
     private var connectedGatt: BluetoothGatt? = null
@@ -457,6 +459,7 @@ class GoProManager private constructor(private val context: Context) {
 
                 status.recordingDuration?.let { duration ->
                     _recordingDuration.value = duration
+                    recordingStartTimeMs = SystemClock.elapsedRealtime() - (duration * 1000L)
                 }
 
                 status.batteryLevel?.let { battery ->
@@ -752,15 +755,27 @@ class GoProManager private constructor(private val context: Context) {
 
     private fun startRecordingTimer() {
         recordingTimerJob?.cancel()
+        if (_recordingDuration.value == 0) {
+            recordingStartTimeMs = SystemClock.elapsedRealtime()
+        } else {
+             recordingStartTimeMs = SystemClock.elapsedRealtime() - (_recordingDuration.value * 1000L)
+        }
+
         recordingTimerJob =
             scope.launch {
                 var ticksSinceSync = 0
                 while (isActive) {
-                    kotlinx.coroutines.delay(1000)
-                    _recordingDuration.value += 1
-                    ticksSinceSync++
+                    kotlinx.coroutines.delay(200) // Update UI frequently
 
-                    if (ticksSinceSync * 1000L >= RECORDING_SYNC_INTERVAL_MS) {
+                    val now = SystemClock.elapsedRealtime()
+                    val newDuration = ((now - recordingStartTimeMs) / 1000).toInt()
+
+                    if (newDuration != _recordingDuration.value) {
+                         _recordingDuration.value = newDuration
+                    }
+
+                    ticksSinceSync++
+                    if (ticksSinceSync * 200L >= RECORDING_SYNC_INTERVAL_MS) {
                         pollDuration()
                         ticksSinceSync = 0
                     }

@@ -768,7 +768,7 @@ class GoProManager private constructor(private val context: Context) {
         if (_recordingDuration.value == 0) {
             recordingStartTimeMs = SystemClock.elapsedRealtime()
         } else {
-             recordingStartTimeMs = SystemClock.elapsedRealtime() - (_recordingDuration.value * 1000L)
+            recordingStartTimeMs = SystemClock.elapsedRealtime() - (_recordingDuration.value * 1000L)
         }
 
         recordingTimerJob =
@@ -781,7 +781,7 @@ class GoProManager private constructor(private val context: Context) {
                     val newDuration = ((now - recordingStartTimeMs) / 1000).toInt()
 
                     if (newDuration != _recordingDuration.value) {
-                         _recordingDuration.value = newDuration
+                        _recordingDuration.value = newDuration
                     }
 
                     ticksSinceSync++

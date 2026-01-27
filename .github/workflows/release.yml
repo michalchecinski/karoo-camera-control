@@ -222,6 +222,7 @@ jobs:
     name: Approve Release
     needs:
       - draft-release
+    if: github.ref_name == 'main'
     runs-on: ubuntu-24.04
     environment: 'production'
     steps:

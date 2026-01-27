@@ -620,14 +620,22 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun stopRecording() {
-        writeCharacteristicSuspend(GoProUUID.COMMAND, GoProCommands.Recording.STOP)
+        pauseRecordingTimer()
+        try {
+            writeCharacteristicSuspend(GoProUUID.COMMAND, GoProCommands.Recording.STOP)
 
-        for (i in 1..RECORDING_STOP_MAX_POLLS) {
-            kotlinx.coroutines.delay(STOP_RECORDING_POLL_DELAY_MS)
-            if (!_isRecording.value) {
-                break
+            for (i in 1..RECORDING_STOP_MAX_POLLS) {
+                kotlinx.coroutines.delay(STOP_RECORDING_POLL_DELAY_MS)
+                if (!_isRecording.value) {
+                    break
+                }
+                pollRecordingState()
             }
-            pollRecordingState()
+        } finally {
+            // If we are still recording (stop failed or timed out), resume the timer
+            if (_isRecording.value) {
+                startRecordingTimer()
+            }
         }
     }
 
@@ -755,6 +763,8 @@ class GoProManager private constructor(private val context: Context) {
 
     private fun startRecordingTimer() {
         recordingTimerJob?.cancel()
+        // Initialize start time if not already set (e.g. if we just started recording)
+        // If we are resuming, the first poll will correct this.
         if (_recordingDuration.value == 0) {
             recordingStartTimeMs = SystemClock.elapsedRealtime()
         } else {
@@ -781,6 +791,11 @@ class GoProManager private constructor(private val context: Context) {
                     }
                 }
             }
+    }
+
+    private fun pauseRecordingTimer() {
+        recordingTimerJob?.cancel()
+        recordingTimerJob = null
     }
 
     private fun stopRecordingTimer() {

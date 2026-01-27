@@ -183,6 +183,7 @@ jobs:
                 "skip-changelog"
               ],
               "empty_template": "Enhancements and bug fixes.",
+              "pr_template": "- #{{TITLE}}"
             }
 
       - name: Output Changelog to github summary

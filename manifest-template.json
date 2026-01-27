@@ -1,10 +1,11 @@
 {
     "label": "Camera Control",
     "packageName": "com.karoocameracontrol",
-    "iconUrl": "https://github.com/michalchecinski/karoo-camera-control/releases/__VERSION_NUMBER_PLACEHOLDER__/download/karoo-camera-control-icon.png",
-    "latestApkUrl": "https://github.com/michalchecinski/karoo-camera-control/releases/__VERSION_NUMBER_PLACEHOLDER__/download/app-release.apk",
+    "iconUrl": "https://github.com/michalchecinski/karoo-camera-control/releases/download/__VERSION_NUMBER_PLACEHOLDER__/karoo-camera-control-icon.png",
+    "latestApkUrl": "https://github.com/michalchecinski/karoo-camera-control/releases/download/__VERSION_NUMBER_PLACEHOLDER__/app-release.apk",
     "latestVersion": "__VERSION_NUMBER_PLACEHOLDER__",
     "latestVersionCode": __VERSION_CODE_PLACEHOLDER__,
+    "apkSha256": "__APK_SHA256_PLACEHOLDER__",
     "developer": "Michal C.",
     "description": "Extension that allows control of a connected action camera from the bike computer.",
     "releaseNotes": "__RELEASE_NOTES_PLACEHOLDER__",

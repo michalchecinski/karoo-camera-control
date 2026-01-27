@@ -186,7 +186,6 @@ jobs:
             }
 
       - name: Output Changelog to github summary
-        if: github.ref_name != 'main'
         run: |
           echo "## Changelog" >> $GITHUB_STEP_SUMMARY
           cat changelog.md >> $GITHUB_STEP_SUMMARY

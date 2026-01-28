@@ -14,7 +14,7 @@ ktlint {
 
 android {
     namespace = "com.karoocameracontrol"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.karoocameracontrol"
@@ -69,4 +69,6 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.bundles.compose.ui)
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.nordic.ble.client)
+    implementation(libs.nordic.ble.core)
 }

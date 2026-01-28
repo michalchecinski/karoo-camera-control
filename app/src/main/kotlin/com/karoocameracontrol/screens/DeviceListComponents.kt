@@ -1,7 +1,5 @@
 package com.karoocameracontrol.screens
 
-import android.annotation.SuppressLint
-import android.bluetooth.BluetoothDevice
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.karoocameracontrol.integrations.gopro.PairedDevice
+import com.karoocameracontrol.integrations.gopro.ScannedDevice
 
 @Composable
 fun PairedDeviceItem(
@@ -51,11 +50,10 @@ fun PairedDeviceItem(
     }
 }
 
-@SuppressLint("MissingPermission")
 @Composable
 fun DeviceItem(
-    device: BluetoothDevice,
-    onConnectClick: (BluetoothDevice) -> Unit,
+    device: ScannedDevice,
+    onConnectClick: (ScannedDevice) -> Unit,
 ) {
     Row(
         modifier =

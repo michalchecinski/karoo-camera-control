@@ -3,7 +3,7 @@ package com.karoocameracontrol.screens
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.karoocameracontrol.integrations.gopro.ConnectionState
+import com.karoocameracontrol.integrations.gopro.GoProConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.PresetGroup
 import kotlinx.coroutines.Job
@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class MainUiState(
-    val connectionState: ConnectionState = ConnectionState.Disconnected,
+    val connectionState: GoProConnectionState = GoProConnectionState.Disconnected,
     val isAutoConnecting: Boolean = false,
     val isProcessing: Boolean = false,
     val showMenu: Boolean = false,
@@ -24,7 +24,7 @@ data class MainUiState(
     val showScanningScreen: Boolean = false,
     val showPresetScreen: Boolean = false,
     // Device Data
-    val scannedDevices: List<android.bluetooth.BluetoothDevice> = emptyList(),
+    val scannedDevices: List<com.karoocameracontrol.integrations.gopro.ScannedDevice> = emptyList(),
     val pairedDevices: List<com.karoocameracontrol.integrations.gopro.PairedDevice> = emptyList(),
     val isRecording: Boolean = false,
     val recordingDuration: Int = 0,
@@ -136,7 +136,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Since flows are involved, we launch a collection.
         viewModelScope.launch {
             goProManager.pairedDevices.collect { devices ->
-                if (devices.isNotEmpty() && _uiState.value.connectionState is ConnectionState.Disconnected) {
+                if (devices.isNotEmpty() && _uiState.value.connectionState is GoProConnectionState.Disconnected) {
                     // Logic to handle auto-connect if needed, currently triggered by LaunchedEffect in MainScreen.
                 }
             }
@@ -145,7 +145,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             // New logic: When connected, automatically dismiss scanning screen
             goProManager.connectionState.collect { connectionState ->
-                if (connectionState is ConnectionState.Connected) {
+                if (connectionState is GoProConnectionState.Connected) {
                     _uiState.value = _uiState.value.copy(showScanningScreen = false)
                 }
             }
@@ -176,7 +176,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // We do NOT disconnect here anymore based on previous fix
     }
 
-    fun connect(device: android.bluetooth.BluetoothDevice) = goProManager.connect(device)
+    fun connect(device: com.karoocameracontrol.integrations.gopro.ScannedDevice) = goProManager.connect(device)
 
     fun connectToPaired(address: String) = goProManager.connectToDevice(address)
 

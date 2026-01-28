@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.karoocameracontrol.R
 import com.karoocameracontrol.components.SimpleAlertDialog
-import com.karoocameracontrol.integrations.gopro.ConnectionState
+import com.karoocameracontrol.integrations.gopro.GoProConnectionState
 import com.karoocameracontrol.integrations.gopro.PairedDevice
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,7 +76,7 @@ fun MainScreen(
                                     "Feedback"
                                 } else if (uiState.showScanningScreen) {
                                     "Scan Devices"
-                                } else if (currentState is ConnectionState.Connected) {
+                                } else if (currentState is GoProConnectionState.Connected) {
                                     "Connected to ${currentState.deviceName ?: "Unknown Device"}"
                                 } else {
                                     "Karoo Camera Control"
@@ -97,7 +97,7 @@ fun MainScreen(
                             DropdownMenuItem(
                                 text = { Text("Disconnect") },
                                 onClick = { viewModel.disconnect() },
-                                enabled = currentState is ConnectionState.Connected,
+                                enabled = currentState is GoProConnectionState.Connected,
                                 leadingIcon = {
                                     Icon(
                                         Icons.Default.LinkOff,
@@ -111,7 +111,7 @@ fun MainScreen(
                                     showUnpairDialog = true
                                     viewModel.setShowMenu(false)
                                 },
-                                enabled = currentState is ConnectionState.Connected,
+                                enabled = currentState is GoProConnectionState.Connected,
                                 leadingIcon = {
                                     Icon(
                                         Icons.Default.Delete,
@@ -168,7 +168,7 @@ fun MainScreen(
                     },
                     onBack = { viewModel.setShowPresetScreen(false) },
                 )
-            } else if (currentState is ConnectionState.Connected) {
+            } else if (currentState is GoProConnectionState.Connected) {
                 ConnectedScreen(
                     deviceName = currentState.deviceName,
                     isRecording = uiState.isRecording,
@@ -200,14 +200,14 @@ fun MainScreen(
                 )
             } else {
                 when (val state = currentState) {
-                    is ConnectionState.Connecting -> {
+                    is GoProConnectionState.Connecting -> {
                         ConnectingScreen(
                             deviceName = state.deviceName,
                             onCancel = { viewModel.cancelAutoConnect() },
                         )
                     }
                     else -> {
-                        if (uiState.isAutoConnecting && currentState is ConnectionState.Disconnected) {
+                        if (uiState.isAutoConnecting && currentState is GoProConnectionState.Disconnected) {
                             ConnectingScreen(
                                 deviceName = null,
                                 onCancel = { viewModel.cancelAutoConnect() },
@@ -229,7 +229,7 @@ fun MainScreen(
 
     if (showUnpairDialog) {
         val currentState = uiState.connectionState
-        val deviceName = (currentState as? ConnectionState.Connected)?.deviceName ?: "this device"
+        val deviceName = (currentState as? GoProConnectionState.Connected)?.deviceName ?: "this device"
         SimpleAlertDialog(
             dialogTitle = "Confirm Unpair",
             dialogSubTitle = "Are you sure you want to unpair and forget $deviceName?",

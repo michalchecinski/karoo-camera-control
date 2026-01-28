@@ -1,6 +1,7 @@
 package com.karoocameracontrol.screens
 
-import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,28 +25,30 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.karoocameracontrol.R
-import com.karoocameracontrol.integrations.gopro.ConnectionState
+import com.karoocameracontrol.integrations.gopro.GoProConnectionState
 import com.karoocameracontrol.integrations.gopro.PairedDevice
+import com.karoocameracontrol.integrations.gopro.ScannedDevice
 
 @Composable
 fun ScanningScreen(
-    connectionState: ConnectionState,
-    scannedDevices: List<BluetoothDevice>,
+    connectionState: GoProConnectionState,
+    scannedDevices: List<ScannedDevice>,
     pairedDevices: List<PairedDevice>,
     permissionsGranted: Boolean,
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
-    onConnect: (BluetoothDevice) -> Unit,
+    onConnect: (ScannedDevice) -> Unit,
     onFinish: () -> Unit,
 ) {
     LaunchedEffect(permissionsGranted) {
         if (permissionsGranted &&
-            connectionState !is ConnectionState.Scanning &&
-            connectionState !is ConnectionState.Connecting &&
-            connectionState !is ConnectionState.Connected
+            connectionState !is GoProConnectionState.Scanning &&
+            connectionState !is GoProConnectionState.Connecting &&
+            connectionState !is GoProConnectionState.Connected
         ) {
             onStartScan()
         }
@@ -55,6 +59,8 @@ fun ScanningScreen(
             onStopScan()
         }
     }
+
+    val context = LocalContext.current
 
     Box(
         modifier =
@@ -83,14 +89,28 @@ fun ScanningScreen(
                 modifier = Modifier.padding(bottom = 8.dp),
             )
 
-            if (connectionState is ConnectionState.Connecting) {
-                Text(text = "Connecting to ${(connectionState as ConnectionState.Connecting).deviceName ?: "..."}...")
+            if (connectionState is GoProConnectionState.Connecting) {
+                Text(text = "Connecting to ${(connectionState as GoProConnectionState.Connecting).deviceName ?: "..."}...")
                 CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
-            } else if (connectionState is ConnectionState.Scanning) {
+            } else if (connectionState is GoProConnectionState.Scanning) {
                 Text("Scanning...", modifier = Modifier.padding(top = 8.dp))
                 CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
-            } else if (connectionState is ConnectionState.Error) {
-                Text(text = "Error: ${(connectionState as ConnectionState.Error).message}", color = MaterialTheme.colorScheme.error)
+            } else if (connectionState is GoProConnectionState.Error) {
+                Text(text = "Error: ${(connectionState as GoProConnectionState.Error).message}", color = MaterialTheme.colorScheme.error)
+            } else if (connectionState is GoProConnectionState.BluetoothDisabled) {
+                Text(text = "Bluetooth is disabled.", color = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = {
+                    val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                    enableBtIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    try {
+                        context.startActivity(enableBtIntent)
+                    } catch (e: Exception) {
+                        // If system prevents this, we can't do much
+                    }
+                }) {
+                    Text("Turn On Bluetooth")
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -131,7 +151,7 @@ fun ScanningScreen(
                     },
         )
 
-        val isScanningOrConnecting = connectionState is ConnectionState.Scanning || connectionState is ConnectionState.Connecting
+        val isScanningOrConnecting = connectionState is GoProConnectionState.Scanning || connectionState is GoProConnectionState.Connecting
         val buttonAlpha = if (isScanningOrConnecting) 0.3f else 1.0f
         val buttonClickable = !isScanningOrConnecting
 

@@ -22,6 +22,10 @@ For detailed information on the GoPro integration, refer to @app/src/main/kotlin
 
 When implementing Hammerhead Karoo functionality please follow guidelines and code samples from the following official Karoo sdk repository: https://github.com/hammerheadnav/karoo-ext. Especially different data sources, types and extensions are available here: https://github.com/hammerheadnav/karoo-ext/tree/master/app/src/main/kotlin/io/hammerhead/sampleext/extension.
 
+Specific examples for BLE device connection (Double Heart Rate Sensor) can be found here:
+- [DoubleHrSensor.kt](https://github.com/hammerheadnav/karoo-ext/blob/master/app/src/main/kotlin/io/hammerhead/sampleext/extension/DoubleHrSensor.kt)
+- [BleManager.kt](https://github.com/hammerheadnav/karoo-ext/blob/master/app/src/main/kotlin/io/hammerhead/sampleext/extension/BleManager.kt)
+
 ## Building and Running
 
 ### Build Commands

@@ -1,8 +1,10 @@
 package com.karoocameracontrol.integrations.gopro
 
 import java.io.ByteArrayOutputStream
-import java.util.UUID
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalUuidApi::class)
 class GoProResponseParser {
     private class BufferState {
         val responseBuffer = ByteArrayOutputStream()
@@ -14,7 +16,7 @@ class GoProResponseParser {
         }
     }
 
-    private val buffers = mutableMapOf<UUID, BufferState>()
+    private val buffers = mutableMapOf<Uuid, BufferState>()
 
     /**
      * Processes a BLE characteristic change event.
@@ -22,7 +24,7 @@ class GoProResponseParser {
      * Returns the fully reassembled data packet if complete, or null if waiting for more packets.
      */
     fun processCharacteristicChange(
-        uuid: UUID,
+        uuid: Uuid,
         value: ByteArray,
     ): ByteArray? {
         if (uuid != GoProUUID.QUERY_RESPONSE && uuid != GoProUUID.COMMAND_RESPONSE && uuid != GoProUUID.SETTING_RESPONSE) {

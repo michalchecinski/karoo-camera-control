@@ -3,7 +3,7 @@
     displayName="Karoo Camera Control"
     icon="@drawable/karoo_camera_control"
     id="karoo-camera-control"
-    scansDevices="false">
+    scansDevices="true">
     <DataType
         description="GoPro Recording Status (1=Rec, 0=Stop)"
         displayName="GoPro Status"

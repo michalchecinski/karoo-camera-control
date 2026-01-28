@@ -37,7 +37,6 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
 
         karooSystem.connect { connected ->
             if (connected) {
-                Log.d(TAG, "Connected to Karoo System. Requesting Bluetooth...")
                 karooSystem.dispatch(RequestBluetooth(extension))
             }
         }

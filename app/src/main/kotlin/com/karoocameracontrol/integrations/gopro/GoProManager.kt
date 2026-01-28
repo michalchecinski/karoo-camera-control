@@ -22,6 +22,7 @@ import android.os.ParcelUuid
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import androidx.core.content.edit
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +40,6 @@ import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import androidx.core.content.edit
 
 data class PairedDevice(val address: String, val name: String)
 

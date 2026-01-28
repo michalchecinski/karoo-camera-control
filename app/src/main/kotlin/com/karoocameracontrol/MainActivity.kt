@@ -56,16 +56,16 @@ class MainActivity : ComponentActivity() {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
             }
         }
-        
+
         // Always request Location permission for BLE scanning, as some devices/OS versions require it
         // even if targeting Android 12+ depending on scan settings, and definitely for older versions.
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
-        
+
         // Also add Coarse Location just in case
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-             permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
 
         if (permissionsToRequest.isNotEmpty()) {

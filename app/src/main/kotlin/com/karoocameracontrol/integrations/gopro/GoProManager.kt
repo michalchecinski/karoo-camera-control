@@ -134,29 +134,33 @@ class GoProManager private constructor(private val context: Context) {
     private var connectedDeviceAddress: String? = null
     private var connectedDeviceName: String? = null
 
-    private val bluetoothStateReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
-                val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
-                Log.d(TAG, "Bluetooth state changed: $state")
-                
-                if (state == BluetoothAdapter.STATE_ON) {
-                    Log.d(TAG, "Bluetooth ON. Restarting scan immediately.")
-                    if (!scanning) {
-                        startScan()
-                    } else {
-                        Log.d(TAG, "Already scanning, ignoring ON event")
+    private val bluetoothStateReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context,
+                intent: Intent,
+            ) {
+                if (intent.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                    val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                    Log.d(TAG, "Bluetooth state changed: $state")
+
+                    if (state == BluetoothAdapter.STATE_ON) {
+                        Log.d(TAG, "Bluetooth ON. Restarting scan immediately.")
+                        if (!scanning) {
+                            startScan()
+                        } else {
+                            Log.d(TAG, "Already scanning, ignoring ON event")
+                        }
+                    } else if (state == BluetoothAdapter.STATE_OFF || state == BluetoothAdapter.STATE_TURNING_OFF) {
+                        if (scanning) {
+                            Log.d(TAG, "Bluetooth turning off, stopping active scan")
+                            stopScan()
+                            _connectionState.value = GoProConnectionState.BluetoothDisabled
+                        }
                     }
-                } else if (state == BluetoothAdapter.STATE_OFF || state == BluetoothAdapter.STATE_TURNING_OFF) {
-                     if (scanning) {
-                         Log.d(TAG, "Bluetooth turning off, stopping active scan")
-                         stopScan()
-                         _connectionState.value = GoProConnectionState.BluetoothDisabled
-                     }
                 }
             }
         }
-    }
 
     init {
         context.registerReceiver(bluetoothStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
@@ -272,17 +276,18 @@ class GoProManager private constructor(private val context: Context) {
                             }
                         }
                     }
-                .catch { e ->
-                    Log.e(TAG, "BLE Scan Failed", e)
-                    if (e.message?.contains("disabled", ignoreCase = true) == true || 
-                        e.message?.contains("unavailable", ignoreCase = true) == true) {
-                        _connectionState.value = GoProConnectionState.BluetoothDisabled
-                    } else {
-                        _connectionState.value = GoProConnectionState.Error("Scan failed: ${e.message}")
+                    .catch { e ->
+                        Log.e(TAG, "BLE Scan Failed", e)
+                        if (e.message?.contains("disabled", ignoreCase = true) == true ||
+                            e.message?.contains("unavailable", ignoreCase = true) == true
+                        ) {
+                            _connectionState.value = GoProConnectionState.BluetoothDisabled
+                        } else {
+                            _connectionState.value = GoProConnectionState.Error("Scan failed: ${e.message}")
+                        }
+                        scanning = false
+                        Log.d(TAG, "BLE Scan Failed. Scanning flag set to false.")
                     }
-                    scanning = false
-                    Log.d(TAG, "BLE Scan Failed. Scanning flag set to false.")
-                }
                     .launchIn(scope)
         }
     }
@@ -399,29 +404,47 @@ class GoProManager private constructor(private val context: Context) {
     ) {
         try {
             Log.d(TAG, "Initializing GoPro connection...")
-            
+
+            // Check Bond State explicitly using Native Adapter
+            val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+            val device = bluetoothAdapter.getRemoteDevice(peripheral.address)
+            Log.d(TAG, "Bond state: ${device.bondState} (10=None, 11=Bonding, 12=Bonded)")
+
             // Handshake: Read Password (Pairs device)
+            // We rely on Implicit Bonding (triggered by reading encrypted char) instead of explicit createBond
             Log.d(TAG, "Reading Wifi AP Password (Pairing)...")
             try {
                 readCharacteristic(peripheral, GoProUUID.WIFI_AP_PASSWORD)
-                Log.d(TAG, "Read Wifi AP Password success")
+                Log.d(TAG, "Read Wifi AP Password success (First Attempt)")
             } catch (e: Exception) {
-                Log.w(TAG, "Read Wifi AP Password failed (might be already paired or rejected): ${e.message}")
+                Log.w(TAG, "Read Wifi AP Password failed: ${e.message}. Waiting 15s for potential implicit bonding...")
+                delay(15000) // Wait for user to accept pair dialog triggered by the read attempt
+
+                // Retry Read
+                Log.d(TAG, "Retrying Read Wifi AP Password...")
+                try {
+                    readCharacteristic(peripheral, GoProUUID.WIFI_AP_PASSWORD)
+                    Log.d(TAG, "Read Wifi AP Password success (Second Attempt)")
+                } catch (retryEx: Exception) {
+                    Log.e(TAG, "Read Wifi AP Password failed again: ${retryEx.message}. Proceeding anyway...")
+                }
             }
             delay(1000)
 
             // Handshake: Enable Notifications sequentially with safe delays
-            Log.d(TAG, "Enabling COMMAND_RESPONSE notifications...")
-            enableNotifications(peripheral, GoProUUID.COMMAND_RESPONSE)
-            delay(1000)
-            
-            Log.d(TAG, "Enabling SETTING_RESPONSE notifications...")
-            enableNotifications(peripheral, GoProUUID.SETTING_RESPONSE)
-            delay(1000)
-            
-            Log.d(TAG, "Enabling QUERY_RESPONSE notifications...")
+            // Minimal setup to test connectivity
+
+            // Request MTU first (Configured in ConnectionOptions)
+            delay(500)
+
+            Log.d(TAG, "Enabling QUERY_RESPONSE notifications ONLY...")
             enableNotifications(peripheral, GoProUUID.QUERY_RESPONSE)
-            delay(1500) // Extra time for last one
+            delay(3000)
+
+            // Set GoPro to Video Mode to ensure it's responsive
+            Log.d(TAG, "Setting GoPro to Video Mode...")
+            writeCharacteristic(peripheral, GoProUUID.COMMAND, GoProCommands.Modes.setMode(PRESET_MODE_VIDEO))
+            delay(1000)
 
             // Register for Status Updates
             Log.d(TAG, "Registering for status updates...")
@@ -710,7 +733,7 @@ class GoProManager private constructor(private val context: Context) {
 
     private fun processCharacteristicData(value: ByteArray) {
         val hexValue = value.joinToString(" ") { "%02x".format(it) }
-        Log.d(TAG, "Process Data: $hexValue")
+        Log.d(TAG, "Process Data (Notification Received): $hexValue")
 
         if (value.isNotEmpty() && value[0] == 0xF5.toByte()) {
             processProtobufData(value)

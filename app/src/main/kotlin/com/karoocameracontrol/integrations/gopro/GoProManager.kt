@@ -15,7 +15,10 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelUuid
@@ -24,6 +27,7 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -861,32 +865,29 @@ class GoProManager private constructor(private val context: Context) {
                         Log.d(TAG, "Services discovered")
                         kotlinx.coroutines.delay(600)
 
-                        // 3. Handshake: Read Password (Pairs device)
+                        // 3. Pair device if needed
                         Log.d(TAG, "Bond state: ${device.bondState} (10=None, 11=Bonding, 12=Bonded)")
-                        if (device.bondState == BluetoothDevice.BOND_NONE) {
-                            Log.d(TAG, "Not bonded, creating bond...")
-                            val bondInitiated = device.createBond()
-                            Log.d(TAG, "createBond result: $bondInitiated")
-                            // Give user time to accept pairing dialog on device
-                            kotlinx.coroutines.delay(10000)
-                        } else if (device.bondState == BluetoothDevice.BOND_BONDING) {
-                            Log.d(TAG, "Device is bonding, waiting...")
-                            kotlinx.coroutines.delay(10000)
+                        if (device.bondState != BluetoothDevice.BOND_BONDED) {
+                            Log.d(TAG, "Device not bonded, initiating bonding...")
+                            val bonded = ensureBonded(device)
+                            if (!bonded) {
+                                throw Exception("Bonding failed")
+                            }
+                            Log.d(TAG, "Bonding completed successfully")
+                            kotlinx.coroutines.delay(1000)
                         }
 
+                        // 4. Read pairing characteristic (handshake)
                         Log.d(TAG, "Reading Pairing characteristic...")
                         try {
-                            // Reduce timeout to fail fast if it hangs
-                            withTimeout(5000) {
-                                readCharacteristicSuspend(GoProUUID.WIFI_AP_PASSWORD)
-                            }
+                            readCharacteristicSuspend(GoProUUID.WIFI_AP_PASSWORD)
                             Log.d(TAG, "Pairing characteristic read success")
                         } catch (e: Exception) {
                             Log.w(TAG, "Pairing characteristic read failed (ignoring): ${e.message}")
                         }
                         kotlinx.coroutines.delay(1000)
 
-                        // 4. Handshake: Enable Notifications
+                        // 5. Enable Notifications
                         Log.d(TAG, "Enabling COMMAND_RESPONSE...")
                         enableNotificationSuspend(GoProUUID.COMMAND_RESPONSE)
                         kotlinx.coroutines.delay(600)
@@ -899,12 +900,12 @@ class GoProManager private constructor(private val context: Context) {
                         enableNotificationSuspend(GoProUUID.QUERY_RESPONSE)
                         kotlinx.coroutines.delay(1000)
 
-                        // 5. Register for Status Updates
+                        // 6. Register for Status Updates
                         Log.d(TAG, "Registering for updates...")
                         registerForStatusUpdatesSuspend()
                         kotlinx.coroutines.delay(600)
 
-                        // 6. Get Initial Status
+                        // 7. Get Initial Status
                         Log.d(TAG, "Polling initial status...")
                         pollInitialStatus()
 
@@ -960,6 +961,130 @@ class GoProManager private constructor(private val context: Context) {
         _connectionState.value = ConnectionState.Disconnected
         _isRecording.value = false
         stopRecordingTimer()
+    }
+
+    private fun launchSystemPairingDialog(
+        device: BluetoothDevice,
+        variant: Int,
+    ) {
+        val pairingDialogClasses =
+            listOf(
+                "com.android.bluetooth" to "com.android.bluetooth.pairingdialog.BluetoothPairingDialog",
+                "com.android.settings" to "com.android.settings.bluetooth.BluetoothPairingDialog",
+            )
+        for ((pkg, cls) in pairingDialogClasses) {
+            try {
+                val pairingIntent =
+                    Intent().apply {
+                        setClassName(pkg, cls)
+                        putExtra(BluetoothDevice.EXTRA_DEVICE, device)
+                        putExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, variant)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                context.startActivity(pairingIntent)
+                Log.d(TAG, "Pairing dialog launched via $cls")
+                return
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to launch $cls: ${e.message}")
+            }
+        }
+        Log.e(TAG, "Could not launch any pairing dialog")
+    }
+
+    private fun createBondWithTransport(device: BluetoothDevice): Boolean {
+        return try {
+            val method = device.javaClass.getMethod("createBond", Int::class.javaPrimitiveType)
+            val result = method.invoke(device, BluetoothDevice.TRANSPORT_LE) as Boolean
+            Log.d(TAG, "createBond(TRANSPORT_LE) result: $result")
+            result
+        } catch (e: Exception) {
+            Log.w(TAG, "createBond(TRANSPORT_LE) failed, falling back to createBond()", e)
+            device.createBond()
+        }
+    }
+
+    private suspend fun ensureBonded(device: BluetoothDevice): Boolean {
+        if (device.bondState == BluetoothDevice.BOND_BONDED) {
+            Log.d(TAG, "Device already bonded")
+            return true
+        }
+
+        val bondResult = CompletableDeferred<Boolean>()
+
+        val receiver =
+            object : BroadcastReceiver() {
+                override fun onReceive(
+                    ctx: Context,
+                    intent: Intent,
+                ) {
+                    @Suppress("DEPRECATION")
+                    val intentDevice = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    if (intentDevice?.address != device.address) return
+
+                    when (intent.action) {
+                        BluetoothDevice.ACTION_PAIRING_REQUEST -> {
+                            val variant = intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, -1)
+                            Log.d(TAG, "Pairing request received, variant: $variant")
+                            try {
+                                intentDevice.setPairingConfirmation(true)
+                                abortBroadcast()
+                                Log.d(TAG, "Pairing auto-confirmed")
+                            } catch (e: SecurityException) {
+                                Log.w(TAG, "Auto-confirm failed, launching pairing dialog")
+                                launchSystemPairingDialog(intentDevice, variant)
+                            }
+                        }
+                        BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
+                            val bondState =
+                                intent.getIntExtra(
+                                    BluetoothDevice.EXTRA_BOND_STATE,
+                                    BluetoothDevice.BOND_NONE,
+                                )
+                            val prevState =
+                                intent.getIntExtra(
+                                    BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE,
+                                    BluetoothDevice.BOND_NONE,
+                                )
+                            Log.d(TAG, "Bond state changed: $prevState -> $bondState")
+
+                            when (bondState) {
+                                BluetoothDevice.BOND_BONDED -> bondResult.complete(true)
+                                BluetoothDevice.BOND_NONE -> bondResult.complete(false)
+                            }
+                        }
+                    }
+                }
+            }
+
+        val filter =
+            IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+                addAction(BluetoothDevice.ACTION_PAIRING_REQUEST)
+                priority = IntentFilter.SYSTEM_HIGH_PRIORITY
+            }
+        context.registerReceiver(receiver, filter)
+
+        try {
+            // Re-check after registering to avoid race condition
+            if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                return true
+            }
+
+            if (device.bondState == BluetoothDevice.BOND_NONE) {
+                val initiated = createBondWithTransport(device)
+                Log.d(TAG, "createBond initiated: $initiated")
+                if (!initiated) return false
+            }
+
+            return withTimeout(PAIRING_TIMEOUT_MS) {
+                bondResult.await()
+            }
+        } finally {
+            try {
+                context.unregisterReceiver(receiver)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     // Suspend Functions
@@ -1182,6 +1307,7 @@ class GoProManager private constructor(private val context: Context) {
         // Timeout values (milliseconds)
         private const val CONNECT_TIMEOUT_MS = 10_000L
         private const val BLE_OPERATION_TIMEOUT_MS = 15_000L
+        private const val PAIRING_TIMEOUT_MS = 30_000L
         private const val RECONNECT_DELAY_MS = 2_000L
 
         // Polling delays (milliseconds)

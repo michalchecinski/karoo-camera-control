@@ -555,13 +555,37 @@ class GoProManager private constructor(private val context: Context) {
 
     // Public API
 
-    fun startScan() {
+    suspend fun startScan() {
         if (!hasPermissions()) {
             _connectionState.value = ConnectionState.Error("Permissions not granted")
             return
         }
 
-        val scanner = bluetoothLeScanner
+        val adapter = bluetoothAdapter
+        if (adapter == null) {
+            _connectionState.value = ConnectionState.Error("Bluetooth not available")
+            return
+        }
+
+        if (!adapter.isEnabled) {
+            _connectionState.value = ConnectionState.Error("Bluetooth is turned off")
+            return
+        }
+
+        // Wait for BLE scanner to become available (handles race with RequestBluetooth)
+        var scanner = adapter.bluetoothLeScanner
+        if (scanner == null) {
+            Log.d(TAG, "BLE scanner not yet available, waiting...")
+            for (attempt in 1..BLE_SCANNER_MAX_RETRIES) {
+                kotlinx.coroutines.delay(BLE_SCANNER_RETRY_DELAY_MS)
+                scanner = adapter.bluetoothLeScanner
+                if (scanner != null) {
+                    Log.d(TAG, "BLE scanner became available after $attempt retries")
+                    break
+                }
+            }
+        }
+
         if (scanner == null) {
             _connectionState.value = ConnectionState.Error("BLE scanner unavailable")
             return
@@ -1171,6 +1195,8 @@ class GoProManager private constructor(private val context: Context) {
         private const val RECORDING_START_MAX_POLLS = 10
         private const val RECORDING_STOP_MAX_POLLS = 5
         private const val PRESET_FETCH_MAX_RETRIES = 3
+        private const val BLE_SCANNER_MAX_RETRIES = 6
+        private const val BLE_SCANNER_RETRY_DELAY_MS = 500L
 
         // GATT status codes
         private const val GATT_CONN_TERMINATE_PEER_USER = 19

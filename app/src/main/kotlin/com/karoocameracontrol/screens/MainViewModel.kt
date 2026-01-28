@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.PresetGroup
+import io.hammerhead.karooext.KarooSystemService
+import io.hammerhead.karooext.models.ReleaseBluetooth
+import io.hammerhead.karooext.models.RequestBluetooth
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +42,7 @@ data class MainUiState(
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val goProManager = GoProManager.getInstance(application)
+    private val karooSystem = KarooSystemService(application)
 
     private val _uiState = MutableStateFlow(MainUiState())
     private var scanTimeoutJob: Job? = null
@@ -124,16 +128,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     init {
-        // Trigger auto-connect logic on init
-        // We delay slightly or just check paired devices
-        // Note: In the original code, this was in LaunchedEffect.
-        // Ideally we check if we should auto-connect.
-        // For now, we mimic the original logic but kept in ViewModel.
-        // However, `pairedDevices` might not be loaded immediately if it's async,
-        // but GoProManager loads them in init block which is synchronous for SharedPreferences.
+        karooSystem.connect { connected ->
+            if (connected) {
+                karooSystem.dispatch(RequestBluetooth("karoo-camera-control"))
+            }
+        }
 
-        // We need to wait until we have the paired devices to decide.
-        // Since flows are involved, we launch a collection.
         viewModelScope.launch {
             goProManager.pairedDevices.collect { devices ->
                 if (devices.isNotEmpty() && _uiState.value.connectionState is ConnectionState.Disconnected) {
@@ -152,6 +152,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    override fun onCleared() {
+        karooSystem.dispatch(ReleaseBluetooth("karoo-camera-control"))
+        karooSystem.disconnect()
+        super.onCleared()
+    }
+
     // Explicit AutoConnect trigger
     fun tryAutoConnect() {
         if (goProManager.pairedDevices.value.isNotEmpty()) {
@@ -161,10 +167,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startScan() {
-        goProManager.startScan()
         scanTimeoutJob?.cancel()
         scanTimeoutJob =
             viewModelScope.launch {
+                goProManager.startScan()
                 delay(120_000) // 2 minutes
                 stopScan()
             }

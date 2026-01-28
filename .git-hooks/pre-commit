@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FILES=$(git diff --cached --name-only --diff-filter=ACM "*.kts")
+FILES=$(git diff --cached --name-only --diff-filter=ACM "*.kt" "*.kts")
 
 ./gradlew ktlintFormat
 

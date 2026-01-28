@@ -39,6 +39,7 @@ import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import androidx.core.content.edit
 
 data class PairedDevice(val address: String, val name: String)
 
@@ -144,11 +145,11 @@ class GoProManager private constructor(private val context: Context) {
         val currentAddresses = prefs.getStringSet("paired_device_addresses", emptySet()) ?: emptySet()
         val newAddresses = currentAddresses + address
 
-        prefs.edit()
-            .putStringSet("paired_device_addresses", newAddresses)
-            .putString("device_name_$address", name)
-            .putString("last_connected_address", address) // Save as last connected
-            .apply()
+        prefs.edit {
+            putStringSet("paired_device_addresses", newAddresses)
+                .putString("device_name_$address", name)
+                .putString("last_connected_address", address) // Save as last connected
+        }
 
         loadPairedDevices()
     }
@@ -178,10 +179,10 @@ class GoProManager private constructor(private val context: Context) {
         val currentAddresses = prefs.getStringSet("paired_device_addresses", emptySet()) ?: emptySet()
         val newAddresses = currentAddresses - address
 
-        prefs.edit()
-            .putStringSet("paired_device_addresses", newAddresses)
-            .remove("device_name_$address")
-            .apply()
+        prefs.edit {
+            putStringSet("paired_device_addresses", newAddresses)
+                .remove("device_name_$address")
+        }
 
         loadPairedDevices()
 

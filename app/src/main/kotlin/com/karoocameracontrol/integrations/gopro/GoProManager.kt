@@ -825,24 +825,62 @@ class GoProManager private constructor(private val context: Context) {
 
                 while (isActive) {
                     try {
+                        Log.d(TAG, "Starting connection sequence...")
                         // 1. Connect
                         connectGattSuspend(device, autoConnect = isPaired)
+                        Log.d(TAG, "GATT connected")
+                        kotlinx.coroutines.delay(600)
 
                         // 2. Discover Services
                         discoverServicesSuspend()
+                        Log.d(TAG, "Services discovered")
+                        kotlinx.coroutines.delay(600)
 
                         // 3. Handshake: Read Password (Pairs device)
-                        readCharacteristicSuspend(GoProUUID.WIFI_AP_PASSWORD)
+                        Log.d(TAG, "Bond state: ${device.bondState} (10=None, 11=Bonding, 12=Bonded)")
+                        if (device.bondState == BluetoothDevice.BOND_NONE) {
+                            Log.d(TAG, "Not bonded, creating bond...")
+                            val bondInitiated = device.createBond()
+                            Log.d(TAG, "createBond result: $bondInitiated")
+                            // Give user time to accept pairing dialog on device
+                            kotlinx.coroutines.delay(10000)
+                        } else if (device.bondState == BluetoothDevice.BOND_BONDING) {
+                            Log.d(TAG, "Device is bonding, waiting...")
+                            kotlinx.coroutines.delay(10000)
+                        }
+
+                        Log.d(TAG, "Reading Pairing characteristic...")
+                        try {
+                            // Reduce timeout to fail fast if it hangs
+                            withTimeout(5000) {
+                                readCharacteristicSuspend(GoProUUID.WIFI_AP_PASSWORD)
+                            }
+                            Log.d(TAG, "Pairing characteristic read success")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Pairing characteristic read failed (ignoring): ${e.message}")
+                        }
+                        kotlinx.coroutines.delay(1000)
 
                         // 4. Handshake: Enable Notifications
+                        Log.d(TAG, "Enabling COMMAND_RESPONSE...")
                         enableNotificationSuspend(GoProUUID.COMMAND_RESPONSE)
+                        kotlinx.coroutines.delay(600)
+
+                        Log.d(TAG, "Enabling SETTING_RESPONSE...")
                         enableNotificationSuspend(GoProUUID.SETTING_RESPONSE)
+                        kotlinx.coroutines.delay(600)
+
+                        Log.d(TAG, "Enabling QUERY_RESPONSE...")
                         enableNotificationSuspend(GoProUUID.QUERY_RESPONSE)
+                        kotlinx.coroutines.delay(1000)
 
                         // 5. Register for Status Updates
+                        Log.d(TAG, "Registering for updates...")
                         registerForStatusUpdatesSuspend()
+                        kotlinx.coroutines.delay(600)
 
                         // 6. Get Initial Status
+                        Log.d(TAG, "Polling initial status...")
                         pollInitialStatus()
 
                         savePairedDevice(device)
@@ -1080,6 +1118,8 @@ class GoProManager private constructor(private val context: Context) {
                             gatt.writeDescriptor(descriptor)
                         }
 
+                    Log.d(TAG, "Initiating descriptor write for $uuid result: $writeResult")
+
                     if (!writeResult) {
                         synchronized(continuationLock) {
                             activeContinuation = null
@@ -1116,7 +1156,7 @@ class GoProManager private constructor(private val context: Context) {
 
         // Timeout values (milliseconds)
         private const val CONNECT_TIMEOUT_MS = 10_000L
-        private const val BLE_OPERATION_TIMEOUT_MS = 5_000L
+        private const val BLE_OPERATION_TIMEOUT_MS = 15_000L
         private const val RECONNECT_DELAY_MS = 2_000L
 
         // Polling delays (milliseconds)

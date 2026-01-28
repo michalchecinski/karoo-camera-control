@@ -7,7 +7,10 @@ import com.karoocameracontrol.integrations.gopro.GoProBatteryDataType
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.GoProRecTimeDataType
 import com.karoocameracontrol.integrations.gopro.GoProStatusDataType
+import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.KarooExtension
+import io.hammerhead.karooext.models.ReleaseBluetooth
+import io.hammerhead.karooext.models.RequestBluetooth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,6 +22,8 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var connectionStateJob: Job? = null
 
+    private val karooSystem by lazy { KarooSystemService(applicationContext) }
+
     override val types by lazy {
         listOf(
             GoProStatusDataType(extension, applicationContext),
@@ -29,6 +34,14 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
 
     override fun onCreate() {
         super.onCreate()
+
+        karooSystem.connect { connected ->
+            if (connected) {
+                Log.d(TAG, "Connected to Karoo System. Requesting Bluetooth...")
+                karooSystem.dispatch(RequestBluetooth(extension))
+            }
+        }
+
         goProManager = GoProManager.getInstance(applicationContext)
 
         // Observe GoProManager connection state
@@ -61,6 +74,9 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     }
 
     override fun onDestroy() {
+        karooSystem.dispatch(ReleaseBluetooth(extension))
+        karooSystem.disconnect()
+
         connectionStateJob?.cancel()
         goProManager.disconnect()
         super.onDestroy()

@@ -1,6 +1,7 @@
 package com.karoocameracontrol.integrations.gopro
 
 import android.app.Notification
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -49,7 +50,8 @@ class BluetoothPairingNotificationService : NotificationListenerService() {
     }
 
     private fun isSystemBluetoothPairingNotification(notification: StatusBarNotification): Boolean {
-        return notification.packageName == SETTINGS_PACKAGE &&
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            notification.packageName == SETTINGS_PACKAGE &&
             notification.notification.channelId == BLUETOOTH_NOTIFICATION_CHANNEL
     }
 

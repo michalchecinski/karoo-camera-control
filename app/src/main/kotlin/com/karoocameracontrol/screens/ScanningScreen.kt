@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +39,7 @@ fun ScanningScreen(
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
     onConnect: (BluetoothDevice) -> Unit,
+    onOpenNotificationAccess: () -> Unit,
     onFinish: () -> Unit,
 ) {
     LaunchedEffect(permissionsGranted) {
@@ -89,6 +91,21 @@ fun ScanningScreen(
             } else if (connectionState is ConnectionState.Scanning) {
                 Text("Scanning...", modifier = Modifier.padding(top = 8.dp))
                 CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
+            } else if (connectionState is ConnectionState.Pairing) {
+                Text("Confirming Bluetooth pairing...", modifier = Modifier.padding(top = 8.dp))
+                CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
+            } else if (connectionState is ConnectionState.PairingAccessRequired) {
+                Text(
+                    text = "Notification access is required to pair this camera.",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Button(
+                    onClick = onOpenNotificationAccess,
+                    modifier = Modifier.padding(top = 8.dp),
+                ) {
+                    Text("Open notification access")
+                }
             } else if (connectionState is ConnectionState.Error) {
                 Text(text = "Error: ${(connectionState as ConnectionState.Error).message}", color = MaterialTheme.colorScheme.error)
             }

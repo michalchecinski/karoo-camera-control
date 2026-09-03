@@ -847,6 +847,11 @@ class GoProManager private constructor(private val context: Context) {
             return
         }
 
+        if (device.bondState != BluetoothDevice.BOND_BONDED && !BluetoothPairingNotificationService.isActive()) {
+            _connectionState.value = ConnectionState.PairingAccessRequired(device.name ?: device.address)
+            return
+        }
+
         if (_connectionState.value is ConnectionState.Connecting || _connectionState.value is ConnectionState.Connected) {
             Log.w(TAG, "Already connecting or connected, ignoring connect request.")
             return
@@ -891,9 +896,9 @@ class GoProManager private constructor(private val context: Context) {
                     } catch (e: Exception) {
                         if (e is kotlinx.coroutines.CancellationException) throw e
                         Log.e(TAG, "Connection failed", e)
-                        disconnect()
+                        disconnectGatt()
 
-                        if (isPaired && e !is PairingAccessRequiredException) {
+                        if (isPaired && device.bondState == BluetoothDevice.BOND_BONDED && e !is PairingAccessRequiredException) {
                             Log.d(TAG, "Retrying connection for saved device...")
                             _connectionState.value = ConnectionState.Connecting(device.name ?: device.address)
                             kotlinx.coroutines.delay(RECONNECT_DELAY_MS)
@@ -931,7 +936,10 @@ class GoProManager private constructor(private val context: Context) {
 
         // Cancel the connection job to stop any ongoing connection attempts
         connectionJob?.cancel()
+        disconnectGatt()
+    }
 
+    private fun disconnectGatt() {
         connectedGatt?.disconnect()
         connectedGatt?.close()
         connectedGatt = null
@@ -951,6 +959,7 @@ class GoProManager private constructor(private val context: Context) {
         _connectionState.value = ConnectionState.Pairing(device.name ?: device.address)
         val finalBondState = CompletableDeferred<Int>()
         val pairingRequestReceived = AtomicBoolean(false)
+        val pairingActionUnavailable = AtomicBoolean(false)
         val confirmationJobs = CopyOnWriteArrayList<Job>()
         val receiver =
             object : BroadcastReceiver() {
@@ -986,6 +995,7 @@ class GoProManager private constructor(private val context: Context) {
                                             }
                                         }
                                         Log.w(TAG, "No supported system pairing notification was available")
+                                        pairingActionUnavailable.set(true)
                                     }
                             } else {
                                 Log.w(TAG, "Pairing requires Android notification access on devices without a system confirmation UI")
@@ -1014,6 +1024,9 @@ class GoProManager private constructor(private val context: Context) {
             }
             if (pairingRequestReceived.get() && !BluetoothPairingNotificationService.isActive()) {
                 throw PairingAccessRequiredException(exception)
+            }
+            if (pairingActionUnavailable.get()) {
+                throw PairingActionUnavailableException(exception)
             }
             throw exception
         } finally {
@@ -1307,6 +1320,12 @@ class GoProManager private constructor(private val context: Context) {
     private class PairingAccessRequiredException(cause: Throwable) :
         IllegalStateException(
             "GoPro pairing needs notification access. Open notification access, enable Karoo Camera Control, and try again.",
+            cause,
+        )
+
+    private class PairingActionUnavailableException(cause: Throwable) :
+        IllegalStateException(
+            "Could not find Android Settings' Pair & connect action. Check the Karoo pairing notification and try again.",
             cause,
         )
 }

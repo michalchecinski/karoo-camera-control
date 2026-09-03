@@ -5,6 +5,7 @@ import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import java.util.Locale
 
 /**
  * Bridges the Android Settings pairing notification to the pairing flow.
@@ -36,11 +37,10 @@ class BluetoothPairingNotificationService : NotificationListenerService() {
             activeNotifications
                 ?.firstOrNull(::isSystemBluetoothPairingNotification)
                 ?: return false
-        val action = findSinglePairingAction(notification.notification) ?: return false
+        val action = findPairingAction(notification.notification) ?: return false
 
         return try {
             action.actionIntent.send()
-            cancelNotification(notification.key)
             Log.i(TAG, "Requested Bluetooth pairing confirmation through Android Settings")
             true
         } catch (exception: Exception) {
@@ -55,13 +55,21 @@ class BluetoothPairingNotificationService : NotificationListenerService() {
             notification.notification.channelId == BLUETOOTH_NOTIFICATION_CHANNEL
     }
 
-    private fun findSinglePairingAction(notification: Notification): Notification.Action? {
+    private fun findPairingAction(notification: Notification): Notification.Action? {
         val actions = notification.actions?.filter { it.actionIntent != null }.orEmpty()
-        if (actions.size != 1) {
-            Log.w(TAG, "Bluetooth pairing notification has ${actions.size} actionable actions")
+        val actionTitles = actions.map { it.title?.toString().orEmpty() }
+        Log.d(TAG, "Bluetooth pairing notification actions: $actionTitles")
+
+        val pairingActions =
+            actions.filter { action ->
+                val title = action.title?.toString()?.lowercase(Locale.ROOT).orEmpty()
+                title.contains("pair") && title.contains("connect")
+            }
+        if (pairingActions.size != 1) {
+            Log.w(TAG, "Could not identify a unique Pair & connect action")
             return null
         }
-        return actions.single()
+        return pairingActions.single()
     }
 
     companion object {

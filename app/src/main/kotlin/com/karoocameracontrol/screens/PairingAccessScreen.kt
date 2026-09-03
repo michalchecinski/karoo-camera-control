@@ -38,16 +38,16 @@ fun PairingAccessScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = "Allow pairing notifications",
+                text = "One-time setup before first pairing",
                 style = MaterialTheme.typography.headlineSmall,
             )
             Text(
-                text = "To pair ${deviceName ?: "this camera"}, allow Karoo Camera Control to access notifications. Return here and connect again after enabling it.",
+                text = "To pair ${deviceName ?: "this camera"}, open notification access, turn on Karoo Camera Control, and accept the system prompt. Return here and connect again after enabling it.",
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
             )
             Button(onClick = onOpenSettings) {
-                Text("Open notification access")
+                Text("Open settings and allow access")
             }
         }
 

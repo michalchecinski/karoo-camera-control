@@ -9,12 +9,16 @@ notification access.
 
 ## First pairing
 
-1. The user enables notification access for Karoo Camera Control.
-2. The app connects to the selected GoPro and reads its protected WAP-password
+1. Before a first pairing, the scan screen explains that this is a one-time
+   setup. Its **Open settings and allow access** button opens Android's
+   notification-access settings and tells the user to turn on Karoo Camera
+   Control, accept the system prompt, return to the app, and tap **Connect**.
+2. The user enables notification access for Karoo Camera Control.
+3. The app connects to the selected GoPro and reads its protected WAP-password
    characteristic, which starts Bluetooth pairing.
-3. The listener finds the Android Settings Bluetooth notification and invokes
+4. The listener finds the Android Settings Bluetooth notification and invokes
    only its uniquely identified **Pair & connect** action.
-4. The app waits for `BOND_BONDED` before it enables GoPro response
+5. The app waits for `BOND_BONDED` before it enables GoPro response
    notifications or sends commands.
 
 If notification access is absent, the app does not start pairing. It shows the

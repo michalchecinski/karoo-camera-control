@@ -10,7 +10,7 @@ notification access.
 ## First pairing
 
 1. Before a first pairing, the scan screen explains that this is a one-time
-   setup. Its **Open settings and allow access** button opens Android's
+   setup. Its **Open settings** button opens Android's
    notification-access settings and tells the user to turn on Karoo Camera
    Control, accept the system prompt, return to the app, and tap **Connect**.
 2. The user enables notification access for Karoo Camera Control.

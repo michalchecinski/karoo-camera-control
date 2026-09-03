@@ -33,21 +33,23 @@ fun PairingAccessScreen(
                 .background(MaterialTheme.colorScheme.background),
     ) {
         Column(
-            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+            modifier =
+                Modifier
+                    .padding(start = 24.dp, top = 56.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "One-time setup before first pairing",
-                style = MaterialTheme.typography.headlineSmall,
+                text = "One-time setup required",
+                style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "To pair ${deviceName ?: "this camera"}, open notification access, turn on Karoo Camera Control, and accept the system prompt. Return here and connect again after enabling it.",
-                style = MaterialTheme.typography.bodyLarge,
+                text = "Tap Open settings, turn on Karoo Camera Control, return here, then tap Connect.",
+                style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
             )
             Button(onClick = onOpenSettings) {
-                Text("Open settings and allow access")
+                Text("Open settings")
             }
         }
 

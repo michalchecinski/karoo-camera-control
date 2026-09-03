@@ -101,17 +101,17 @@ fun ScanningScreen(
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 Text(
-                    text = "Allow Karoo Camera Control to access pairing notifications before connecting this camera.",
+                    text = "Before first pairing, allow Karoo Camera Control to access pairing notifications.",
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 Button(
                     onClick = onOpenNotificationAccess,
                     modifier = Modifier.padding(top = 8.dp),
                 ) {
-                    Text("Open settings and allow access")
+                    Text("Open settings")
                 }
                 Text(
-                    text = "On the next screen, turn on Karoo Camera Control and accept the system prompt. Then return here and tap Connect.",
+                    text = "On the next screen, turn on Karoo Camera Control. Return here, then tap Connect.",
                     modifier = Modifier.padding(top = 8.dp),
                 )
             } else if (connectionState is ConnectionState.Error) {

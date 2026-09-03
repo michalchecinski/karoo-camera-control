@@ -191,7 +191,9 @@ fun ConnectedScreen(
 
             Button(
                 onClick = onToggleRecording,
-                enabled = !isProcessing,
+                // Stop must remain available if the camera has already begun
+                // recording, even while start confirmation is still in progress.
+                enabled = !isProcessing || isRecording,
                 modifier =
                     Modifier
                         .width(200.dp)
@@ -210,7 +212,7 @@ fun ConnectedScreen(
                             },
                     ),
             ) {
-                if (isProcessing) {
+                if (isProcessing && !isRecording) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(32.dp),
                         color = MaterialTheme.colorScheme.onPrimary,

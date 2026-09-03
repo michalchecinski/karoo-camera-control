@@ -48,6 +48,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(MainUiState())
     private var scanTimeoutJob: Job? = null
+    private var recordingCommandJob: Job? = null
+    private var recordingCommandGeneration = 0L
 
     // 1. Group Connection Data
     private val connectionInfo =
@@ -207,19 +209,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun removePairedDevice(address: String) = goProManager.removePairedDevice(address)
 
     fun toggleRecording() {
-        if (_uiState.value.isProcessing) return
+        val isRecording = goProManager.isRecording.value
+        if (_uiState.value.isProcessing && !isRecording) return
+
+        // The camera can report that recording has started before the start command's
+        // status-confirmation polling has finished. Let the user stop immediately in
+        // that state rather than leaving the Stop control disabled.
+        recordingCommandJob?.cancel()
+        val commandGeneration = ++recordingCommandGeneration
         _uiState.value = _uiState.value.copy(isProcessing = true)
-        viewModelScope.launch {
-            try {
-                if (goProManager.isRecording.value) {
-                    goProManager.stopRecording()
-                } else {
-                    goProManager.startRecording()
+        recordingCommandJob =
+            viewModelScope.launch {
+                try {
+                    if (isRecording) {
+                        goProManager.stopRecording()
+                    } else {
+                        goProManager.startRecording()
+                    }
+                } finally {
+                    if (recordingCommandGeneration == commandGeneration) {
+                        _uiState.value = _uiState.value.copy(isProcessing = false)
+                        recordingCommandJob = null
+                    }
                 }
-            } finally {
-                _uiState.value = _uiState.value.copy(isProcessing = false)
             }
-        }
     }
 
     fun setMode(mode: Int) {

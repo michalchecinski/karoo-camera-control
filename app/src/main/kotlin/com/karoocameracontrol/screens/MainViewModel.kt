@@ -1,6 +1,8 @@
 package com.karoocameracontrol.screens
 
 import android.app.Application
+import android.content.Intent
+import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.karoocameracontrol.integrations.gopro.ConnectionState
@@ -185,6 +187,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun connect(device: android.bluetooth.BluetoothDevice) = goProManager.connect(device)
 
     fun connectToPaired(address: String) = goProManager.connectToDevice(address)
+
+    fun openNotificationAccess() {
+        getApplication<Application>().startActivity(
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
 
     fun disconnect() {
         goProManager.disconnect()

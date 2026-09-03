@@ -196,6 +196,7 @@ fun MainScreen(
                     onStartScan = { viewModel.startScan() },
                     onStopScan = { viewModel.stopScan() },
                     onConnect = { device -> viewModel.connect(device) },
+                    onOpenNotificationAccess = { viewModel.openNotificationAccess() },
                     onFinish = { viewModel.setShowScanningScreen(false) },
                 )
             } else {
@@ -204,6 +205,20 @@ fun MainScreen(
                         ConnectingScreen(
                             deviceName = state.deviceName,
                             onCancel = { viewModel.cancelAutoConnect() },
+                        )
+                    }
+                    is ConnectionState.Pairing -> {
+                        ConnectingScreen(
+                            deviceName = state.deviceName,
+                            status = "Confirming Bluetooth pairing for",
+                            onCancel = { viewModel.cancelAutoConnect() },
+                        )
+                    }
+                    is ConnectionState.PairingAccessRequired -> {
+                        PairingAccessScreen(
+                            deviceName = state.deviceName,
+                            onOpenSettings = { viewModel.openNotificationAccess() },
+                            onBack = { viewModel.disconnect() },
                         )
                     }
                     else -> {

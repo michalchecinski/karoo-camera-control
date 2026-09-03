@@ -96,16 +96,24 @@ fun ScanningScreen(
                 CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
             } else if (connectionState is ConnectionState.PairingAccessRequired) {
                 Text(
-                    text = "Notification access is required to pair this camera.",
-                    color = MaterialTheme.colorScheme.error,
+                    text = "One-time setup before first pairing",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Text(
+                    text = "Before first pairing, allow Karoo Camera Control to access pairing notifications.",
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 Button(
                     onClick = onOpenNotificationAccess,
                     modifier = Modifier.padding(top = 8.dp),
                 ) {
-                    Text("Open notification access")
+                    Text("Open settings")
                 }
+                Text(
+                    text = "On the next screen, turn on Karoo Camera Control. Return here, then tap Connect.",
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             } else if (connectionState is ConnectionState.Error) {
                 Text(text = "Error: ${(connectionState as ConnectionState.Error).message}", color = MaterialTheme.colorScheme.error)
             }

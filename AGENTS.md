@@ -32,7 +32,7 @@ Do not use an `agent/` prefix for branch names.
 ### PR
 
 When creating a PR, use `.github/PULL_REQUEST_TEMPLATE.md` and check every
-item on its checklist. When a PR changes the UI, include screenshots of only
+item on its checklist. ALsays add a `version:` label. When a PR changes the UI, include screenshots of only
 the changed screens (use the `karoo-screenshots` skill).
 
 ### Human judgment

@@ -235,6 +235,17 @@ class GoProManager private constructor(private val context: Context) {
     // Lock for thread-safe access to continuation state from callbacks and coroutines
     private val continuationLock = Any()
 
+    // A GATT write acknowledgement only confirms that Android delivered bytes to the
+    // camera. Open GoPro sends the command result separately as a notification.
+    private val responseLock = Any()
+    private var pendingResponse: PendingResponse? = null
+
+    private data class PendingResponse(
+        val characteristicUuid: UUID,
+        val messageType: Byte,
+        val result: CompletableDeferred<ByteArray>,
+    )
+
     private val scanCallback =
         object : ScanCallback() {
             override fun onScanResult(
@@ -440,11 +451,15 @@ class GoProManager private constructor(private val context: Context) {
             ) {
                 val fullData = responseParser.processCharacteristicChange(uuid, value)
                 if (fullData != null) {
-                    processCharacteristicData(fullData)
+                    processCharacteristicData(uuid, fullData)
+                    completePendingResponse(uuid, fullData)
                 }
             }
 
-            private fun processCharacteristicData(value: ByteArray) {
+            private fun processCharacteristicData(
+                uuid: UUID,
+                value: ByteArray,
+            ) {
                 val hexValue = value.joinToString(" ") { "%02x".format(it) }
                 Log.d(TAG, "Process Data: $hexValue")
 
@@ -453,8 +468,27 @@ class GoProManager private constructor(private val context: Context) {
                     return
                 }
 
-                // Use sequential TLV parser for status responses
-                val status = GoProStatusParser.parse(value)
+                if (uuid != GoProUUID.QUERY_RESPONSE || value.size < RESPONSE_HEADER_SIZE) {
+                    return
+                }
+
+                val responseType = value[0]
+                val responseStatus = value[1]
+                if (responseStatus != COMMAND_STATUS_SUCCESS) {
+                    Log.w(TAG, "GoPro query response ${responseType.toUByte()} failed with status ${responseStatus.toUByte()}")
+                    return
+                }
+
+                if (responseType != QUERY_ID_GET_STATUS &&
+                    responseType != QUERY_ID_REGISTER_STATUS_UPDATES &&
+                    responseType != QUERY_ID_NOTIFY_STATUS_UPDATE
+                ) {
+                    return
+                }
+
+                // Query responses begin with query ID and result status; only the
+                // remaining bytes are status TLVs.
+                val status = GoProStatusParser.parse(value.copyOfRange(RESPONSE_HEADER_SIZE, value.size))
 
                 // Apply parsed values to state flows (only if present in response)
                 status.isRecording?.let { recording ->
@@ -564,6 +598,20 @@ class GoProManager private constructor(private val context: Context) {
         currentOperationType = BleOperationType.NONE
     }
 
+    private fun completePendingResponse(
+        characteristicUuid: UUID,
+        value: ByteArray,
+    ) {
+        if (value.size < RESPONSE_HEADER_SIZE) return
+
+        synchronized(responseLock) {
+            val pending = pendingResponse ?: return
+            if (pending.characteristicUuid == characteristicUuid && pending.messageType == value[0]) {
+                pending.result.complete(value)
+            }
+        }
+    }
+
     // Public API
 
     suspend fun startScan() {
@@ -642,29 +690,25 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun startRecording() {
-        writeCharacteristicSuspend(GoProUUID.COMMAND, GoProCommands.Recording.START)
-
-        for (i in 1..RECORDING_START_MAX_POLLS) {
-            kotlinx.coroutines.delay(RECORDING_POLL_DELAY_MS)
-            if (_isRecording.value) {
-                break
-            }
-            pollRecordingState()
-        }
+        writeAndAwaitResponseSuspend(
+            writeUuid = GoProUUID.COMMAND,
+            responseUuid = GoProUUID.COMMAND_RESPONSE,
+            messageType = COMMAND_ID_SET_SHUTTER,
+            value = GoProCommands.Recording.START,
+        )
+        awaitRecordingState(isRecording = true)
     }
 
     suspend fun stopRecording() {
         pauseRecordingTimer()
         try {
-            writeCharacteristicSuspend(GoProUUID.COMMAND, GoProCommands.Recording.STOP)
-
-            for (i in 1..RECORDING_STOP_MAX_POLLS) {
-                kotlinx.coroutines.delay(STOP_RECORDING_POLL_DELAY_MS)
-                if (!_isRecording.value) {
-                    break
-                }
-                pollRecordingState()
-            }
+            writeAndAwaitResponseSuspend(
+                writeUuid = GoProUUID.COMMAND,
+                responseUuid = GoProUUID.COMMAND_RESPONSE,
+                messageType = COMMAND_ID_SET_SHUTTER,
+                value = GoProCommands.Recording.STOP,
+            )
+            awaitRecordingState(isRecording = false)
         } finally {
             // If we are still recording (stop failed or timed out), resume the timer
             if (_isRecording.value) {
@@ -715,10 +759,22 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     private suspend fun pollRecordingState() {
-        try {
-            writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.STATUS)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to poll recording state", e)
+        writeAndAwaitResponseSuspend(
+            writeUuid = GoProUUID.QUERY,
+            responseUuid = GoProUUID.QUERY_RESPONSE,
+            messageType = QUERY_ID_GET_STATUS,
+            value = GoProCommands.Query.STATUS,
+        )
+    }
+
+    private suspend fun awaitRecordingState(isRecording: Boolean) {
+        withTimeout(RECORDING_STATE_CONFIRMATION_TIMEOUT_MS) {
+            while (_isRecording.value != isRecording) {
+                pollRecordingState()
+                if (_isRecording.value != isRecording) {
+                    delay(RECORDING_POLL_DELAY_MS)
+                }
+            }
         }
     }
 
@@ -1162,6 +1218,42 @@ class GoProManager private constructor(private val context: Context) {
         uuid: UUID,
         value: ByteArray,
     ) = operationMutex.withLock {
+        writeCharacteristicSuspendLocked(uuid, value)
+    }
+
+    private suspend fun writeAndAwaitResponseSuspend(
+        writeUuid: UUID,
+        responseUuid: UUID,
+        messageType: Byte,
+        value: ByteArray,
+    ) = operationMutex.withLock {
+        val response = CompletableDeferred<ByteArray>()
+        val pending = PendingResponse(responseUuid, messageType, response)
+        synchronized(responseLock) {
+            pendingResponse = pending
+        }
+
+        try {
+            writeCharacteristicSuspendLocked(writeUuid, value)
+            val responseData = withTimeout(BLE_OPERATION_TIMEOUT_MS) { response.await() }
+            if (responseData[1] != COMMAND_STATUS_SUCCESS) {
+                throw Exception(
+                    "GoPro command ${messageType.toUByte()} failed with status ${responseData[1].toUByte()}",
+                )
+            }
+        } finally {
+            synchronized(responseLock) {
+                if (pendingResponse === pending) {
+                    pendingResponse = null
+                }
+            }
+        }
+    }
+
+    private suspend fun writeCharacteristicSuspendLocked(
+        uuid: UUID,
+        value: ByteArray,
+    ) {
         val gatt = connectedGatt ?: throw Exception("Not connected")
         val char = findCharacteristic(gatt, uuid) ?: throw Exception("Characteristic $uuid not found in any service")
 
@@ -1280,6 +1372,7 @@ class GoProManager private constructor(private val context: Context) {
         // Timeout values (milliseconds)
         private const val CONNECT_TIMEOUT_MS = 10_000L
         private const val BLE_OPERATION_TIMEOUT_MS = 5_000L
+        private const val RECORDING_STATE_CONFIRMATION_TIMEOUT_MS = 5_000L
         private const val PAIRING_OPERATION_TIMEOUT_MS = 35_000L
         private const val RECONNECT_DELAY_MS = 2_000L
         private const val PAIRING_NOTIFICATION_INITIAL_DELAY_MS = 500L
@@ -1287,13 +1380,10 @@ class GoProManager private constructor(private val context: Context) {
         // Polling delays (milliseconds)
         private const val RECORDING_POLL_DELAY_MS = 500L
         private const val RECORDING_SYNC_INTERVAL_MS = 5_000L
-        private const val STOP_RECORDING_POLL_DELAY_MS = 1_000L
         private const val MODE_CHANGE_DELAY_MS = 200L
         private const val PRESET_FETCH_BASE_DELAY_MS = 300L
 
         // Retry configuration
-        private const val RECORDING_START_MAX_POLLS = 10
-        private const val RECORDING_STOP_MAX_POLLS = 5
         private const val PRESET_FETCH_MAX_RETRIES = 3
         private const val PAIRING_NOTIFICATION_ATTEMPTS = 5
         private const val BLE_SCANNER_MAX_RETRIES = 6
@@ -1306,6 +1396,14 @@ class GoProManager private constructor(private val context: Context) {
         private const val PRESET_MODE_VIDEO = 1000
         private const val PRESET_MODE_PHOTO = 1001
         private const val PRESET_MODE_TIMELAPSE = 1002
+
+        // Open GoPro response message IDs and shared response status values.
+        private const val COMMAND_ID_SET_SHUTTER: Byte = 0x03
+        private const val QUERY_ID_GET_STATUS: Byte = 0x13
+        private const val QUERY_ID_REGISTER_STATUS_UPDATES: Byte = 0x53
+        private const val QUERY_ID_NOTIFY_STATUS_UPDATE: Byte = 0x93.toByte()
+        private const val COMMAND_STATUS_SUCCESS: Byte = 0x00
+        private const val RESPONSE_HEADER_SIZE = 2
 
         @Volatile
         private var instance: GoProManager? = null

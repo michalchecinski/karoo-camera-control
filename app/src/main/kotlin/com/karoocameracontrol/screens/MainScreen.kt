@@ -173,6 +173,7 @@ fun MainScreen(
                     deviceName = currentState.deviceName,
                     isRecording = uiState.isRecording,
                     isProcessing = uiState.isProcessing,
+                    isRecordingOperationInFlight = uiState.isRecordingOperationInFlight,
                     recordingDuration = uiState.recordingDuration,
                     batteryLevel = uiState.batteryLevel,
                     remainingTime = uiState.remainingVideoTime,

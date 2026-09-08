@@ -24,6 +24,7 @@ data class MainUiState(
     val connectionState: ConnectionState = ConnectionState.Disconnected,
     val isAutoConnecting: Boolean = false,
     val isProcessing: Boolean = false,
+    val isRecordingOperationInFlight: Boolean = false,
     val showMenu: Boolean = false,
     val showFeedbackScreen: Boolean = false,
     val showScanningScreen: Boolean = false,
@@ -210,25 +211,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleRecording() {
         val isRecording = goProManager.isRecording.value
-        if (_uiState.value.isProcessing && !isRecording) return
+        if (recordingCommandJob?.isActive == true) {
+            // A second tap during a recording command always means stop. Do not
+            // wait for the camera's encoding-status notification before exposing
+            // that escape path to the user.
+            recordingCommandJob?.cancel()
+            launchRecordingCommand(stopRecording = true)
+            return
+        }
 
-        // The camera can report that recording has started before the start command's
-        // status-confirmation polling has finished. Let the user stop immediately in
-        // that state rather than leaving the Stop control disabled.
-        recordingCommandJob?.cancel()
+        if (_uiState.value.isProcessing && !isRecording) return
+        launchRecordingCommand(stopRecording = isRecording)
+    }
+
+    private fun launchRecordingCommand(stopRecording: Boolean) {
         val commandGeneration = ++recordingCommandGeneration
-        _uiState.value = _uiState.value.copy(isProcessing = true)
+        _uiState.value =
+            _uiState.value.copy(
+                isProcessing = true,
+                isRecordingOperationInFlight = true,
+            )
         recordingCommandJob =
             viewModelScope.launch {
                 try {
-                    if (isRecording) {
+                    if (stopRecording) {
                         goProManager.stopRecording()
                     } else {
                         goProManager.startRecording()
                     }
                 } finally {
                     if (recordingCommandGeneration == commandGeneration) {
-                        _uiState.value = _uiState.value.copy(isProcessing = false)
+                        _uiState.value =
+                            _uiState.value.copy(
+                                isProcessing = false,
+                                isRecordingOperationInFlight = false,
+                            )
                         recordingCommandJob = null
                     }
                 }

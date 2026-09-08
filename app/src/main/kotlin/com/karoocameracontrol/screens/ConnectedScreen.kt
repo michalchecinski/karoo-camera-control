@@ -41,6 +41,7 @@ fun ConnectedScreen(
     deviceName: String?,
     isRecording: Boolean,
     isProcessing: Boolean,
+    isRecordingOperationInFlight: Boolean,
     recordingDuration: Int,
     batteryLevel: Int,
     remainingTime: Int,
@@ -191,9 +192,9 @@ fun ConnectedScreen(
 
             Button(
                 onClick = onToggleRecording,
-                // Stop must remain available if the camera has already begun
-                // recording, even while start confirmation is still in progress.
-                enabled = !isProcessing || isRecording,
+                // A second press is always available to stop or cancel a recording
+                // request, even before the camera sends its encoding-state update.
+                enabled = !isProcessing || isRecording || isRecordingOperationInFlight,
                 modifier =
                     Modifier
                         .width(200.dp)
@@ -201,9 +202,14 @@ fun ConnectedScreen(
                         .padding(bottom = 16.dp),
                 colors =
                     ButtonDefaults.buttonColors(
-                        containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        containerColor =
+                            if (isRecording || isRecordingOperationInFlight) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
                         disabledContainerColor =
-                            if (isRecording) {
+                            if (isRecording || isRecordingOperationInFlight) {
                                 MaterialTheme.colorScheme.error.copy(
                                     alpha = 0.5f,
                                 )
@@ -212,7 +218,7 @@ fun ConnectedScreen(
                             },
                     ),
             ) {
-                if (isProcessing && !isRecording) {
+                if (isProcessing && !isRecording && !isRecordingOperationInFlight) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(32.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
@@ -229,12 +235,12 @@ fun ConnectedScreen(
                                     .size(24.dp)
                                     .background(
                                         color = MaterialTheme.colorScheme.onPrimary,
-                                        shape = if (isRecording) RectangleShape else CircleShape,
+                                        shape = if (isRecording || isRecordingOperationInFlight) RectangleShape else CircleShape,
                                     ),
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
-                            text = if (isRecording) "Stop" else "Record",
+                            text = if (isRecording || isRecordingOperationInFlight) "Stop" else "Record",
                             style = MaterialTheme.typography.titleLarge,
                         )
                     }

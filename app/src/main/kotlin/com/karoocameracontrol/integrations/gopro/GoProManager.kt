@@ -1398,7 +1398,7 @@ class GoProManager private constructor(private val context: Context) {
         private const val PRESET_MODE_TIMELAPSE = 1002
 
         // Open GoPro response message IDs and shared response status values.
-        private const val COMMAND_ID_SET_SHUTTER: Byte = 0x03
+        private const val COMMAND_ID_SET_SHUTTER: Byte = 0x01
         private const val QUERY_ID_GET_STATUS: Byte = 0x13
         private const val QUERY_ID_REGISTER_STATUS_UPDATES: Byte = 0x53
         private const val QUERY_ID_NOTIFY_STATUS_UPDATE: Byte = 0x93.toByte()

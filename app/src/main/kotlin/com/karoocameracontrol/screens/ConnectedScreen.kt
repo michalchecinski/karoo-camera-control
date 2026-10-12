@@ -6,14 +6,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +38,7 @@ import com.karoocameracontrol.R
 import com.karoocameracontrol.components.SimpleAlertDialog
 import com.karoocameracontrol.integrations.gopro.PresetGroup
 import com.karoocameracontrol.integrations.gopro.PresetIcon
+import com.karoocameracontrol.recording.DescentStatus
 import kotlin.time.Duration.Companion.seconds
 
 @Composable
@@ -50,6 +55,8 @@ fun ConnectedScreen(
     activePresetName: String?,
     // Added Icon ID
     activePresetIcon: Int?,
+    descentRecordingEnabled: Boolean = false,
+    descentStatus: DescentStatus = DescentStatus.OFF,
     onToggleRecording: () -> Unit,
     onSetMode: (Int) -> Unit,
     onOpenPresetSelection: () -> Unit,
@@ -64,116 +71,135 @@ fun ConnectedScreen(
             Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
-                .padding(top = 16.dp),
+                .padding(top = 8.dp),
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(
+            modifier = Modifier.fillMaxSize().padding(bottom = 64.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Status Row
             Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 16.dp),
             ) {
-                Text(
-                    text = "Battery: $batteryLevel%",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-
-                val hours = remainingTime / 3600
-                val minutes = (remainingTime % 3600) / 60
-                val seconds = remainingTime % 60
-
-                val timeText =
-                    if (hours > 0) {
-                        "%dh %02dm".format(hours, minutes)
-                    } else {
-                        "%02dm %02ds".format(minutes, seconds)
-                    }
-
-                Text(
-                    text = "Storage: $timeText",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-
-            // Mode Selection
-            Row(
-                modifier = Modifier.padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
-
-                // Video
-                Button(
-                    onClick = { onSetMode(0) },
-                    enabled = !isProcessing && !isRecording,
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = if (current == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                        ),
-                ) {
-                    Text("Video")
-                }
-
-                // Photo
-                Button(
-                    onClick = { onSetMode(1) },
-                    enabled = !isProcessing && !isRecording,
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = if (current == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                        ),
-                ) {
-                    Text("Photo")
-                }
-
-                // Timelapse
-                Button(
-                    onClick = { onSetMode(2) },
-                    enabled = !isProcessing && !isRecording,
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = if (current == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                        ),
-                ) {
-                    Text("Timelapse")
-                }
-            }
-
-            activePresetName?.let {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                ) {
-                    activePresetIcon?.let { iconId ->
-                        Icon(
-                            imageVector = PresetIcon.getIcon(iconId),
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 8.dp).size(24.dp),
-                        )
-                    }
+                if (descentRecordingEnabled) {
                     Text(
-                        text = "Preset: $it",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "Descent recording: ${descentStatus.message}",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                     )
                 }
-            }
-
-            val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
-            val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
-
-            if (currentPresets.isNotEmpty()) {
-                Button(
-                    onClick = onOpenPresetSelection,
-                    enabled = !isProcessing && !isRecording,
+                // Status Row
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(bottom = 16.dp),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiary,
-                        ),
                 ) {
-                    Text("Change Preset")
+                    Text(
+                        text = "Battery: $batteryLevel%",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+
+                    val hours = remainingTime / 3600
+                    val minutes = (remainingTime % 3600) / 60
+                    val seconds = remainingTime % 60
+
+                    val timeText =
+                        if (hours > 0) {
+                            "%dh %02dm".format(hours, minutes)
+                        } else {
+                            "%02dm %02ds".format(minutes, seconds)
+                        }
+
+                    Text(
+                        text = "Storage: $timeText",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+
+                // Mode Selection
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
+
+                    // Video
+                    Button(
+                        onClick = { onSetMode(0) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
+                        enabled = !isProcessing && !isRecording,
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = if (current == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                            ),
+                    ) {
+                        Text("Video", style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    }
+
+                    // Photo
+                    Button(
+                        onClick = { onSetMode(1) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
+                        enabled = !isProcessing && !isRecording,
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = if (current == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                            ),
+                    ) {
+                        Text("Photo", style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    }
+
+                    // Timelapse
+                    Button(
+                        onClick = { onSetMode(2) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 4.dp),
+                        enabled = !isProcessing && !isRecording,
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = if (current == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                            ),
+                    ) {
+                        Text("Timelapse", style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    }
+                }
+
+                activePresetName?.let {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    ) {
+                        activePresetIcon?.let { iconId ->
+                            Icon(
+                                imageVector = PresetIcon.getIcon(iconId),
+                                contentDescription = null,
+                                modifier = Modifier.padding(end = 8.dp).size(24.dp),
+                            )
+                        }
+                        Text(
+                            text = "Preset: $it",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
+
+                val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
+                val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
+
+                if (currentPresets.isNotEmpty()) {
+                    Button(
+                        onClick = onOpenPresetSelection,
+                        enabled = !isProcessing && !isRecording,
+                        modifier = Modifier.padding(bottom = 16.dp),
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiary,
+                            ),
+                    ) {
+                        Text("Change Preset")
+                    }
                 }
             }
 
@@ -185,8 +211,8 @@ fun ConnectedScreen(
                     }
                 Text(
                     text = formattedDuration,
-                    style = MaterialTheme.typography.displayMedium,
-                    modifier = Modifier.padding(bottom = 24.dp),
+                    style = MaterialTheme.typography.displaySmall,
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
             }
 
@@ -198,8 +224,7 @@ fun ConnectedScreen(
                 modifier =
                     Modifier
                         .width(200.dp)
-                        .height(100.dp)
-                        .padding(bottom = 16.dp),
+                        .height(72.dp),
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor =

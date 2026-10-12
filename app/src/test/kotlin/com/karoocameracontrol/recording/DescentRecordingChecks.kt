@@ -35,6 +35,12 @@ object DescentRecordingChecks {
     ) = onSample(timeMs, grade, speed, active, config)
 
     private fun detectorChecks() {
+        verify("cached telemetry expires at 2.5 seconds and rejects future or non-finite values") {
+            check(TimedRideValue(4.0, 1000).freshValue(3500) == 4.0)
+            check(TimedRideValue(4.0, 1000).freshValue(3501) == null)
+            check(TimedRideValue(4.0, 1000).freshValue(999) == null)
+            check(TimedRideValue(Double.NaN, 1000).freshValue(1000) == null)
+        }
         verify("sustained descent fires once at the confirmation boundary") {
             val detector = DescentDetector()
             for (time in 0L..2000L step 1000L) check(!detector.sample(time))
@@ -107,11 +113,11 @@ object DescentRecordingChecks {
         verify("only a sustained flat section rearms the next descent") {
             val detector = DescentDetector()
             detector.suppressUntilNextDescent()
-            check(!detector.sample(0, grade = -1.0))
+            check(!detector.sample(0, grade = -0.5))
             check(!detector.sample(1000, grade = -2.0))
-            for (time in 2000L..4000L step 1000L) check(!detector.sample(time, grade = -1.0))
+            for (time in 2000L..4000L step 1000L) check(!detector.sample(time, grade = -0.5))
             check(detector.descentConsumed)
-            check(!detector.sample(5000, grade = -1.0))
+            check(!detector.sample(5000, grade = -0.5))
             check(!detector.descentConsumed)
             for (time in 6000L..8000L step 1000L) check(!detector.sample(time))
             check(detector.sample(9000))
@@ -126,6 +132,14 @@ object DescentRecordingChecks {
             check(detector.descentConsumed)
             check(!detector.sample(5000, grade = 0.0))
             check(!detector.descentConsumed)
+        }
+        verify("the shallowest trigger cannot rearm on the same sustained slope") {
+            val detector = DescentDetector()
+            val config = settings.copy(gradientPercent = 1, confirmationSeconds = 1)
+            check(!detector.sample(0, grade = -1.0, config = config))
+            check(detector.sample(1000, grade = -1.0, config = config))
+            for (time in 2000L..12000L step 1000L) check(!detector.sample(time, grade = -1.0, config = config))
+            check(detector.descentConsumed)
         }
         verify("ending the ride resets suppression") {
             val detector = DescentDetector()

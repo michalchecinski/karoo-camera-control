@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.PresetGroup
+import com.karoocameracontrol.recording.DescentSettings
+import com.karoocameracontrol.recording.DescentSettingsStore
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.ReleaseBluetooth
 import io.hammerhead.karooext.models.RequestBluetooth
@@ -29,6 +31,8 @@ data class MainUiState(
     val showFeedbackScreen: Boolean = false,
     val showScanningScreen: Boolean = false,
     val showPresetScreen: Boolean = false,
+    val showDescentSettings: Boolean = false,
+    val cameraCommandError: String? = null,
     // Device Data
     val scannedDevices: List<android.bluetooth.BluetoothDevice> = emptyList(),
     val pairedDevices: List<com.karoocameracontrol.integrations.gopro.PairedDevice> = emptyList(),
@@ -46,11 +50,12 @@ data class MainUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val goProManager = GoProManager.getInstance(application)
     private val karooSystem = KarooSystemService(application)
+    private val descentSettingsStore = DescentSettingsStore.getInstance(application)
+    val descentSettings = descentSettingsStore.settings
+    val descentStatus = descentSettingsStore.status
 
     private val _uiState = MutableStateFlow(MainUiState())
     private var scanTimeoutJob: Job? = null
-    private var recordingCommandJob: Job? = null
-    private var recordingCommandGeneration = 0L
 
     // 1. Group Connection Data
     private val connectionInfo =
@@ -92,8 +97,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             connectionInfo,
             statusInfo,
             presetInfo,
-        ) { localState, connInfo, statInfo, presInfo ->
+            goProManager.recordingCommands.state,
+        ) { localState, connInfo, statInfo, presInfo, commandState ->
             localState.copy(
+                isProcessing = commandState.busy,
+                isRecordingOperationInFlight = commandState.recordingInFlight,
+                cameraCommandError = commandState.error,
                 // Connection
                 connectionState = connInfo.first,
                 scannedDevices = connInfo.second,
@@ -135,7 +144,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         karooSystem.connect { connected ->
             if (connected) {
-                karooSystem.dispatch(RequestBluetooth("karoo-camera-control"))
+                karooSystem.dispatch(RequestBluetooth("karoo-camera-control-ui"))
             }
         }
 
@@ -158,7 +167,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        karooSystem.dispatch(ReleaseBluetooth("karoo-camera-control"))
+        karooSystem.dispatch(ReleaseBluetooth("karoo-camera-control-ui"))
         karooSystem.disconnect()
         super.onCleared()
     }
@@ -210,71 +219,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun removePairedDevice(address: String) = goProManager.removePairedDevice(address)
 
     fun toggleRecording() {
-        val isRecording = goProManager.isRecording.value
-        if (recordingCommandJob?.isActive == true) {
-            // A second tap during a recording command always means stop. Do not
-            // wait for the camera's encoding-status notification before exposing
-            // that escape path to the user.
-            recordingCommandJob?.cancel()
-            launchRecordingCommand(stopRecording = true)
-            return
-        }
-
-        if (_uiState.value.isProcessing && !isRecording) return
-        launchRecordingCommand(stopRecording = isRecording)
-    }
-
-    private fun launchRecordingCommand(stopRecording: Boolean) {
-        val commandGeneration = ++recordingCommandGeneration
-        _uiState.value =
-            _uiState.value.copy(
-                isProcessing = true,
-                isRecordingOperationInFlight = true,
-            )
-        recordingCommandJob =
-            viewModelScope.launch {
-                try {
-                    if (stopRecording) {
-                        goProManager.stopRecording()
-                    } else {
-                        goProManager.startRecording()
-                    }
-                } finally {
-                    if (recordingCommandGeneration == commandGeneration) {
-                        _uiState.value =
-                            _uiState.value.copy(
-                                isProcessing = false,
-                                isRecordingOperationInFlight = false,
-                            )
-                        recordingCommandJob = null
-                    }
-                }
-            }
+        goProManager.recordingCommands.toggleManually()
     }
 
     fun setMode(mode: Int) {
-        if (_uiState.value.isProcessing) return
-        _uiState.value = _uiState.value.copy(isProcessing = true)
-        viewModelScope.launch {
-            try {
-                goProManager.setMode(mode)
-            } finally {
-                _uiState.value = _uiState.value.copy(isProcessing = false)
-            }
+        goProManager.recordingCommands.configure {
+            goProManager.setMode(mode)
         }
     }
 
     fun loadPreset(presetId: Int) {
-        if (_uiState.value.isProcessing) return
-        _uiState.value = _uiState.value.copy(isProcessing = true)
-        viewModelScope.launch {
-            try {
-                goProManager.loadPreset(presetId)
-                _uiState.value = _uiState.value.copy(showPresetScreen = false)
-            } finally {
-                _uiState.value = _uiState.value.copy(isProcessing = false)
-            }
+        goProManager.recordingCommands.configure {
+            goProManager.loadPreset(presetId)
+            _uiState.value = _uiState.value.copy(showPresetScreen = false)
         }
+    }
+
+    fun clearCameraCommandError() = goProManager.recordingCommands.clearError()
+
+    fun updateDescentSettings(settings: DescentSettings) = descentSettingsStore.update(settings)
+
+    fun setShowDescentSettings(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showDescentSettings = show, showMenu = false)
     }
 
     // UI Navigation / Dialog State Setters

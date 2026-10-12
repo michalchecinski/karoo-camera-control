@@ -8,6 +8,7 @@ This is an extension to control sports action cameras using Hammerhead Karoo cyc
 
 - Connect and manage multiple GoPro cameras.
 - Start and stop recording and monitor recording time.
+- Optionally start video recording when a descent begins; [configure descent recording](docs/descent-recording.md).
 - Change camera modes (Video, Photo, Timelapse).
 - Select specific presets within each mode.
 - View battery life, remaining storage space.

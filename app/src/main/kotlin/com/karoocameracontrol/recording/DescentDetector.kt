@@ -1,5 +1,10 @@
 package com.karoocameracontrol.recording
 
+internal data class TimedRideValue(val value: Double, val receivedMs: Long) {
+    fun freshValue(nowMs: Long): Double? =
+        value.takeIf { it.isFinite() && nowMs - receivedMs in 0..DescentDetector.MAX_SAMPLE_AGE_MS }
+}
+
 data class DescentSettings(
     val enabled: Boolean = false,
     val gradientPercent: Int = 3,
@@ -94,7 +99,7 @@ class DescentDetector {
     companion object {
         const val MAX_SAMPLE_AGE_MS = 2500L
         const val MIN_SPEED_METERS_PER_SECOND = 5.0 / 3.6
-        private const val REARM_GRADIENT_PERCENT = -1.0
+        private const val REARM_GRADIENT_PERCENT = -0.5
         private const val REARM_DURATION_MS = 3000L
     }
 }

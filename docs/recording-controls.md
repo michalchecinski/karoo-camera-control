@@ -10,3 +10,10 @@ A second press stops or cancels the pending recording request even before the
 GoPro has reported that recording began. Mode and preset controls remain
 disabled while recording because the GoPro cannot safely switch them
 mid-recording.
+
+Manual commands and [automatic descent starts](descent-recording.md) use the
+same application-scoped controller. Command progress remains visible when
+the screen is reopened, and failures appear in a snackbar. The timer and
+Record/Stop button remain fixed above Back on the Karoo screen; other camera
+details scroll when needed. A manual Stop suppresses automatic starts until
+the next descent.

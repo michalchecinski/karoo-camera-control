@@ -27,7 +27,7 @@ The normal Stop control remains available during an automatic start.
 A confirmed descent consumes one automatic start opportunity, including when
 the camera is unavailable, already recording, busy, or rejects the command.
 Manual Stop suppresses further starts until the next descent. Rearming requires
-a gradient of **−1% or flatter for 3 seconds** while riding and moving. A pause,
+a gradient of **−0.5% or flatter for 3 seconds** while riding and moving. A pause,
 connection loss, settings change, or missing data does not rearm a consumed
 descent. Ending the ride resets detection for the next ride.
 
@@ -59,6 +59,27 @@ References:
 - [Open GoPro BLE specification](https://gopro.github.io/OpenGoPro/ble/index.html)
 
 ## Validation
+
+Run `./gradlew :app:verifyDescentRecording` for the deterministic checks. They
+also run as part of Gradle `check` and CI `build`, using the app's existing
+dependencies. No library versions have changed.
+
+For UI checks, build `:app:assembleDebug :app:assembleDebugAndroidTest`, install
+both APKs on the isolated Karoo AVD, and run:
+
+```sh
+adb -s emulator-5554 shell am instrument -w \
+  com.karoocameracontrol.test/com.karoocameracontrol.DescentUiInstrumentation
+python3 scripts/verify-descent-settings.py emulator-5554
+```
+
+The instrumentation uses an isolated fake camera to exercise the production
+connected screen on a real Android emulator. It checks pending and confirmed
+automatic starts, disabled mode controls, visible Stop, and manual override.
+The settings script requires the defaults in an isolated app install, checks
+persistence across process restart and adjustment boundaries, captures the
+changed menu/settings screens, and restores defaults. It refuses physical
+devices. The final screenshots are 480×656 with Android system bars removed.
 
 Deterministic tests cover sustained descents, noise, slow/stationary riding,
 pauses, stale/non-finite data, manual suppression, rearming, and shared camera

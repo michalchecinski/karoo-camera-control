@@ -115,6 +115,11 @@ both back controls returned to the main screen. Debug build, `ktlint`, and
 Android lint passed (lint reported warnings, no errors). Screenshots were
 visually inspected at 480×656 without Android system bars.
 
+CI explicitly requests `platform-tools` from the existing pinned Android
+setup action. Its default also requests the obsolete `tools` package, which
+is no longer served and caused setup to fail before compilation. No action
+or dependency versions were changed.
+
 An Android emulator cannot validate Karoo's proprietary radar service or a
 physical GoPro BLE connection. Before release, test on a Karoo with a paired
 radar and supported GoPro: single pass, successive cars, manual recording,

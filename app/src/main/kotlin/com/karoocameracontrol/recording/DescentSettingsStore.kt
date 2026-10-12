@@ -25,6 +25,7 @@ class DescentSettingsStore private constructor(context: Context) {
                 enabled = preferences.getBoolean("enabled", false),
                 gradientPercent = preferences.getInt("gradient_percent", 3).coerceIn(1, 10),
                 confirmationSeconds = preferences.getInt("confirmation_seconds", 3).coerceIn(1, 10),
+                stopAtDescentEnd = preferences.getBoolean("stop_at_descent_end", false),
             ),
         )
     val settings = _settings.asStateFlow()
@@ -36,6 +37,7 @@ class DescentSettingsStore private constructor(context: Context) {
             putBoolean("enabled", settings.enabled)
             putInt("gradient_percent", settings.gradientPercent)
             putInt("confirmation_seconds", settings.confirmationSeconds)
+            putBoolean("stop_at_descent_end", settings.stopAtDescentEnd)
         }
         _settings.value = settings
         if (!settings.enabled) _status.value = DescentStatus.OFF

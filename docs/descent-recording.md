@@ -21,8 +21,22 @@ adjustable from 1 to 10 percent and 1 to 10 seconds. Changes save immediately.
 
 The feature starts video recording only during an actively recording Karoo
 ride, with a connected GoPro in Video mode. It does not change the selected
-mode or preset, wake a disconnected camera, or stop recording automatically.
+mode or preset or wake a disconnected camera.
 The normal Stop control remains available during an automatic start.
+
+**Stop at descent end** is a separate option, off by default. When selected,
+recordings started by this automation stop after a gradient of **−0.5% or
+flatter for 3 seconds** while riding and moving, or when the Karoo ride finishes.
+Short flat sections, pauses, slow/stationary riding, missing data, and Bluetooth
+loss do not declare a descent end. Automatic stopping does not touch manual
+recordings. Manual Stop, a confirmed camera-side stop, or a disconnection releases
+ownership; recordings discovered after reconnect must be stopped manually.
+Turning automatic stopping off leaves the current clip running.
+
+If a descent ends while an automatic start is still awaiting confirmation,
+the app cancels the pending start and sends Stop through the same command
+controller. Automatic-stop failures leave manual Stop available and report
+the camera error. Automatic stopping does not suppress the next descent.
 
 A confirmed descent consumes one automatic start opportunity, including when
 the camera is unavailable, already recording, busy, or rejects the command.

@@ -58,7 +58,7 @@ class DescentRecordingMonitor(
                                     subscribe(settings.enabled)
                                 }
                             }
-                            evaluate(settings)
+                            evaluate()
                             delay(if (settings.enabled) 250 else 1000)
                         }
                     } finally {
@@ -91,7 +91,11 @@ class DescentRecordingMonitor(
                     if (generation != subscriptionGeneration) return@launch
                     rideActive = state is RideState.Recording
                     if (!rideActive) detector.interrupt()
-                    if (state is RideState.Idle) detector.endRide()
+                    if (state is RideState.Idle) {
+                        val settings = settingsStore.settings.value
+                        if (settings.enabled && settings.stopAtDescentEnd) camera.recordingCommands.stopAutomatically()
+                        detector.endRide()
+                    }
                 }
             }
         // Keep observing ride end while disabled, without streaming sensor data.
@@ -145,12 +149,15 @@ class DescentRecordingMonitor(
         detector.interrupt()
     }
 
-    private fun evaluate(settings: DescentSettings) {
+    private fun evaluate() {
+        val settings = settingsStore.settings.value
         val nowMs = SystemClock.elapsedRealtime()
         val freshGradient = gradient?.freshValue(nowMs)
         val freshSpeed = speed?.freshValue(nowMs)
-        if (detector.onSample(nowMs, freshGradient, freshSpeed, systemConnected && rideActive, settings)) {
-            camera.recordingCommands.startAutomatically()
+        when (detector.onSample(nowMs, freshGradient, freshSpeed, systemConnected && rideActive, settings)) {
+            DescentEvent.STARTED -> camera.recordingCommands.startAutomatically()
+            DescentEvent.ENDED -> if (settings.stopAtDescentEnd) camera.recordingCommands.stopAutomatically()
+            DescentEvent.NONE -> {}
         }
         val status =
             when {

@@ -521,6 +521,9 @@ class GoProManager private constructor(private val context: Context) {
                         startRecordingTimer()
                     } else if (!recording && wasRecording) {
                         stopRecordingTimer()
+                        // Preserve every stop transition, even if StateFlow conflates
+                        // a rapid camera-side Stop followed by a manual Start.
+                        commandScope.launch { recordingCommands.recordingStopped() }
                     }
                 }
 

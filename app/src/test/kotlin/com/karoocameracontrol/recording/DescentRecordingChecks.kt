@@ -14,6 +14,7 @@ object DescentRecordingChecks {
     fun main(args: Array<String>) {
         detectorChecks()
         commandChecks()
+        automaticStopChecks()
         println("Passed $passed descent recording checks")
     }
 
@@ -32,9 +33,38 @@ object DescentRecordingChecks {
         speed: Double? = 4.0,
         active: Boolean = true,
         config: DescentSettings = settings,
-    ) = onSample(timeMs, grade, speed, active, config)
+    ) = onSample(timeMs, grade, speed, active, config) == DescentEvent.STARTED
 
     private fun detectorChecks() {
+        verify("automatic stopping is a separate opt-in, off by default") {
+            check(!DescentSettings(enabled = true).stopAtDescentEnd)
+            check(DescentSettings(enabled = true, stopAtDescentEnd = true).stopAtDescentEnd)
+        }
+        verify("descent end fires once after three seconds of confirmed flatter terrain") {
+            val detector = DescentDetector()
+            for (time in 0L..2000L step 1000L) check(!detector.sample(time))
+            check(detector.sample(3000))
+            check(detector.onSample(4000, -0.5, 4.0, true, settings) == DescentEvent.NONE)
+            check(detector.onSample(5000, -2.0, 4.0, true, settings) == DescentEvent.NONE)
+            for (time in 6000L..8000L step 1000L) check(detector.onSample(time, -0.5, 4.0, true, settings) == DescentEvent.NONE)
+            check(detector.onSample(9000, -0.5, 4.0, true, settings) == DescentEvent.ENDED)
+            for (time in 10000L..13000L step 1000L) check(detector.onSample(time, 0.0, 4.0, true, settings) == DescentEvent.NONE)
+        }
+        verify("pauses, missing data and telemetry gaps cannot declare descent end") {
+            for ((grade, speed, active) in listOf(Triple(null, 4.0, true), Triple(0.0, null, true), Triple(0.0, 4.0, false))) {
+                val detector = DescentDetector()
+                detector.suppressUntilNextDescent()
+                check(detector.onSample(0, 0.0, 4.0, true, settings) == DescentEvent.NONE)
+                check(detector.onSample(1000, grade, speed, active, settings) == DescentEvent.NONE)
+                for (time in 2000L..4000L step 1000L) check(detector.onSample(time, 0.0, 4.0, true, settings) == DescentEvent.NONE)
+                check(detector.onSample(5000, 0.0, 4.0, true, settings) == DescentEvent.ENDED)
+            }
+            val detector = DescentDetector()
+            detector.suppressUntilNextDescent()
+            check(detector.onSample(0, 0.0, 4.0, true, settings) == DescentEvent.NONE)
+            check(detector.onSample(4000, 0.0, 4.0, true, settings) == DescentEvent.NONE)
+            check(detector.descentConsumed)
+        }
         verify("cached telemetry expires at 2.5 seconds and rejects future or non-finite values") {
             check(TimedRideValue(4.0, 1000).freshValue(3500) == 4.0)
             check(TimedRideValue(4.0, 1000).freshValue(3501) == null)
@@ -255,5 +285,144 @@ object DescentRecordingChecks {
                 check(controller.state.value.error == null)
             }
             // The scope uses the runner's context; all command jobs have completed.
+        }
+
+    private class CameraFixture(scope: CoroutineScope) {
+        var connected = true
+        var recording = false
+        var startFails = false
+        var stopFails = false
+        var starts = 0
+        var stops = 0
+        var startGate = CompletableDeferred(Unit)
+        var stopGate = CompletableDeferred(Unit)
+        val controller =
+            CameraCommandController(
+                scope,
+                connected = { connected },
+                recording = { recording },
+                videoMode = { true },
+                startRecording = {
+                    starts += 1
+                    if (startFails) error("Start rejected")
+                    startGate.await()
+                    recording = true
+                },
+                stopRecording = {
+                    stops += 1
+                    if (stopFails) error("Stop rejected")
+                    stopGate.await()
+                    recording = false
+                },
+            )
+    }
+
+    private suspend fun settle() {
+        repeat(3) { yield() }
+    }
+
+    private fun automaticStopChecks() =
+        runBlocking {
+            val scope = CoroutineScope(coroutineContext)
+            val automatic = CameraFixture(scope)
+            check(automatic.controller.startAutomatically())
+            settle()
+            automatic.stopGate = CompletableDeferred()
+            check(automatic.controller.stopAutomatically())
+            settle()
+            verify("automatic stop uses shared progress and rejects duplicate stops") {
+                check(automatic.controller.state.value.busy && automatic.controller.state.value.recordingInFlight)
+                check(!automatic.controller.stopAutomatically())
+            }
+            automatic.stopGate.complete(Unit)
+            settle()
+            verify("automatic stop completes once without suppressing the next descent") {
+                check(automatic.stops == 1 && !automatic.recording)
+                check(!automatic.controller.state.value.busy)
+                check(automatic.controller.manualStopCount.value == 0L)
+                check(!automatic.controller.stopAutomatically())
+            }
+
+            val manual = CameraFixture(scope)
+            manual.controller.toggleManually()
+            settle()
+            verify("automatically stopping cannot stop a manually started recording") {
+                check(manual.recording)
+                check(!manual.controller.stopAutomatically())
+                check(manual.stops == 0)
+            }
+            manual.controller.toggleManually()
+            settle()
+
+            val existing = CameraFixture(scope)
+            existing.recording = true
+            verify("pre-existing recordings never become automation-owned") {
+                check(!existing.controller.startAutomatically())
+                check(!existing.controller.stopAutomatically())
+                check(existing.recording && existing.stops == 0)
+            }
+
+            val pending = CameraFixture(scope)
+            pending.startGate = CompletableDeferred()
+            check(pending.controller.startAutomatically())
+            settle()
+            check(pending.controller.stopAutomatically())
+            settle()
+            pending.startGate.complete(Unit)
+            settle()
+            verify("descent end cancels a pending automatic start and sends Stop") {
+                check(pending.starts == 1 && pending.stops == 1 && !pending.recording)
+                check(pending.controller.manualStopCount.value == 0L)
+                check(!pending.controller.state.value.busy)
+            }
+
+            val external = CameraFixture(scope)
+            check(external.controller.startAutomatically())
+            settle()
+            external.recording = false
+            external.controller.recordingStopped()
+            external.recording = true
+            verify("a camera-side stop releases ownership of later manual recordings") {
+                check(!external.controller.stopAutomatically())
+                check(external.recording && external.stops == 0)
+            }
+
+            val reconnected = CameraFixture(scope)
+            check(reconnected.controller.startAutomatically())
+            settle()
+            reconnected.controller.disconnected()
+            reconnected.recording = true
+            verify("reconnect cannot stop an existing camera recording") {
+                check(!reconnected.controller.stopAutomatically())
+                check(reconnected.stops == 0 && reconnected.recording)
+            }
+
+            val failed = CameraFixture(scope)
+            failed.startFails = true
+            check(failed.controller.startAutomatically())
+            settle()
+            failed.recording = true
+            verify("a rejected automatic start cannot own a subsequent manual recording") {
+                check(!failed.controller.stopAutomatically())
+                check(failed.stops == 0)
+            }
+
+            val stopFailure = CameraFixture(scope)
+            check(stopFailure.controller.startAutomatically())
+            settle()
+            stopFailure.stopFails = true
+            check(stopFailure.controller.stopAutomatically())
+            settle()
+            verify("failed automatic stop reports an error and leaves manual Stop available") {
+                check(stopFailure.recording && !stopFailure.controller.state.value.busy)
+                check(stopFailure.controller.state.value.error == "Stop rejected")
+            }
+            stopFailure.stopFails = false
+            stopFailure.controller.toggleManually()
+            settle()
+            verify("manual override after failed automatic stop releases ownership") {
+                check(!stopFailure.recording && stopFailure.controller.manualStopCount.value == 1L)
+                check(!stopFailure.controller.stopAutomatically())
+            }
         }
 }

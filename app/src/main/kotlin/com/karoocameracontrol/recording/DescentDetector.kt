@@ -9,12 +9,15 @@ data class DescentSettings(
     val enabled: Boolean = false,
     val gradientPercent: Int = 3,
     val confirmationSeconds: Int = 3,
+    val stopAtDescentEnd: Boolean = false,
 ) {
     init {
         require(gradientPercent in 1..10)
         require(confirmationSeconds in 1..10)
     }
 }
+
+enum class DescentEvent { NONE, STARTED, ENDED }
 
 /** Consumes one opportunity per descent; missing data never releases the latch. */
 class DescentDetector {
@@ -35,7 +38,7 @@ class DescentDetector {
         speedMetersPerSecond: Double?,
         rideActive: Boolean,
         settings: DescentSettings,
-    ): Boolean {
+    ): DescentEvent {
         if (lastSettings != settings) {
             interrupt()
             lastSettings = settings
@@ -52,7 +55,7 @@ class DescentDetector {
             speedMetersPerSecond < MIN_SPEED_METERS_PER_SECOND
         ) {
             interrupt()
-            return false
+            return DescentEvent.NONE
         }
 
         if (descentConsumed) {
@@ -61,23 +64,24 @@ class DescentDetector {
                 if (nowMs - since >= REARM_DURATION_MS) {
                     descentConsumed = false
                     interrupt()
+                    return DescentEvent.ENDED
                 }
             } else {
                 flatSinceMs = null
             }
-            return false
+            return DescentEvent.NONE
         }
 
         if (gradientPercent > -settings.gradientPercent) {
             descentSinceMs = null
-            return false
+            return DescentEvent.NONE
         }
         val since = descentSinceMs ?: nowMs.also { descentSinceMs = it }
-        if (nowMs - since < settings.confirmationSeconds * 1000L) return false
+        if (nowMs - since < settings.confirmationSeconds * 1000L) return DescentEvent.NONE
 
         descentConsumed = true
         interrupt()
-        return true
+        return DescentEvent.STARTED
     }
 
     fun suppressUntilNextDescent() {

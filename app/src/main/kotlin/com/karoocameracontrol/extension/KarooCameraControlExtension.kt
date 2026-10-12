@@ -7,6 +7,8 @@ import com.karoocameracontrol.integrations.gopro.GoProBatteryDataType
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.GoProRecTimeDataType
 import com.karoocameracontrol.integrations.gopro.GoProStatusDataType
+import com.karoocameracontrol.radar.RadarRecordingController
+import com.karoocameracontrol.radar.RadarRecordingSettings
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.extension.KarooExtension
 import io.hammerhead.karooext.models.ReleaseBluetooth
@@ -21,6 +23,7 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     private lateinit var goProManager: GoProManager
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var connectionStateJob: Job? = null
+    private val radarRecording by lazy { RadarRecordingController.getInstance(applicationContext) }
 
     private val karooSystem by lazy { KarooSystemService(applicationContext) }
 
@@ -35,13 +38,18 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     override fun onCreate() {
         super.onCreate()
 
+        goProManager = GoProManager.getInstance(applicationContext)
+        radarRecording.start(karooSystem)
+
         karooSystem.connect { connected ->
+            radarRecording.onSystemConnection(connected)
             if (connected) {
                 karooSystem.dispatch(RequestBluetooth(extension))
+                if (RadarRecordingSettings.getInstance(applicationContext).settings.value.enabled) {
+                    goProManager.tryAutoConnect()
+                }
             }
         }
-
-        goProManager = GoProManager.getInstance(applicationContext)
 
         // Observe GoProManager connection state
         connectionStateJob =
@@ -73,10 +81,12 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     }
 
     override fun onDestroy() {
+        radarRecording.stop()
         karooSystem.dispatch(ReleaseBluetooth(extension))
         karooSystem.disconnect()
 
         connectionStateJob?.cancel()
+        scope.coroutineContext[Job]?.cancel()
         goProManager.disconnect()
         super.onDestroy()
     }

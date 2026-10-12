@@ -10,3 +10,7 @@ A second press stops or cancels the pending recording request even before the
 GoPro has reported that recording began. Mode and preset controls remain
 disabled while recording because the GoPro cannot safely switch them
 mid-recording.
+
+Optional [radar-triggered recording](radar-recording.md) uses these same
+confirmed shutter commands. Manual controls override automation for the
+current encounter. Radar only stops recordings that it started.

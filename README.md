@@ -10,6 +10,7 @@ This is an extension to control sports action cameras using Hammerhead Karoo cyc
 - Start and stop recording and monitor recording time.
 - Change camera modes (Video, Photo, Timelapse).
 - Select specific presets within each mode.
+- Automatically record radar-detected traffic during a ride, with a configurable stop delay after radar clears. [Setup and limitations](docs/radar-recording.md).
 - View battery life, remaining storage space.
 
 ## Installation

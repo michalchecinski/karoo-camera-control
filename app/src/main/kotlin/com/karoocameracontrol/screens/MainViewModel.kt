@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.PresetGroup
+import com.karoocameracontrol.radar.RadarRecordingController
+import com.karoocameracontrol.radar.RadarRecordingSettings
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.ReleaseBluetooth
 import io.hammerhead.karooext.models.RequestBluetooth
@@ -29,6 +31,7 @@ data class MainUiState(
     val showFeedbackScreen: Boolean = false,
     val showScanningScreen: Boolean = false,
     val showPresetScreen: Boolean = false,
+    val showRadarScreen: Boolean = false,
     // Device Data
     val scannedDevices: List<android.bluetooth.BluetoothDevice> = emptyList(),
     val pairedDevices: List<com.karoocameracontrol.integrations.gopro.PairedDevice> = emptyList(),
@@ -46,6 +49,18 @@ data class MainUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val goProManager = GoProManager.getInstance(application)
     private val karooSystem = KarooSystemService(application)
+    private val radarRecording = RadarRecordingController.getInstance(application)
+    val radarSettings = RadarRecordingSettings.getInstance(application)
+    val radarStatus =
+        combine(radarRecording.status, radarSettings.settings) { status, settings ->
+            if (radarRecording.isRunning) {
+                status
+            } else if (settings.enabled) {
+                "Waiting for Karoo extension"
+            } else {
+                "Radar recording off"
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Waiting for Karoo extension")
 
     private val _uiState = MutableStateFlow(MainUiState())
     private var scanTimeoutJob: Job? = null
@@ -133,9 +148,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     init {
+        viewModelScope.launch {
+            radarRecording.operationInFlight.collect { inFlight ->
+                _uiState.value =
+                    _uiState.value.copy(
+                        isRecordingOperationInFlight = inFlight || recordingCommandJob?.isActive == true,
+                        isProcessing = inFlight || recordingCommandJob?.isActive == true,
+                    )
+            }
+        }
         karooSystem.connect { connected ->
             if (connected) {
-                karooSystem.dispatch(RequestBluetooth("karoo-camera-control"))
+                karooSystem.dispatch(RequestBluetooth(BLUETOOTH_RESOURCE))
             }
         }
 
@@ -158,7 +182,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        karooSystem.dispatch(ReleaseBluetooth("karoo-camera-control"))
+        karooSystem.dispatch(ReleaseBluetooth(BLUETOOTH_RESOURCE))
         karooSystem.disconnect()
         super.onCleared()
     }
@@ -211,6 +235,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleRecording() {
         val isRecording = goProManager.isRecording.value
+        val radarWasStarting = radarRecording.manualOverride()
+        if (radarWasStarting) {
+            launchRecordingCommand(stopRecording = true)
+            return
+        }
         if (recordingCommandJob?.isActive == true) {
             // A second tap during a recording command always means stop. Do not
             // wait for the camera's encoding-status notification before exposing
@@ -225,6 +254,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun launchRecordingCommand(stopRecording: Boolean) {
+        radarRecording.manualOperationStarted()
         val commandGeneration = ++recordingCommandGeneration
         _uiState.value =
             _uiState.value.copy(
@@ -240,6 +270,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         goProManager.startRecording()
                     }
                 } finally {
+                    radarRecording.manualOperationFinished()
                     if (recordingCommandGeneration == commandGeneration) {
                         _uiState.value =
                             _uiState.value.copy(
@@ -254,11 +285,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setMode(mode: Int) {
         if (_uiState.value.isProcessing) return
+        radarRecording.manualOverride()
+        radarRecording.manualOperationStarted()
         _uiState.value = _uiState.value.copy(isProcessing = true)
         viewModelScope.launch {
             try {
                 goProManager.setMode(mode)
             } finally {
+                radarRecording.manualOperationFinished()
                 _uiState.value = _uiState.value.copy(isProcessing = false)
             }
         }
@@ -266,12 +300,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadPreset(presetId: Int) {
         if (_uiState.value.isProcessing) return
+        radarRecording.manualOverride()
+        radarRecording.manualOperationStarted()
         _uiState.value = _uiState.value.copy(isProcessing = true)
         viewModelScope.launch {
             try {
                 goProManager.loadPreset(presetId)
                 _uiState.value = _uiState.value.copy(showPresetScreen = false)
             } finally {
+                radarRecording.manualOperationFinished()
                 _uiState.value = _uiState.value.copy(isProcessing = false)
             }
         }
@@ -280,6 +317,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // UI Navigation / Dialog State Setters
     fun setShowMenu(show: Boolean) {
         _uiState.value = _uiState.value.copy(showMenu = show)
+    }
+
+    fun setShowRadarScreen(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showRadarScreen = show, showMenu = false)
     }
 
     fun setShowFeedbackScreen(show: Boolean) {
@@ -300,5 +341,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelAutoConnect() {
         goProManager.disconnect()
         _uiState.value = _uiState.value.copy(isAutoConnecting = false, showMenu = false)
+    }
+
+    companion object {
+        private const val BLUETOOTH_RESOURCE = "karoo-camera-control-ui"
     }
 }

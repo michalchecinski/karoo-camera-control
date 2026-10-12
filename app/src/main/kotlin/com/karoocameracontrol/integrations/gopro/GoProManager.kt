@@ -89,6 +89,10 @@ class GoProManager private constructor(private val context: Context) {
 
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+    private val _recordingStateKnown = MutableStateFlow(false)
+    val recordingStateKnown: StateFlow<Boolean> = _recordingStateKnown.asStateFlow()
+    private val _cameraModeKnown = MutableStateFlow(false)
+    val cameraModeKnown: StateFlow<Boolean> = _cameraModeKnown.asStateFlow()
 
     private val _recordingDuration = MutableStateFlow(0)
     val recordingDuration: StateFlow<Int> = _recordingDuration.asStateFlow()
@@ -499,6 +503,7 @@ class GoProManager private constructor(private val context: Context) {
                     } else if (!recording && wasRecording) {
                         stopRecordingTimer()
                     }
+                    _recordingStateKnown.value = true
                 }
 
                 status.recordingDuration?.let { duration ->
@@ -520,6 +525,7 @@ class GoProManager private constructor(private val context: Context) {
 
                 status.cameraMode?.let { mode ->
                     _cameraMode.value = mode
+                    _cameraModeKnown.value = true
                 }
 
                 status.activePresetId?.let { presetId ->
@@ -697,6 +703,15 @@ class GoProManager private constructor(private val context: Context) {
             value = GoProCommands.Recording.START,
         )
         awaitRecordingState(isRecording = true)
+    }
+
+    suspend fun keepAlive() {
+        writeAndAwaitResponseSuspend(
+            writeUuid = GoProUUID.SETTING,
+            responseUuid = GoProUUID.SETTING_RESPONSE,
+            messageType = 0x5B,
+            value = GoProCommands.KEEP_ALIVE,
+        )
     }
 
     suspend fun stopRecording() {
@@ -921,6 +936,8 @@ class GoProManager private constructor(private val context: Context) {
                 _connectionState.value = ConnectionState.Connecting(device.name ?: device.address)
 
                 while (isActive) {
+                    _recordingStateKnown.value = false
+                    _cameraModeKnown.value = false
                     try {
                         // 1. Connect
                         connectGattSuspend(device, autoConnect = isPaired)

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -51,6 +52,8 @@ fun MainScreen(
 ) {
     val viewModel: MainViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
+    val radarSettings by viewModel.radarSettings.settings.collectAsState()
+    val radarStatus by viewModel.radarStatus.collectAsState()
     var showUnpairDialog by remember { mutableStateOf(false) }
 
     // Auto-connect trigger
@@ -72,7 +75,9 @@ fun MainScreen(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
                             text =
-                                if (uiState.showFeedbackScreen) {
+                                if (uiState.showRadarScreen) {
+                                    "Radar recording"
+                                } else if (uiState.showFeedbackScreen) {
                                     "Feedback"
                                 } else if (uiState.showScanningScreen) {
                                     "Scan Devices"
@@ -86,7 +91,7 @@ fun MainScreen(
                     }
                 },
                 actions = {
-                    if (!uiState.showFeedbackScreen) {
+                    if (!uiState.showFeedbackScreen && !uiState.showRadarScreen) {
                         IconButton(onClick = { viewModel.setShowMenu(true) }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More options")
                         }
@@ -94,6 +99,11 @@ fun MainScreen(
                             expanded = uiState.showMenu,
                             onDismissRequest = { viewModel.setShowMenu(false) },
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("Radar recording") },
+                                onClick = { viewModel.setShowRadarScreen(true) },
+                                leadingIcon = { Icon(Icons.Default.Sensors, contentDescription = null) },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Disconnect") },
                                 onClick = { viewModel.disconnect() },
@@ -154,7 +164,15 @@ fun MainScreen(
         ) {
             val currentState = uiState.connectionState
 
-            if (uiState.showFeedbackScreen) {
+            if (uiState.showRadarScreen) {
+                RadarRecordingScreen(
+                    settings = radarSettings,
+                    status = radarStatus,
+                    onEnabledChanged = viewModel.radarSettings::setEnabled,
+                    onDelayChanged = viewModel.radarSettings::setStopDelay,
+                    onBack = { viewModel.setShowRadarScreen(false) },
+                )
+            } else if (uiState.showFeedbackScreen) {
                 FeedbackScreen(onFinish = { viewModel.setShowFeedbackScreen(false) })
             } else if (uiState.showPresetScreen) {
                 val currentModeId = if (uiState.cameraMode < 1000) uiState.cameraMode + 1000 else uiState.cameraMode

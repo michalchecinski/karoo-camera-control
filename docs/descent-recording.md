@@ -43,7 +43,9 @@ The existing `karoo-ext` 1.1.3 dependency provides `RideState` and
 detector reads `DataType.Field.ELEVATION_GRADE` (percent) and
 `DataType.Field.SPEED` (metres per second). There is no dedicated public
 descent-start event. The extension follows the official subscription and
-cleanup examples, registering listeners only while the setting is enabled.
+cleanup examples, streaming gradient and speed only while the setting is
+enabled. Ride-state observation stays active so ending a ride also resets
+suppression when the feature is off.
 
 Automatic and manual recording share an application-scoped command controller.
 It uses the existing GoPro Set Shutter response and recording-state confirmation

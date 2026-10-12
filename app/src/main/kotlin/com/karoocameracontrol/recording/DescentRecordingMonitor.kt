@@ -49,21 +49,17 @@ class DescentRecordingMonitor(
             scope.launch {
                 settingsStore.settings.collectLatest { settings ->
                     unsubscribe()
-                    if (!settings.enabled) {
-                        settingsStore.setStatus(DescentStatus.OFF)
-                        return@collectLatest
-                    }
-                    subscribe()
+                    subscribe(settings.enabled)
                     try {
                         while (isActive) {
                             retryAtMs?.let { retryMs ->
                                 if (SystemClock.elapsedRealtime() >= retryMs) {
                                     unsubscribe()
-                                    subscribe()
+                                    subscribe(settings.enabled)
                                 }
                             }
                             evaluate(settings)
-                            delay(250)
+                            delay(if (settings.enabled) 250 else 1000)
                         }
                     } finally {
                         unsubscribe()
@@ -84,7 +80,7 @@ class DescentRecordingMonitor(
         settingsStore.setStatus(if (settingsStore.settings.value.enabled) DescentStatus.WAITING_FOR_KAROO else DescentStatus.OFF)
     }
 
-    private fun subscribe() {
+    private fun subscribe(enabled: Boolean) {
         val generation = subscriptionGeneration
         consumerIds +=
             karooSystem.addConsumer<RideState>(
@@ -98,8 +94,11 @@ class DescentRecordingMonitor(
                     if (state is RideState.Idle) detector.endRide()
                 }
             }
-        subscribeData(DataType.Type.ELEVATION_GRADE, DataType.Field.ELEVATION_GRADE) { gradient = it }
-        subscribeData(DataType.Type.SPEED, DataType.Field.SPEED) { speed = it }
+        // Keep observing ride end while disabled, without streaming sensor data.
+        if (enabled) {
+            subscribeData(DataType.Type.ELEVATION_GRADE, DataType.Field.ELEVATION_GRADE) { gradient = it }
+            subscribeData(DataType.Type.SPEED, DataType.Field.SPEED) { speed = it }
+        }
     }
 
     private fun subscribeData(
@@ -155,6 +154,7 @@ class DescentRecordingMonitor(
         }
         val status =
             when {
+                !settings.enabled -> DescentStatus.OFF
                 !systemConnected -> DescentStatus.WAITING_FOR_KAROO
                 !rideActive -> DescentStatus.WAITING_FOR_RIDE
                 camera.connectionState.value !is ConnectionState.Connected -> DescentStatus.WAITING_FOR_CAMERA

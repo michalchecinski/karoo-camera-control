@@ -8,10 +8,13 @@ import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -19,7 +22,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
+import com.karoocameracontrol.integrations.gopro.Preset
+import com.karoocameracontrol.integrations.gopro.PresetGroup
 import com.karoocameracontrol.recording.CameraCommandController
 import com.karoocameracontrol.recording.DescentStatus
 import com.karoocameracontrol.screens.ConnectedScreen
@@ -71,8 +76,12 @@ class DescentUiInstrumentation : Instrumentation() {
                         Scaffold(
                             topBar = {
                                 CenterAlignedTopAppBar(
-                                    modifier = Modifier.height(36.dp),
-                                    title = { Text("GoPro Test Camera", style = MaterialTheme.typography.titleMedium) },
+                                    title = {
+                                        Text("Connected to GoPro Test Camera", style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    },
+                                    actions = {
+                                        IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
+                                    },
                                     colors =
                                         TopAppBarDefaults.centerAlignedTopAppBarColors(
                                             containerColor = MaterialTheme.colorScheme.primary,
@@ -91,11 +100,11 @@ class DescentUiInstrumentation : Instrumentation() {
                                     batteryLevel = 87,
                                     remainingTime = 3720,
                                     cameraMode = 0,
-                                    availablePresets = emptyList(),
+                                    availablePresets = listOf(PresetGroup(id = 1000, presets = listOf(Preset(id = 1)))),
                                     activePresetName = "Standard",
                                     activePresetIcon = null,
                                     descentRecordingEnabled = true,
-                                    descentStatus = if (isRecording || command.recordingInFlight) DescentStatus.CONSUMED else DescentStatus.READY,
+                                    descentStatus = if (isRecording || command.recordingInFlight) DescentStatus.CONSUMED else DescentStatus.WAITING_FOR_RIDE,
                                     onToggleRecording = { controller.toggleManually() },
                                     onSetMode = {},
                                     onOpenPresetSelection = {},
@@ -108,7 +117,14 @@ class DescentUiInstrumentation : Instrumentation() {
                     }
                 }
             }
-            waitForText("Record")
+            val readyRecord = clickableParent(waitForText("Record"))
+            val presetBounds = android.graphics.Rect()
+            clickableParent(waitForText("Preset: Standard")).getBoundsInScreen(presetBounds)
+            val recordBounds = android.graphics.Rect()
+            readyRecord.getBoundsInScreen(recordBounds)
+            capture("connected-layout-ready")
+            check(presetBounds.height() >= 96) { "Preset button clipped: $presetBounds" }
+            check(presetBounds.bottom <= recordBounds.top - 16) { "Preset touches recording control: $presetBounds / $recordBounds" }
             runOnMainSync { check(controller.startAutomatically()) }
             val pendingStop = waitForText("Stop")
             check(clickableParent(pendingStop).isEnabled) { "Stop unavailable during automatic start" }

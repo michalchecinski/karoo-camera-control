@@ -13,10 +13,14 @@ mid-recording.
 
 Manual commands and [automatic descent starts](descent-recording.md) use the
 same application-scoped controller. Command progress remains visible when
-the screen is reopened, and failures appear in a snackbar. The timer and
-Record/Stop button remain fixed above Back on the Karoo screen; other camera
-details scroll when needed. A manual Stop suppresses automatic starts until
-the next descent.
+the screen is reopened, and failures appear in a snackbar. Record/Stop and Back
+share a fixed bottom row on the Karoo screen, with the recording timer above.
+Other camera details scroll when needed, with a gap above the fixed controls.
+Battery and storage share a compact row so the mode and preset controls fit
+more comfortably. Tap the preset button, labelled with the current preset, to
+choose another preset. The app header allows two lines for the camera name and
+ellipsizes longer names instead of clipping them. A manual Stop suppresses
+automatic starts until the next descent.
 
 If the shutter response or recording-state confirmation times out, the shared
 controller reports **Camera command timed out** in the snackbar and releases
@@ -36,3 +40,14 @@ controls override radar for the current encounter.
 Recording requests, command acknowledgements, confirmed states, and failures are
 recorded in the local [diagnostic log](diagnostic-reports.md). Uploading that log
 requires an explicit action in the Leave Feedback screen.
+
+## Layout verification
+
+The connected screen was checked on the isolated 480×800 Karoo emulator with
+a sample camera, populated presets, and descent status enabled. The UI runner
+checks that the preset button is fully visible with a gap above Record, and
+that Stop stays available during pending commands and active recording.
+
+![Connected camera ready](../screenshots/emulator-karoo-480x800/connected-layout-ready.png)
+![Pending recording command](../screenshots/emulator-karoo-480x800/descent-start-pending.png)
+![Active recording](../screenshots/emulator-karoo-480x800/descent-recording-active.png)

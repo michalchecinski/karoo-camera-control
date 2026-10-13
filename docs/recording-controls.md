@@ -47,6 +47,9 @@ The connected screen was checked on the isolated 480×800 Karoo emulator with
 a sample camera, populated presets, and descent status enabled. The UI runner
 checks that the preset button is fully visible with a gap above Record, and
 that Stop stays available during pending commands and active recording.
+Debug app/test APK builds, formatting checks, and Android lint passed, along
+with 22 unit tests and all 41 deterministic descent-recording checks. Physical
+Karoo/GoPro regression testing remains a release validation step.
 
 ![Connected camera ready](../screenshots/emulator-karoo-480x800/connected-layout-ready.png)
 ![Pending recording command](../screenshots/emulator-karoo-480x800/descent-start-pending.png)

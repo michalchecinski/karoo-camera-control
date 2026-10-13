@@ -45,6 +45,7 @@ class DescentUiInstrumentation : Instrumentation() {
             val activity = startActivitySync(Intent(targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
             val recording = MutableStateFlow(false)
             var startGate = CompletableDeferred<Unit>()
+            var stopGate = CompletableDeferred(Unit)
             var stops = 0
             val controller =
                 CameraCommandController(
@@ -58,6 +59,7 @@ class DescentUiInstrumentation : Instrumentation() {
                     },
                     stopRecording = {
                         stops += 1
+                        stopGate.await()
                         recording.value = false
                     },
                 )
@@ -133,7 +135,29 @@ class DescentUiInstrumentation : Instrumentation() {
             waitForText("Record")
             runOnMainSync { check(stops == 2 && !recording.value) }
             capture("descent-recording-ready")
-            finish(Activity.RESULT_OK, Bundle().apply { putString("stream", "PASS: automatic start, pending Stop, mode lock, visible recording Stop and manual override\n") })
+            runOnMainSync {
+                check(controller.startAutomatically())
+            }
+            waitForText("00:12")
+            runOnMainSync {
+                stopGate = CompletableDeferred()
+                check(controller.stopAutomatically())
+            }
+            waitForIdleSync()
+            val automaticStop = clickableParent(waitForText("Stop"))
+            check(automaticStop.isEnabled)
+            runOnMainSync { check(controller.state.value.busy && controller.state.value.recordingInFlight) }
+            automaticStop.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            waitForManualStops(controller, 3L)
+            runOnMainSync { stopGate.complete(Unit) }
+            waitForText("Record")
+            runOnMainSync { check(!recording.value && controller.manualStopCount.value == 3L) }
+            runOnMainSync { check(controller.startAutomatically()) }
+            waitForText("00:12")
+            runOnMainSync { check(controller.stopAutomatically()) }
+            waitForText("Record")
+            runOnMainSync { check(!recording.value && controller.manualStopCount.value == 3L) }
+            finish(Activity.RESULT_OK, Bundle().apply { putString("stream", "PASS: automatic start/stop, pending Stop, mode lock, visible recording Stop and manual override\n") })
         } catch (e: Throwable) {
             finish(Activity.RESULT_CANCELED, Bundle().apply { putString("stream", "FAIL: ${e.stackTraceToString()}\n") })
         } finally {
@@ -149,6 +173,20 @@ class DescentUiInstrumentation : Instrumentation() {
             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
         bitmap.recycle()
+    }
+
+    private fun waitForManualStops(
+        controller: CameraCommandController,
+        count: Long,
+    ) {
+        val deadline = SystemClock.elapsedRealtime() + 10000
+        while (SystemClock.elapsedRealtime() < deadline) {
+            var observed = 0L
+            runOnMainSync { observed = controller.manualStopCount.value }
+            if (observed == count) return
+            SystemClock.sleep(100)
+        }
+        error("Manual override did not arrive")
     }
 
     private fun waitForText(text: String): AccessibilityNodeInfo {

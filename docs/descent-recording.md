@@ -1,4 +1,4 @@
-# Recording when a descent starts
+# Descent recording
 
 ## Implementation plan
 
@@ -11,6 +11,8 @@
 3. Build and check the changed screens on the 480×800 Karoo Android emulator,
    capture app-only screenshots, run formatting and validation, then commit,
    push, and open a pull request.
+4. Add optional stops at descent end with ownership of automatic clips, then
+   verify both opt-ins, recording controls, and persistence on the emulator.
 
 ## Behaviour
 
@@ -96,8 +98,12 @@ python3 scripts/verify-descent-settings.py emulator-5554
 The instrumentation uses an isolated fake camera to exercise the production
 connected screen on a real Android emulator. It checks pending and confirmed
 automatic starts, disabled mode controls, visible Stop, and manual override.
+It also checks a completed automatic stop and manual override while an
+automatic stop is pending.
+
 The settings script requires the defaults in an isolated app install, checks
-persistence across process restart and adjustment boundaries, captures the
+persistence across process restart, adjustment boundaries, and the two
+separate opt-ins (both off by default). It captures the
 changed menu/settings screens, and restores defaults. It refuses physical
 devices. The final screenshots are 480×656 with Android system bars removed.
 

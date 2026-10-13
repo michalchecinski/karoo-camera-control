@@ -54,21 +54,32 @@ fun DescentRecordingScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text = "Start on descents",
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Start on descents", style = MaterialTheme.typography.titleSmall)
+                    Text("Video • ≥5 km/h", style = MaterialTheme.typography.labelSmall)
+                }
                 Switch(
                     checked = settings.enabled,
                     onCheckedChange = { onSettingsChanged(settings.copy(enabled = it)) },
                     modifier = Modifier.semantics { contentDescription = "Start on descents" },
                 )
             }
-            Text(
-                text = "Starts video during rides.\nStop recording manually.",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Stop at descent end", style = MaterialTheme.typography.titleSmall)
+                    Text("Automatic clips only", style = MaterialTheme.typography.labelSmall)
+                }
+                Switch(
+                    checked = settings.stopAtDescentEnd,
+                    enabled = settings.enabled,
+                    onCheckedChange = { onSettingsChanged(settings.copy(stopAtDescentEnd = it)) },
+                    modifier = Modifier.semantics { contentDescription = "Stop at descent end" },
+                )
+            }
             SettingStepper(
                 label = "Descent gradient",
                 value = "−${settings.gradientPercent}%",
@@ -92,15 +103,17 @@ fun DescentRecordingScreen(
                 onIncrease = { onSettingsChanged(settings.copy(confirmationSeconds = settings.confirmationSeconds + 1)) },
             )
             Text(
-                text = "Connected GoPro • Video • ≥5 km/h",
+                text = if (settings.stopAtDescentEnd) "Auto stop after 3s on flat ground." else "Stop recording manually.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            Text(
-                text = status.message,
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.labelSmall,
-            )
         }
+        Text(
+            text = status.message,
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelSmall,
+            textAlign = TextAlign.End,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(start = 64.dp, end = 12.dp, bottom = 24.dp),
+        )
         Image(
             painter = painterResource(R.drawable.back),
             contentDescription = "Back",

@@ -75,24 +75,32 @@ node("text", "Descent recording")
 screenshot("descent-menu.png")
 tap(node("text", "Descent recording"))
 assert description("Start on descents").get("checked") == "false"
+assert description("Stop at descent end").get("checked") == "false"
+assert description("Stop at descent end").get("enabled") == "false"
 for label in ("Less steep gradient", "Steeper gradient", "Shorter confirmation", "Longer confirmation"):
     assert description(label).get("enabled") == "false"
-print("PASS: navigation, off by default, and disabled adjustments", flush=True)
+print("PASS: navigation, both recording options off by default, and disabled adjustments", flush=True)
 
 tap(description("Start on descents"))
 assert description("Start on descents").get("checked") == "true"
-for text in ("−3%", "3 s", "Waiting for Karoo"):
+assert description("Stop at descent end").get("enabled") == "true"
+assert description("Stop at descent end").get("checked") == "false"
+tap(description("Stop at descent end"))
+assert description("Stop at descent end").get("checked") == "true"
+for text in ("−3%", "3 s", "Auto stop after 3s on flat ground."):
     found = node("text", text)
     assert int(re.findall(r"\d+", found.get("bounds"))[-1]) <= 576, f"Clipped setting: {text}"
+assert int(re.findall(r"\d+", node("text", "Waiting for Karoo").get("bounds"))[-1]) <= 684
 screenshot("descent-settings-enabled.png")
 tap(description("Steeper gradient"))
 tap(description("Longer confirmation"))
 launch()
 open_settings()
 assert description("Start on descents").get("checked") == "true"
+assert description("Stop at descent end").get("checked") == "true"
 node("text", "−4%")
 node("text", "4 s")
-print("PASS: enabled flag, gradient, and delay persist across process restart", flush=True)
+print("PASS: both recording options, gradient, and delay persist across process restart", flush=True)
 
 for label in ("Less steep gradient", "Shorter confirmation"):
     control = description(label)
@@ -115,12 +123,19 @@ for label in ("Less steep gradient", "Shorter confirmation"):
     for _ in range(7):
         tap(control)
 tap(description("Start on descents"))
+assert description("Stop at descent end").get("enabled") == "false"
+assert description("Stop at descent end").get("checked") == "true"
 command("shell", "input", "keyevent", "KEYCODE_BACK")
 node("content-desc", "More options")
 open_settings()
 assert description("Start on descents").get("checked") == "false"
+assert description("Stop at descent end").get("checked") == "true"
 node("text", "−3%")
 node("text", "3 s")
+tap(description("Start on descents"))
+tap(description("Stop at descent end"))
+assert description("Stop at descent end").get("checked") == "false"
+tap(description("Start on descents"))
 tap(description("Back"))
 node("content-desc", "More options")
 print("PASS: system Back, in-app Back, and restored default settings", flush=True)

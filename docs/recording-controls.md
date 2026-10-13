@@ -17,3 +17,9 @@ the screen is reopened, and failures appear in a snackbar. The timer and
 Record/Stop button remain fixed above Back on the Karoo screen; other camera
 details scroll when needed. A manual Stop suppresses automatic starts until
 the next descent.
+
+An optional **Stop at descent end** setting stops only clips started by descent
+automation, after confirmed flatter terrain or ride finish. It is off by
+default. Automatic stops use the same acknowledgement and progress path;
+manual Stop remains available while an automatic stop is pending. Manual clips
+and recordings found after reconnect are never stopped by this option.

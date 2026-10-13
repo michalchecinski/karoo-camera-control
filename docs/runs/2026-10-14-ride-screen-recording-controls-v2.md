@@ -31,6 +31,16 @@ Non-goals: Bonus Actions, dependency updates, alerts/sound, whole-ride recording
 - Pipeline configuration and companion skills are absent. Operator authorized autonomous fallback using gh, repository build checks, and Copilot CLI review. Base branch resolved from GitHub default-branch: main. Missing pipeline labels are skipped; existing feature/version labels applied.
 - Local release signing credentials are unavailable; validate debug build, lint, and tests rather than signing a release.
 
+## Validation gate
+
+Fallback gate derived from repository checks (JDK 17, installed Android SDK):
+
+- `./gradlew :app:ktlintFormat :app:ktlintCheck`
+- `./gradlew :app:testDebugUnitTest :app:verifyDescentRecording`
+- `./gradlew :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest -PcameraTestRunner=com.karoocameracontrol.RecordingFieldInstrumentation`
+- Run `RecordingFieldInstrumentation` on an isolated 480×800 emulator and inspect app-only screenshots.
+- Copilot CLI read-only review against `origin/main`, including compatibility, security, breaking-change, and scope checks.
+
 ## Progress
 
 PR: #49
@@ -44,5 +54,5 @@ PR: #49
 
 ### Phase 2: Verification and delivery
 
-- [ ] 2.1 Add emulator integration checks and capture changed field states; update product docs.
+- [x] 2.1 Add emulator integration checks and capture changed field states; update product docs. — f907782
 - [ ] 2.2 Run ktlint, unit/controller checks, debug build, and Copilot CLI review; finalize PR.

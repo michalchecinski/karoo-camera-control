@@ -22,6 +22,11 @@ body:
     attributes:
       label: Screenshots or Videos
       description: If applicable, add screenshots and/or a short video to help explain the problem you've encountered.
+  - type: input
+    id: diagnostics-code
+    attributes:
+      label: Diagnostic support code
+      description: Optional. In the app's Leave Feedback screen, send diagnostics over Wi-Fi or a hotspot and enter the displayed code here.
   - type: textarea
     id: additional-info
     attributes:

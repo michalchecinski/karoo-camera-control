@@ -23,7 +23,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelUuid
 import android.os.SystemClock
-import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
 import com.karoocameracontrol.recording.CameraCommandController
@@ -48,6 +47,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import com.karoocameracontrol.diagnostics.DiagnosticLog as Log
 
 data class PairedDevice(val address: String, val name: String)
 
@@ -177,7 +177,7 @@ class GoProManager private constructor(private val context: Context) {
         if (lastAddress != null) {
             // Check if it's still in the paired list
             if (devices.any { it.address == lastAddress }) {
-                Log.d(TAG, "Auto-connecting to last device: $lastAddress")
+                Log.d(TAG, "Auto-connecting to last saved device")
                 connectToDevice(lastAddress)
                 return
             }
@@ -186,7 +186,7 @@ class GoProManager private constructor(private val context: Context) {
         // Fallback: Connect to first paired device if exists
         if (devices.isNotEmpty()) {
             val firstDevice = devices.first()
-            Log.d(TAG, "Auto-connecting to first paired device: ${firstDevice.address}")
+            Log.d(TAG, "Auto-connecting to first saved device")
             connectToDevice(firstDevice.address)
         }
     }
@@ -284,7 +284,7 @@ class GoProManager private constructor(private val context: Context) {
 
                 if (!_scannedDevices.value.contains(device)) {
                     _scannedDevices.value = _scannedDevices.value + device
-                    Log.d(TAG, "Found GoPro: ${device.name} (${device.address})")
+                    Log.d(TAG, "Found supported camera")
                 }
             }
 
@@ -295,7 +295,7 @@ class GoProManager private constructor(private val context: Context) {
 
                     if (!_scannedDevices.value.contains(device)) {
                         _scannedDevices.value = _scannedDevices.value + device
-                        Log.d(TAG, "Found GoPro (batch): ${device.name} (${device.address})")
+                        Log.d(TAG, "Found supported camera (batch)")
                     }
                 }
             }
@@ -321,14 +321,14 @@ class GoProManager private constructor(private val context: Context) {
                 // GATT_CONN_TERMINATE_PEER_USER means remote device disconnected - treat as normal disconnect
                 if (status == BluetoothGatt.GATT_SUCCESS || status == GATT_CONN_TERMINATE_PEER_USER) {
                     if (newState == BluetoothProfile.STATE_CONNECTED) {
-                        Log.d(TAG, "onConnectionStateChange: Connected to $deviceName")
+                        Log.d(TAG, "onConnectionStateChange: Connected to camera")
                         synchronized(continuationLock) {
                             if (currentOperationType == BleOperationType.CONNECT) {
                                 resumeActiveContinuationLocked(Unit)
                             }
                         }
                     } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                        Log.d(TAG, "onConnectionStateChange: Disconnected from $deviceName (status=$status)")
+                        Log.d(TAG, "onConnectionStateChange: Disconnected from camera (status=$status)")
                         connectedGatt?.close()
                         connectedGatt = null
                         _connectionState.value = ConnectionState.Disconnected
@@ -487,8 +487,7 @@ class GoProManager private constructor(private val context: Context) {
                 uuid: UUID,
                 value: ByteArray,
             ) {
-                val hexValue = value.joinToString(" ") { "%02x".format(it) }
-                Log.d(TAG, "Process Data: $hexValue")
+                Log.d(TAG, "BLE response received (${value.size} bytes)")
 
                 if (value.isNotEmpty() && value[0] == 0xF5.toByte()) {
                     processProtobufData(value)
@@ -639,6 +638,7 @@ class GoProManager private constructor(private val context: Context) {
         synchronized(responseLock) {
             val pending = pendingResponse ?: return
             if (pending.characteristicUuid == characteristicUuid && pending.messageType == value[0]) {
+                Log.i(TAG, "Command response ${value[0].toUByte()} status ${value[1].toUByte()}")
                 pending.result.complete(value)
             }
         }
@@ -722,13 +722,21 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun startRecording() {
-        writeAndAwaitResponseSuspend(
-            writeUuid = GoProUUID.COMMAND,
-            responseUuid = GoProUUID.COMMAND_RESPONSE,
-            messageType = COMMAND_ID_SET_SHUTTER,
-            value = GoProCommands.Recording.START,
-        )
-        awaitRecordingState(isRecording = true)
+        Log.i(TAG, "Recording start requested")
+        try {
+            writeAndAwaitResponseSuspend(
+                writeUuid = GoProUUID.COMMAND,
+                responseUuid = GoProUUID.COMMAND_RESPONSE,
+                messageType = COMMAND_ID_SET_SHUTTER,
+                value = GoProCommands.Recording.START,
+            )
+            Log.i(TAG, "Recording start command acknowledged")
+            awaitRecordingState(isRecording = true)
+            Log.i(TAG, "Recording start state confirmed")
+        } catch (error: Exception) {
+            Log.e(TAG, "Recording start interrupted or failed", error)
+            throw error
+        }
     }
 
     suspend fun keepAlive() {
@@ -741,6 +749,7 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun stopRecording() {
+        Log.i(TAG, "Recording stop requested")
         pauseRecordingTimer()
         try {
             writeAndAwaitResponseSuspend(
@@ -749,7 +758,12 @@ class GoProManager private constructor(private val context: Context) {
                 messageType = COMMAND_ID_SET_SHUTTER,
                 value = GoProCommands.Recording.STOP,
             )
+            Log.i(TAG, "Recording stop command acknowledged")
             awaitRecordingState(isRecording = false)
+            Log.i(TAG, "Recording stop state confirmed")
+        } catch (error: Exception) {
+            Log.e(TAG, "Recording stop interrupted or failed", error)
+            throw error
         } finally {
             // If we are still recording (stop failed or timed out), resume the timer
             if (_isRecording.value) {
@@ -759,6 +773,7 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun setMode(mode: Int) {
+        Log.i(TAG, "Camera mode requested: $mode")
         val modeId =
             when (mode) {
                 0 -> PRESET_MODE_VIDEO
@@ -783,6 +798,7 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     suspend fun loadPreset(presetId: Int) {
+        Log.i(TAG, "Camera preset requested: $presetId")
         val cmd = GoProCommands.Presets.load(presetId)
         writeCharacteristicSuspend(GoProUUID.COMMAND, cmd)
 
@@ -826,7 +842,7 @@ class GoProManager private constructor(private val context: Context) {
         try {
             writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.STATUS)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to poll recording state: ${e.message}")
+            Log.w(TAG, "Failed to poll recording state")
         }
 
         if (_isRecording.value) {
@@ -836,37 +852,37 @@ class GoProManager private constructor(private val context: Context) {
         try {
             writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.BATTERY)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to poll battery: ${e.message}")
+            Log.w(TAG, "Failed to poll battery")
         }
 
         try {
             writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.REMAINING_SPACE)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to poll space: ${e.message}")
+            Log.w(TAG, "Failed to poll space")
         }
 
         try {
             writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.REMAINING_VIDEO_TIME)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to poll remaining time: ${e.message}")
+            Log.w(TAG, "Failed to poll remaining time")
         }
 
         try {
             writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.MODE)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to poll mode: ${e.message}")
+            Log.w(TAG, "Failed to poll mode")
         }
 
         try {
             writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.PRESET_GROUP)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to poll mode 96: ${e.message}")
+            Log.w(TAG, "Failed to poll mode 96")
         }
 
         try {
             writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.ACTIVE_PRESET)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to poll active preset ID 0x61: ${e.message}")
+            Log.w(TAG, "Failed to poll active preset ID 0x61")
         }
 
         // Fetch presets - Critical for UI, retry on failure
@@ -876,7 +892,7 @@ class GoProManager private constructor(private val context: Context) {
                 getAvailablePresets()
                 break // Success, exit retry loop
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to get available presets (attempt $attempt/$PRESET_FETCH_MAX_RETRIES): ${e.message}")
+                Log.w(TAG, "Failed to get available presets (attempt $attempt/$PRESET_FETCH_MAX_RETRIES)")
                 if (attempt == PRESET_FETCH_MAX_RETRIES) {
                     Log.e(TAG, "Failed to get available presets after $PRESET_FETCH_MAX_RETRIES attempts", e)
                 }
@@ -888,7 +904,7 @@ class GoProManager private constructor(private val context: Context) {
         try {
             writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.DURATION)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to poll duration: ${e.message}")
+            Log.w(TAG, "Failed to poll duration")
         }
     }
 
@@ -1019,7 +1035,7 @@ class GoProManager private constructor(private val context: Context) {
         try {
             writeCharacteristicSuspend(GoProUUID.QUERY, GoProCommands.Query.REGISTER_UPDATES)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to register for status updates: ${e.message}")
+            Log.w(TAG, "Failed to register for status updates")
         }
     }
 
@@ -1298,6 +1314,9 @@ class GoProManager private constructor(private val context: Context) {
         uuid: UUID,
         value: ByteArray,
     ) {
+        if ((uuid == GoProUUID.COMMAND || uuid == GoProUUID.QUERY) && value.size > 1) {
+            Log.d(TAG, "BLE command ${value[1].toUByte()} to $uuid")
+        }
         val gatt = connectedGatt ?: throw Exception("Not connected")
         val char = findCharacteristic(gatt, uuid) ?: throw Exception("Characteristic $uuid not found in any service")
 

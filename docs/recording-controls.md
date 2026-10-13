@@ -32,3 +32,7 @@ and recordings found after reconnect are never stopped by this option.
 Optional [radar-triggered recording](radar-recording.md) uses the same shared
 command controller. Each automation stops only its own recordings. Manual
 controls override radar for the current encounter.
+
+Recording requests, command acknowledgements, confirmed states, and failures are
+recorded in the local [diagnostic log](diagnostic-reports.md). Uploading that log
+requires an explicit action in the Leave Feedback screen.

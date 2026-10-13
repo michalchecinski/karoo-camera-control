@@ -4,8 +4,8 @@ import android.app.Notification
 import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import android.util.Log
 import java.util.Locale
+import com.karoocameracontrol.diagnostics.DiagnosticLog as Log
 
 /**
  * Bridges the Android Settings pairing notification to the pairing flow.
@@ -58,7 +58,7 @@ class BluetoothPairingNotificationService : NotificationListenerService() {
     private fun findPairingAction(notification: Notification): Notification.Action? {
         val actions = notification.actions?.filter { it.actionIntent != null }.orEmpty()
         val actionTitles = actions.map { it.title?.toString().orEmpty() }
-        Log.d(TAG, "Bluetooth pairing notification actions: $actionTitles")
+        Log.d(TAG, "Bluetooth pairing notification action count: ${actionTitles.size}")
 
         val pairingActions =
             actions.filter { action ->

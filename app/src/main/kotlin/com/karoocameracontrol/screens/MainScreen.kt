@@ -56,6 +56,7 @@ fun MainScreen(
 ) {
     val viewModel: MainViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
+    val reportState by viewModel.reportState.collectAsState()
     val radarSettings by viewModel.radarSettings.settings.collectAsState()
     val radarStatus by viewModel.radarStatus.collectAsState()
     val descentSettings by viewModel.descentSettings.collectAsState()
@@ -205,7 +206,13 @@ fun MainScreen(
                     onBack = { viewModel.setShowDescentSettings(false) },
                 )
             } else if (uiState.showFeedbackScreen) {
-                FeedbackScreen(onFinish = { viewModel.setShowFeedbackScreen(false) })
+                FeedbackScreen(
+                    onFinish = { viewModel.setShowFeedbackScreen(false) },
+                    reportState = reportState,
+                    onSend = viewModel::sendDiagnostics,
+                    onRetry = viewModel::retryDiagnostics,
+                    onDiscard = viewModel::discardDiagnostics,
+                )
             } else if (uiState.showPresetScreen) {
                 val currentModeId = if (uiState.cameraMode < 1000) uiState.cameraMode + 1000 else uiState.cameraMode
                 val currentPresets = uiState.availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()

@@ -25,6 +25,13 @@ android {
                 .getOrElse("com.karoocameracontrol.radar.RadarTestInstrumentation")
         versionCode = (System.getenv("BUILD_NUMBER")?.toInt() ?: 1)
         versionName = System.getenv("RELEASE_VERSION") ?: "1.0"
+        val sentryDsn = providers.environmentVariable("SENTRY_DSN").getOrElse("")
+        if (!System.getenv("RELEASE_VERSION").isNullOrBlank()) {
+            require(sentryDsn.matches(Regex("https://[^/@:]+@[^/]+/(?:.*/)?[0-9]+"))) {
+                "Publishing builds require a valid public HTTPS SENTRY_DSN."
+            }
+        }
+        buildConfigField("String", "SENTRY_DSN", "\"" + sentryDsn.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
     }
 
     signingConfigs {
@@ -62,10 +69,13 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
+    implementation(libs.sentry.core)
+    testImplementation(libs.junit)
     implementation(libs.hammerhead.karoo.ext)
     implementation(libs.androidx.core.ktx)
     implementation(libs.bundles.androidx.lifeycle)

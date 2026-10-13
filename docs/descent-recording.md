@@ -82,9 +82,8 @@ Run `./gradlew :app:verifyDescentRecording` for the deterministic checks. They
 also run as part of Gradle `check` and CI `build`, using the app's existing
 dependencies. No library versions have changed.
 
-CI explicitly installs `platform-tools` through the existing pinned
-`setup-android` action. Its default also requests the obsolete `tools` package,
-which fails before Gradle starts on current runners.
+CI explicitly installs `platform-tools` through the pinned `setup-android`
+action so SDK package selection stays explicit across action updates.
 
 For UI checks, build `:app:assembleDebug :app:assembleDebugAndroidTest`, install
 both APKs on the isolated Karoo AVD, and run:

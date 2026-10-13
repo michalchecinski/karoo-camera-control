@@ -2,7 +2,10 @@ package com.karoocameracontrol.recording
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 
 /** Runnable deterministic checks, using existing Kotlin/coroutines dependencies. */
@@ -15,6 +18,7 @@ object DescentRecordingChecks {
         detectorChecks()
         commandChecks()
         automaticStopChecks()
+        timeoutChecks()
         println("Passed $passed descent recording checks")
     }
 
@@ -285,6 +289,75 @@ object DescentRecordingChecks {
                 check(controller.state.value.error == null)
             }
             // The scope uses the runner's context; all command jobs have completed.
+        }
+
+    private fun timeoutChecks() =
+        runBlocking {
+            var recording = false
+            var startOperation: suspend () -> Unit = { withTimeout(1) { awaitCancellation() } }
+            var stopOperation: suspend () -> Unit = { withTimeout(1) { awaitCancellation() } }
+            val controller =
+                CameraCommandController(
+                    scope = CoroutineScope(coroutineContext),
+                    connected = { true },
+                    recording = { recording },
+                    videoMode = { true },
+                    startRecording = { startOperation() },
+                    stopRecording = { stopOperation() },
+                )
+
+            suspend fun awaitFinished() = withTimeout(5000) { controller.state.first { !it.busy } }
+
+            check(controller.startAutomatically())
+            awaitFinished()
+            verify("automatic start timeout reports an error and releases controls and ownership") {
+                check(controller.state.value.error == "Camera command timed out")
+                check(!controller.state.value.recordingInFlight)
+                recording = true
+                check(!controller.stopAutomatically())
+                recording = false
+            }
+
+            startOperation = { recording = true }
+            check(controller.startAutomatically())
+            awaitFinished()
+            check(controller.stopAutomatically())
+            awaitFinished()
+            verify("automatic stop timeout reports an error and allows manual recovery") {
+                check(controller.state.value.error == "Camera command timed out")
+                check(!controller.state.value.recordingInFlight && recording)
+                check(controller.manualStopCount.value == 0L)
+            }
+            stopOperation = { recording = false }
+            controller.toggleManually()
+            awaitFinished()
+            check(!recording && controller.state.value.error == null)
+
+            controller.configure { withTimeout(1) { awaitCancellation() } }
+            awaitFinished()
+            verify("configuration timeout uses the same error reporting") {
+                check(controller.state.value.error == "Camera command timed out")
+            }
+
+            val startGate = CompletableDeferred<Unit>()
+            startOperation = { withTimeout(60_000) { startGate.await() } }
+            check(controller.startAutomatically())
+            settle()
+            controller.toggleManually()
+            awaitFinished()
+            verify("manual override cancels a timed operation without a timeout error") {
+                check(controller.state.value.error == null)
+                check(!controller.state.value.recordingInFlight && !recording)
+            }
+
+            check(controller.startAutomatically())
+            settle()
+            controller.disconnected()
+            settle()
+            verify("disconnect cancels a timed operation without a timeout error") {
+                check(controller.state.value.error == null)
+                check(!controller.state.value.busy && !controller.state.value.recordingInFlight)
+            }
         }
 
     private class CameraFixture(scope: CoroutineScope) {

@@ -18,6 +18,11 @@ Record/Stop button remain fixed above Back on the Karoo screen; other camera
 details scroll when needed. A manual Stop suppresses automatic starts until
 the next descent.
 
+If the shutter response or recording-state confirmation times out, the shared
+controller reports **Camera command timed out** in the snackbar and releases
+the controls for retry or manual Stop. Cancelling a command through manual
+override or disconnection does not report a timeout error.
+
 An optional **Stop at descent end** setting stops only clips started by descent
 automation, after confirmed flatter terrain or ride finish. It is off by
 default. Automatic stops use the same acknowledgement and progress path;

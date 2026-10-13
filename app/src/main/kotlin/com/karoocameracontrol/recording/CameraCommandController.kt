@@ -4,6 +4,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -116,6 +119,12 @@ class CameraCommandController(
                     previousJob?.join()
                     operation()
                     succeeded = true
+                } catch (e: TimeoutCancellationException) {
+                    // An operation's timeout is a failure; cancellation of this job still wins.
+                    currentCoroutineContext().ensureActive()
+                    if (generation == currentGeneration) {
+                        _state.value = _state.value.copy(error = "Camera command timed out")
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {

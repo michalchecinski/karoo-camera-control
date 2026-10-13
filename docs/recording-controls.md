@@ -18,8 +18,8 @@ share a fixed bottom row on the Karoo screen, with the recording timer above.
 Other camera details scroll when needed, with a gap above the fixed controls.
 Battery and storage share a compact row so the mode and preset controls fit
 more comfortably. Tap the preset button, labelled with the current preset, to
-choose another preset. The app header allows two lines for the camera name and
-ellipsizes longer names instead of clipping them. A manual Stop suppresses
+choose another preset. The app header uses smaller, 14 sp text, allows two lines for the camera name,
+and ellipsizes longer names instead of clipping them. A manual Stop suppresses
 automatic starts until the next descent.
 
 If the shutter response or recording-state confirmation times out, the shared

@@ -104,7 +104,7 @@ fun MainScreen(
                             } else {
                                 "Karoo Camera Control"
                             },
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )

@@ -77,7 +77,7 @@ class DescentUiInstrumentation : Instrumentation() {
                             topBar = {
                                 CenterAlignedTopAppBar(
                                     title = {
-                                        Text("Connected to GoPro Test Camera", style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                        Text("Connected to GoPro Test Camera", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                     },
                                     actions = {
                                         IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }

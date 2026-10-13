@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 
+enum class ReportFailureReason { EXPIRED, PREPARATION_FAILED, UPLOAD_FAILED }
+
 sealed interface ReportState {
     data object Loading : ReportState
 
@@ -21,7 +23,9 @@ sealed interface ReportState {
 
     data class Sent(val code: String) : ReportState
 
-    data class Failed(val canRetry: Boolean, val message: String) : ReportState
+    data class Failed(val reason: ReportFailureReason) : ReportState {
+        val canRetry: Boolean get() = reason == ReportFailureReason.UPLOAD_FAILED
+    }
 }
 
 class DiagnosticReportRepository(
@@ -73,7 +77,7 @@ class DiagnosticReportRepository(
         act {
             val report = store.load()
             if (report == null) {
-                mutableState.value = ReportState.Failed(false, "This report expired. Discard it and send a new report.")
+                mutableState.value = ReportState.Failed(ReportFailureReason.EXPIRED)
             } else {
                 mutableState.value = ReportState.Sending
                 submit(report)
@@ -108,8 +112,7 @@ class DiagnosticReportRepository(
 
     private fun failure(retry: Boolean) =
         ReportState.Failed(
-            retry,
-            if (retry) "Check Wi-Fi or a hotspot and retry. The service may be temporarily unavailable." else "Could not prepare diagnostics. Discard and try again.",
+            if (retry) ReportFailureReason.UPLOAD_FAILED else ReportFailureReason.PREPARATION_FAILED,
         )
 }
 

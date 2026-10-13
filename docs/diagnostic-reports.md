@@ -65,6 +65,11 @@ ID alone is not proof of acceptance. Sentry ingestion acceptance does not
 promise permanent storage or bypass server-side quotas or filtering. A lost
 response can leave delivery uncertain; manual retries retain the same event ID.
 
+Diagnostics UI copy is stored in Android string resources. Repository failures
+carry typed reasons (expired, preparation failure, or upload failure), which the
+Feedback screen maps to localized messages. Retry remains available only while
+a pending report can be submitted.
+
 ## Release validation
 
 Run the diagnostic unit tests, the Gradle build, and ktlint. Inspect the Feedback

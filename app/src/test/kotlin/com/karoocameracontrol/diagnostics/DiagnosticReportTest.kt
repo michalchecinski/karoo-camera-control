@@ -63,7 +63,9 @@ class DiagnosticReportTest {
                 await(repository) { it == ReportState.Idle }
                 assertEquals(0, submissions.size)
                 repository.send(emptyMap())
-                await(repository) { it is ReportState.Failed }
+                val failure = await(repository) { it is ReportState.Failed } as ReportState.Failed
+                assertEquals(ReportFailureReason.UPLOAD_FAILED, failure.reason)
+                assertTrue(failure.canRetry)
                 assertNotNull(store.load())
                 delay(100)
                 assertEquals(1, submissions.size)
@@ -137,6 +139,7 @@ class DiagnosticReportTest {
                 await(repository) { it == ReportState.Idle }
                 repository.send(emptyMap())
                 val failure = await(repository) { it is ReportState.Failed } as ReportState.Failed
+                assertEquals(ReportFailureReason.PREPARATION_FAILED, failure.reason)
                 assertFalse(failure.canRetry)
                 assertEquals(0, count.get())
             } finally {
@@ -157,7 +160,8 @@ class DiagnosticReportTest {
                 await(repository) { it is ReportState.Failed }
                 now += PendingReportStore.EXPIRY_MS
                 repository.retry()
-                await(repository) { it is ReportState.Failed && !it.canRetry }
+                val failure = await(repository) { it is ReportState.Failed && !it.canRetry } as ReportState.Failed
+                assertEquals(ReportFailureReason.EXPIRED, failure.reason)
                 assertEquals(0, count.get())
                 assertNull(store.load())
             } finally {

@@ -2,4 +2,22 @@
     <string name="app_name">Camera Control</string>
     <string name="extension_name">Camera Control</string>
     <string name="pair_your_camera">Pair your action cam</string>
+    <string name="diagnostics_problem_heading">Having a problem?</string>
+    <string name="diagnostics_send">Send diagnostics</string>
+    <string name="diagnostics_unavailable">Diagnostics sending is unavailable in this build.</string>
+    <string name="diagnostics_loading">Checking saved report…</string>
+    <string name="diagnostics_sending">Sending diagnostics…</string>
+    <string name="diagnostics_sent">Diagnostics sent</string>
+    <string name="diagnostics_support_code">Support code: %1$s</string>
+    <string name="diagnostics_feedback_instruction">Include this code when reporting the problem using the feedback link below.</string>
+    <string name="diagnostics_failed">Could not send diagnostics</string>
+    <string name="diagnostics_retry">Retry</string>
+    <string name="diagnostics_discard">Discard</string>
+    <string name="diagnostics_confirm_title">Send diagnostics?</string>
+    <string name="diagnostics_confirm_body">Send recent logs, app and Android versions, device model, and connection state privately to the developer via Sentry. Camera names, Bluetooth addresses, and passwords are omitted. Use Wi-Fi or a hotspot.</string>
+    <string name="diagnostics_confirm_send">Send</string>
+    <string name="diagnostics_cancel">Cancel</string>
+    <string name="diagnostics_error_expired">This report expired. Discard it and send a new report.</string>
+    <string name="diagnostics_error_preparation">Could not prepare diagnostics. Discard and try again.</string>
+    <string name="diagnostics_error_upload">Check Wi-Fi or a hotspot and retry. The service may be temporarily unavailable.</string>
 </resources>

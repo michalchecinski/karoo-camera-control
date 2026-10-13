@@ -27,11 +27,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.karoocameracontrol.R
 import com.karoocameracontrol.diagnostics.DiagnosticReports
+import com.karoocameracontrol.diagnostics.ReportFailureReason
 import com.karoocameracontrol.diagnostics.ReportState
 
 @Composable
@@ -152,37 +154,43 @@ fun DiagnosticsControls(
     configured: Boolean = DiagnosticReports.configured,
 ) {
     var confirm by remember { mutableStateOf(false) }
-    Text("Having a problem?", style = MaterialTheme.typography.titleMedium)
+    Text(stringResource(R.string.diagnostics_problem_heading), style = MaterialTheme.typography.titleMedium)
     Button(
         onClick = { confirm = true },
         enabled = configured && (state == ReportState.Idle || state is ReportState.Sent),
-    ) { Text("Send diagnostics") }
+    ) { Text(stringResource(R.string.diagnostics_send)) }
     if (!configured) {
-        Text("Diagnostics sending is unavailable in this build.", textAlign = TextAlign.Center)
+        Text(stringResource(R.string.diagnostics_unavailable), textAlign = TextAlign.Center)
     }
     when (state) {
-        ReportState.Loading -> Text("Checking saved report…")
-        ReportState.Sending -> Text("Sending diagnostics…", textAlign = TextAlign.Center)
+        ReportState.Loading -> Text(stringResource(R.string.diagnostics_loading))
+        ReportState.Sending -> Text(stringResource(R.string.diagnostics_sending), textAlign = TextAlign.Center)
         is ReportState.Sent -> {
-            Text("Diagnostics sent", style = MaterialTheme.typography.titleMedium)
-            Text("Support code: ${state.code}", textAlign = TextAlign.Center)
-            Text("Include this code when reporting the problem using the feedback link below.", textAlign = TextAlign.Center)
+            Text(stringResource(R.string.diagnostics_sent), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.diagnostics_support_code, state.code), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.diagnostics_feedback_instruction), textAlign = TextAlign.Center)
         }
         is ReportState.Failed -> {
-            Text("Could not send diagnostics", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-            Text(state.message, textAlign = TextAlign.Center)
-            if (state.canRetry) Button(onClick = onRetry, enabled = configured) { Text("Retry") }
-            TextButton(onClick = onDiscard) { Text("Discard") }
+            Text(stringResource(R.string.diagnostics_failed), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+            val message =
+                when (state.reason) {
+                    ReportFailureReason.EXPIRED -> R.string.diagnostics_error_expired
+                    ReportFailureReason.PREPARATION_FAILED -> R.string.diagnostics_error_preparation
+                    ReportFailureReason.UPLOAD_FAILED -> R.string.diagnostics_error_upload
+                }
+            Text(stringResource(message), textAlign = TextAlign.Center)
+            if (state.canRetry) Button(onClick = onRetry, enabled = configured) { Text(stringResource(R.string.diagnostics_retry)) }
+            TextButton(onClick = onDiscard) { Text(stringResource(R.string.diagnostics_discard)) }
         }
         ReportState.Idle -> Unit
     }
     if (confirm) {
         AlertDialog(
             onDismissRequest = { confirm = false },
-            title = { Text("Send diagnostics?", style = MaterialTheme.typography.titleLarge) },
+            title = { Text(stringResource(R.string.diagnostics_confirm_title), style = MaterialTheme.typography.titleLarge) },
             text = {
                 Text(
-                    "Send recent logs, app and Android versions, device model, and connection state privately to the developer via Sentry. Camera names, Bluetooth addresses, and passwords are omitted. Use Wi-Fi or a hotspot.",
+                    stringResource(R.string.diagnostics_confirm_body),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.heightIn(max = 140.dp).verticalScroll(rememberScrollState()),
                 )
@@ -191,9 +199,9 @@ fun DiagnosticsControls(
                 TextButton(onClick = {
                     confirm = false
                     onSend()
-                }) { Text("Send") }
+                }) { Text(stringResource(R.string.diagnostics_confirm_send)) }
             },
-            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.diagnostics_cancel)) } },
         )
     }
 }

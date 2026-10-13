@@ -1,6 +1,6 @@
 # Recording controls from the ride screen
 
-Status: **Planned**. Priority: **1** in the [Karoo integration roadmap](README.md).
+Status: **Implemented; physical Karoo/GoPro QA pending**. See [usage and verification](../ride-screen-recording-controls.md). Priority: **1** in the [Karoo integration roadmap](README.md).
 
 ## Description
 
@@ -9,7 +9,7 @@ and leaving the Karoo ride screen. Provide an interactive camera data field
 that can be added to a ride profile. The field shows the current recording
 state and a large action suitable for quick use during a ride.
 
-## Proposed experience
+## Implemented experience
 
 - When ready, show **Start recording**.
 - While a start is pending, show **Starting…** and keep **Stop / cancel** available.
@@ -21,8 +21,7 @@ state and a large action suitable for quick use during a ride.
 
 The first version focuses on Video recording. It must not change the camera's
 mode or preset automatically. Photo, preset selection, and multi-camera control
-remain separate possible extensions. Small field sizes should retain a clear
-state and usable action, or explain that a larger field is required.
+remain separate possible extensions. Fields smaller than 160 × 112 dp explain that a larger field is required.
 
 ## Behaviour and integration
 
@@ -31,9 +30,10 @@ A ride-screen Stop must cancel a pending start and suppress automation exactly
 as an app Stop does. Display confirmed camera state separately from command
 progress, and keep both synchronized with the app and physical camera shutter.
 
-Karoo's official sample demonstrates custom graphical data fields through
-`DataTypeImpl.startView` and RemoteViews. Validate interactive actions on the
-project's pinned SDK and target firmware before choosing the final layout.
+The field follows Karoo's official custom graphical data-field example through
+`DataTypeImpl.startView` and RemoteViews on the pinned SDK. Android host actions
+are verified in the emulator; native Karoo touch forwarding still requires
+physical target-firmware validation.
 Keep existing numeric data types intact; add a dedicated graphical control field.
 
 An optional later enhancement is a **Toggle recording** Bonus Action that users

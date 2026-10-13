@@ -44,8 +44,8 @@ assembleDebug, lintDebug, and focused emulator instrumentation.
 
 ### Phase 1: Event policy and integration
 
-- [ ] 1.1 Implement deterministic alert policy and focused tests.
-- [ ] 1.2 Feed confirmed camera/command events and dispatch native alerts/beeps from the extension.
+- [x] 1.1 Implement deterministic alert policy and focused tests. — 21d199d
+- [x] 1.2 Feed confirmed camera/command events and dispatch native alerts/beeps from the extension. — 21d199d
 
 ### Phase 2: Settings and documentation
 

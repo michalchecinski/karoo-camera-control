@@ -1,6 +1,7 @@
 package com.karoocameracontrol
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -12,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import com.karoocameracontrol.extension.KarooCameraControlExtension
 import com.karoocameracontrol.screens.MainScreen
 import com.karoocameracontrol.theme.AppTheme
 
@@ -34,6 +36,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         checkAndRequestPermissions()
+
+        // Start while the activity is foreground; Karoo can also bind the extension.
+        startService(Intent(this, KarooCameraControlExtension::class.java))
 
         setContent {
             AppTheme {

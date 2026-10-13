@@ -22,6 +22,7 @@ android {
         targetSdk = 34
         versionCode = (System.getenv("BUILD_NUMBER")?.toInt() ?: 1)
         versionName = System.getenv("RELEASE_VERSION") ?: "1.0"
+        testInstrumentationRunner = "com.karoocameracontrol.DescentUiInstrumentation"
     }
 
     signingConfigs {
@@ -69,4 +70,21 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.bundles.compose.ui)
     implementation(libs.androidx.compose.material.icons.extended)
+}
+
+// These checks use only the Kotlin/coroutines libraries already used by the app.
+val verifyDescentRecording by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs deterministic descent detection and camera command checks"
+    dependsOn("compileDebugUnitTestKotlin")
+    mainClass.set("com.karoocameracontrol.recording.DescentRecordingChecks")
+    classpath =
+        files(
+            layout.buildDirectory.dir("tmp/kotlin-classes/debugUnitTest"),
+            layout.buildDirectory.dir("tmp/kotlin-classes/debug"),
+        ) + configurations.getByName("debugUnitTestRuntimeClasspath")
+}
+
+tasks.named("check") {
+    dependsOn(verifyDescentRecording)
 }

@@ -18,8 +18,9 @@ share a fixed bottom row on the Karoo screen, with the recording timer above.
 Other camera details scroll when needed, with a gap above the fixed controls.
 Battery and storage share a compact row so the mode and preset controls fit
 more comfortably. Tap the preset button, labelled with the current preset, to
-choose another preset. The app header uses smaller, 14 sp text, allows two lines for the camera name,
-and ellipsizes longer names instead of clipping them. A manual Stop suppresses
+choose another preset. The 48 dp app header keeps its title on one line. It measures the available
+width and selects a text size from 12 down to 10 sp. Names that still do not
+fit at 10 sp are ellipsized, preserving a readable minimum and the menu target. A manual Stop suppresses
 automatic starts until the next descent.
 
 If the shutter response or recording-state confirmation times out, the shared
@@ -46,7 +47,9 @@ requires an explicit action in the Leave Feedback screen.
 The connected screen was checked on the isolated 480×800 Karoo emulator with
 a sample camera, populated presets, and descent status enabled. The UI runner
 checks that the preset button is fully visible with a gap above Record, and
-that Stop stays available during pending commands and active recording.
+that Stop stays available during pending commands and active recording. It
+uses the production header and checks a single-line normal title and a long
+title that ellipsizes at the 10 sp minimum.
 Debug app/test APK builds, formatting checks, and Android lint passed, along
 with 22 unit tests and all 41 deterministic descent-recording checks. Physical
 Karoo/GoPro regression testing remains a release validation step.

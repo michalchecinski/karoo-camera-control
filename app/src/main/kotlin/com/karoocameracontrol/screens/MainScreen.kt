@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Terrain
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,7 +27,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -40,10 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.karoocameracontrol.R
+import com.karoocameracontrol.components.CompactTopAppBar
 import com.karoocameracontrol.components.SimpleAlertDialog
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.PairedDevice
@@ -87,28 +85,21 @@ fun MainScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             val currentState = uiState.connectionState
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text =
-                            if (uiState.showRadarScreen) {
-                                "Radar recording"
-                            } else if (uiState.showDescentSettings) {
-                                "Descent recording"
-                            } else if (uiState.showFeedbackScreen) {
-                                "Feedback"
-                            } else if (uiState.showScanningScreen) {
-                                "Scan Devices"
-                            } else if (currentState is ConnectionState.Connected) {
-                                "Connected to ${currentState.deviceName ?: "Unknown Device"}"
-                            } else {
-                                "Karoo Camera Control"
-                            },
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
+            CompactTopAppBar(
+                title =
+                    if (uiState.showRadarScreen) {
+                        "Radar recording"
+                    } else if (uiState.showDescentSettings) {
+                        "Descent recording"
+                    } else if (uiState.showFeedbackScreen) {
+                        "Feedback"
+                    } else if (uiState.showScanningScreen) {
+                        "Scan Devices"
+                    } else if (currentState is ConnectionState.Connected) {
+                        "Connected to ${currentState.deviceName ?: "Unknown Device"}"
+                    } else {
+                        "Karoo Camera Control"
+                    },
                 actions = {
                     if (!uiState.showFeedbackScreen && !uiState.showDescentSettings && !uiState.showRadarScreen) {
                         IconButton(onClick = { viewModel.setShowMenu(true) }) {
@@ -171,12 +162,6 @@ fun MainScreen(
                         }
                     }
                 },
-                colors =
-                    TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
             )
         },
     ) { paddingValues ->

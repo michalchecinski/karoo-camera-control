@@ -11,18 +11,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.TextLayoutResult
+import com.karoocameracontrol.components.CompactTopAppBar
 import com.karoocameracontrol.integrations.gopro.Preset
 import com.karoocameracontrol.integrations.gopro.PresetGroup
 import com.karoocameracontrol.recording.CameraCommandController
@@ -35,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.util.concurrent.atomic.AtomicReference
 
 /** Runs the production connected composable with an isolated test camera on an AVD. */
 class DescentUiInstrumentation : Instrumentation() {
@@ -49,6 +47,8 @@ class DescentUiInstrumentation : Instrumentation() {
         try {
             val activity = startActivitySync(Intent(targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
             val recording = MutableStateFlow(false)
+            val title = MutableStateFlow("Connected to GoPro Test Camera")
+            val titleLayout = AtomicReference<TextLayoutResult>()
             var startGate = CompletableDeferred<Unit>()
             var stopGate = CompletableDeferred(Unit)
             var stops = 0
@@ -70,23 +70,18 @@ class DescentUiInstrumentation : Instrumentation() {
                 )
             runOnMainSync {
                 activity.setContent {
+                    val cameraTitle by title.collectAsState()
                     val command by controller.state.collectAsState()
                     val isRecording by recording.collectAsState()
                     AppTheme {
                         Scaffold(
                             topBar = {
-                                CenterAlignedTopAppBar(
-                                    title = {
-                                        Text("Connected to GoPro Test Camera", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                    },
+                                CompactTopAppBar(
+                                    title = cameraTitle,
+                                    onTitleLayout = { titleLayout.set(it) },
                                     actions = {
                                         IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
                                     },
-                                    colors =
-                                        TopAppBarDefaults.centerAlignedTopAppBarColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                                        ),
                                 )
                             },
                         ) { padding ->
@@ -118,6 +113,9 @@ class DescentUiInstrumentation : Instrumentation() {
                 }
             }
             val readyRecord = clickableParent(waitForText("Record"))
+            val measuredTitle = checkNotNull(titleLayout.get())
+            check(measuredTitle.lineCount == 1 && !measuredTitle.hasVisualOverflow) { "Camera title must fit one line" }
+            check(measuredTitle.layoutInput.style.fontSize.value <= 12f) { "Camera title too large" }
             val presetBounds = android.graphics.Rect()
             clickableParent(waitForText("Preset: Standard")).getBoundsInScreen(presetBounds)
             val recordBounds = android.graphics.Rect()
@@ -173,6 +171,12 @@ class DescentUiInstrumentation : Instrumentation() {
             runOnMainSync { check(controller.stopAutomatically()) }
             waitForText("Record")
             runOnMainSync { check(!recording.value && controller.manualStopCount.value == 3L) }
+            runOnMainSync { title.value = "Connected to GoPro " + "Long camera name ".repeat(12) }
+            waitForIdleSync()
+            SystemClock.sleep(200)
+            val longTitle = checkNotNull(titleLayout.get())
+            check(longTitle.lineCount == 1 && longTitle.isLineEllipsized(0)) { "Long title must remain one line" }
+            check(longTitle.layoutInput.style.fontSize.value == 10f) { "Long title shrank below readable minimum" }
             finish(Activity.RESULT_OK, Bundle().apply { putString("stream", "PASS: automatic start/stop, pending Stop, mode lock, visible recording Stop and manual override\n") })
         } catch (e: Throwable) {
             finish(Activity.RESULT_CANCELED, Bundle().apply { putString("stream", "FAIL: ${e.stackTraceToString()}\n") })

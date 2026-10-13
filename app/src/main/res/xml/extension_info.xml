@@ -22,4 +22,10 @@
         graphical="false"
         icon="@drawable/karoo_camera_control"
         typeId="gopro-battery" />
+    <DataType
+        description="Start and stop GoPro video recording from the ride screen"
+        displayName="GoPro Recording Controls"
+        graphical="true"
+        icon="@drawable/karoo_camera_control"
+        typeId="gopro-recording-controls" />
 </ExtensionInfo>

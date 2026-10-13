@@ -15,6 +15,7 @@ data class CameraCommandState(
     val busy: Boolean = false,
     val recordingInFlight: Boolean = false,
     val error: String? = null,
+    val targetRecording: Boolean? = null,
 )
 
 enum class AutomaticRecordingOwner { DESCENT, RADAR }
@@ -43,6 +44,7 @@ class CameraCommandController(
         automaticStartPending = true
         launchCommand(
             recordingCommand = true,
+            targetRecording = true,
             onFinished = { succeeded ->
                 // Radar cleans up ambiguous starts even when encoding status is
                 // still false. Keep its ownership until that cleanup Stop.
@@ -63,6 +65,7 @@ class CameraCommandController(
         automaticStartPending = false
         launchCommand(
             recordingCommand = true,
+            targetRecording = false,
             onFinished = { succeeded ->
                 automaticStartPending = !succeeded && owner == AutomaticRecordingOwner.RADAR
                 if (succeeded || (!recording() && owner == AutomaticRecordingOwner.DESCENT)) automaticOwner = null
@@ -96,9 +99,9 @@ class CameraCommandController(
         automaticStartPending = false
         if (stop) {
             _manualStopCount.value += 1
-            launchCommand(recordingCommand = true) { stopRecording() }
+            launchCommand(recordingCommand = true, targetRecording = false) { stopRecording() }
         } else {
-            launchCommand(recordingCommand = true) { startRecording() }
+            launchCommand(recordingCommand = true, targetRecording = true) { startRecording() }
         }
     }
 
@@ -122,6 +125,7 @@ class CameraCommandController(
 
     private fun launchCommand(
         recordingCommand: Boolean,
+        targetRecording: Boolean? = null,
         onFinished: (Boolean) -> Unit = {},
         operation: suspend () -> Unit,
     ) {
@@ -129,7 +133,7 @@ class CameraCommandController(
         val currentGeneration = ++generation
         val previousJob = commandJob
         previousJob?.cancel()
-        _state.value = CameraCommandState(busy = true, recordingInFlight = recordingCommand)
+        _state.value = CameraCommandState(busy = true, recordingInFlight = recordingCommand, targetRecording = targetRecording)
         commandJob =
             scope.launch(start = CoroutineStart.LAZY) {
                 var succeeded = false
@@ -153,7 +157,7 @@ class CameraCommandController(
                 } finally {
                     if (generation == currentGeneration) {
                         onFinished(succeeded)
-                        _state.value = _state.value.copy(busy = false, recordingInFlight = false)
+                        _state.value = _state.value.copy(busy = false, recordingInFlight = false, targetRecording = null)
                         commandJob = null
                     }
                 }

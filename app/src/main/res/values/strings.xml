@@ -20,4 +20,17 @@
     <string name="diagnostics_error_expired">This report expired. Discard it and send a new report.</string>
     <string name="diagnostics_error_preparation">Could not prepare diagnostics. Discard and try again.</string>
     <string name="diagnostics_error_upload">Check Wi-Fi or a hotspot and retry. The service may be temporarily unavailable.</string>
+    <string name="recording_field_disconnected">Camera disconnected</string>
+    <string name="recording_field_unknown">Waiting for camera state</string>
+    <string name="recording_field_video_required">Select Video on camera</string>
+    <string name="recording_field_ready">Camera ready</string>
+    <string name="recording_field_starting">Starting…</string>
+    <string name="recording_field_recording">Recording\n%1$s</string>
+    <string name="recording_field_stopping">Stopping…</string>
+    <string name="recording_field_busy">Camera busy</string>
+    <string name="recording_field_failed">Command failed\n%1$s</string>
+    <string name="recording_field_larger">Use a larger field</string>
+    <string name="recording_field_start">Start recording</string>
+    <string name="recording_field_cancel">Stop / cancel</string>
+    <string name="recording_field_stop">Stop recording</string>
 </resources>

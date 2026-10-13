@@ -38,6 +38,15 @@ operator authorized a standard autonomous workflow. Base branch resolved from Gi
 Validation: ktlintFormat, ktlintCheck, testDebugUnitTest, verifyDescentRecording,
 assembleDebug, lintDebug, and focused emulator instrumentation.
 
+## Verification evidence
+
+Local gate passed: ktlintFormat, ktlintCheck, testDebugUnitTest (42 tests, including 20 alert
+checks), verifyDescentRecording (41 checks), assembleDebug and lintDebug (0 errors,
+30 warnings). CameraAlertInstrumentation passed 12 preferences/SDK effect checks.
+Settings UI script passed defaults, independent toggles, restart persistence and both
+Back controls. All three changed-screen screenshots were inspected at 480×656.
+Copilot CLI review is running before PR creation, as explicitly requested by the operator.
+
 ## Progress
 
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
@@ -49,10 +58,10 @@ assembleDebug, lintDebug, and focused emulator instrumentation.
 
 ### Phase 2: Settings and documentation
 
-- [ ] 2.1 Add persistent preferences and settings UI; verify persistence and capture changed screens.
-- [ ] 2.2 Update feature and roadmap documentation.
+- [x] 2.1 Add persistent preferences and settings UI; verify persistence and capture changed screens. — 8b967d5
+- [x] 2.2 Update feature and roadmap documentation. — 8b967d5
 
 ### Phase 3: Validation and review
 
-- [ ] 3.1 Run formatting, unit checks, debug build, lint and relevant emulator checks.
+- [x] 3.1 Run formatting, unit checks, debug build, lint and relevant emulator checks. — 8b967d5
 - [ ] 3.2 Run GitHub Copilot CLI review, fix relevant findings, and publish the PR.

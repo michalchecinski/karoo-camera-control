@@ -33,12 +33,14 @@ Non-goals: Bonus Actions, dependency updates, alerts/sound, whole-ride recording
 
 ## Progress
 
+PR: #49
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: Field and manual actions
 
-- [ ] 1.1 Add a tested presentation/action policy and shared manual entry point.
-- [ ] 1.2 Register a graphical field with live state, timer, safe actions, and lifecycle cleanup.
+- [x] 1.1 Add a tested presentation/action policy and shared manual entry point. — ce9048c
+- [x] 1.2 Register a graphical field with live state, timer, safe actions, and lifecycle cleanup. — ce9048c
 
 ### Phase 2: Verification and delivery
 

@@ -36,3 +36,8 @@ controls override radar for the current encounter.
 Recording requests, command acknowledgements, confirmed states, and failures are
 recorded in the local [diagnostic log](diagnostic-reports.md). Uploading that log
 requires an explicit action in the Leave Feedback screen.
+
+Optional [native camera alerts and sound](camera-alerts.md) confirm verified
+recording transitions and warn about failed recording commands, connection
+loss and low camera resources during active or paused rides. Preferences are
+independent; in-app failures remain visible regardless of notification settings.

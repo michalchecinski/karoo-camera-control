@@ -7,7 +7,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -92,6 +94,17 @@ class CameraAlertPolicyTest {
             assertTrue(p.status(true).isEmpty())
             assertEquals(CameraAlertKind.STOPPED, p.status(false).single().kind)
         }
+    }
+
+    @Test fun cancelledStartCannotConfirmLateAfterNoOpStop() {
+        val p = policy()
+        p.status(false)
+        p.accept(CameraAlertInput.CommandStarted(true, RecordingOrigin.DESCENT))
+        p.accept(CameraAlertInput.CommandStarted(false, RecordingOrigin.MANUAL))
+        assertTrue(p.accept(CameraAlertInput.CommandFinished(true)).isEmpty())
+        assertTrue(p.status(true).isEmpty())
+        assertEquals(CameraAlertKind.STOPPED, p.status(false).single().kind)
+        assertEquals(CameraAlertKind.STARTED, p.status(true).single().kind)
     }
 
     @Test fun rejectedCommandAfterEncodingUpdateStillDoesNotConfirm() {
@@ -252,6 +265,33 @@ class CameraAlertPolicyTest {
                 } finally {
                     scope.cancel()
                 }
+            }
+        }
+
+    @Test fun sharedControllerTimeoutWarnsOnceAndRejectsLateSuccess() =
+        runBlocking {
+            val scope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
+            try {
+                val p = policy()
+                p.status(false)
+                val alerts = mutableListOf<CameraAlert>()
+                val controller =
+                    CameraCommandController(
+                        scope,
+                        { true },
+                        { false },
+                        { true },
+                        startRecording = { withTimeout(10) { CompletableDeferred<Unit>().await() } },
+                        stopRecording = {},
+                        alertEvent = { alerts += p.accept(it) },
+                    )
+                controller.toggleManually()
+                delay(50)
+                assertFalse(controller.state.value.busy)
+                assertEquals(CameraAlertKind.FAILED, alerts.single().kind)
+                assertTrue(p.status(true).isEmpty())
+            } finally {
+                scope.cancel()
             }
         }
 

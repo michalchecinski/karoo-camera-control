@@ -13,11 +13,13 @@ This is an extension to control sports action cameras using Hammerhead Karoo cyc
 - Select specific presets within each mode.
 - Automatically record radar-detected traffic during a ride, with a configurable stop delay after radar clears. [Setup and limitations](docs/radar-recording.md).
 - View battery life, remaining storage space.
+- Receive native camera alerts and optional audible recording confirmations during a ride. [Settings and validation](docs/camera-alerts.md).
 
 ## Roadmap
 
-Planned Karoo integrations: ride-screen recording controls, native camera alerts
-and sound, opt-in whole-ride recording, and an automation status field.
+Planned Karoo integrations: ride-screen recording controls, opt-in whole-ride
+recording, and an automation status field. Native camera alerts and sound are
+implemented, with physical-device validation pending.
 See the [feature roadmap](docs/roadmap/README.md) for individual descriptions and
 proposed behaviour.
 

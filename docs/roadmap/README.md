@@ -1,6 +1,6 @@
 # Karoo integration roadmap
 
-These four features are planned, not implemented. Their documents describe
+This roadmap tracks four Karoo integrations. Their documents describe
 the intended experience, proposed behaviour, and acceptance criteria. Defaults
 and design choices marked as proposals can be refined before implementation.
 There are no release dates or dependency updates committed by this roadmap.
@@ -10,7 +10,7 @@ There are no release dates or dependency updates committed by this roadmap.
 | Order | Feature | Purpose | Status |
 | --- | --- | --- | --- |
 | 1 | [Recording controls from the ride screen](ride-screen-recording-controls.md) | Start and stop a camera without leaving the ride screen. | Planned |
-| 2 | [Native camera alerts and audible confirmation](camera-alerts-and-sound.md) | Confirm recording changes and report camera problems during a ride. | Planned |
+| 2 | [Native camera alerts and audible confirmation](camera-alerts-and-sound.md) | Confirm recording changes and report camera problems during a ride. | Implemented; hardware validation pending |
 | 3 | [Opt-in whole-ride recording](whole-ride-recording.md) | Automatically record from ride start to ride finish. | Planned |
 | 4 | [Automation status field](automation-status-field.md) | Explain what camera automation is doing and why it is waiting. | Planned |
 

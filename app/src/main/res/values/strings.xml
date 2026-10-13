@@ -27,7 +27,7 @@
     <string name="camera_alert_warnings_help">Failures, connection loss, low battery or space</string>
     <string name="camera_alert_sound">Sound</string>
     <string name="camera_alert_sound_help">Beep for camera events, even with visuals off</string>
-    <string name="camera_alert_settings_help">During active or paused rides only. Warn at 20% battery or 5 minutes remaining. Check the camera if its connection is lost.</string>
+    <string name="camera_alert_settings_help" formatted="false">Active or paused rides only. Warn at 20% battery or 5 minutes left.</string>
     <string name="camera_alert_back">Back</string>
     <string name="camera_alert_started">Recording started</string>
     <string name="camera_alert_stopped">Recording stopped</string>

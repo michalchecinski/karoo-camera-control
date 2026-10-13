@@ -74,7 +74,7 @@ class CameraAlertPolicy {
                     emptyList()
                 } else if (input.succeeded) {
                     failureWarned = false
-                    suppressedTarget = null
+                    if (suppressedTarget == command.target) suppressedTarget = null
                     if (command.before != null && command.before != command.target && snapshot.recording == command.target && snapshot.connected) {
                         listOfNotNull(alert(if (command.target) CameraAlertKind.STARTED else CameraAlertKind.STOPPED, command.origin))
                     } else {

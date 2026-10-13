@@ -1,6 +1,11 @@
 # Native camera alerts and audible confirmation
 
-Status: **Planned**. Priority: **2** in the [Karoo integration roadmap](README.md).
+Status: **Implemented; physical Karoo/GoPro validation pending**. Priority: **2** in the [Karoo integration roadmap](README.md).
+
+The delivered behavior, preferences, and validation commands are documented in
+[native camera alerts and sound](../camera-alerts.md). The original proposal below
+provides the acceptance criteria; recovery thresholds use hysteresis as described
+in the implementation document.
 
 ## Description
 

@@ -25,6 +25,7 @@ import android.os.ParcelUuid
 import android.os.SystemClock
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
+import com.karoocameracontrol.alerts.CameraAlertFeed
 import com.karoocameracontrol.recording.CameraCommandController
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CompletableDeferred
@@ -213,6 +214,7 @@ class GoProManager private constructor(private val context: Context) {
     // Coroutine scope for BLE operations
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val commandScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    val alertFeed = CameraAlertFeed()
     val recordingCommands =
         CameraCommandController(
             scope = commandScope,
@@ -221,11 +223,13 @@ class GoProManager private constructor(private val context: Context) {
             videoMode = { cameraMode.value == 0 || cameraMode.value == PRESET_MODE_VIDEO },
             startRecording = { startRecording() },
             stopRecording = { stopRecording() },
+            alertEvent = alertFeed::command,
         )
 
     init {
         commandScope.launch {
             connectionState.collect { state ->
+                alertFeed.connection(state is ConnectionState.Connected)
                 if (state !is ConnectionState.Connected) {
                     recordingCommands.disconnected()
                     _cameraMode.value = -1
@@ -515,6 +519,11 @@ class GoProManager private constructor(private val context: Context) {
                 // Query responses begin with query ID and result status; only the
                 // remaining bytes are status TLVs.
                 val status = GoProStatusParser.parse(value.copyOfRange(RESPONSE_HEADER_SIZE, value.size))
+
+                // Preserve status packet order before waking recording command continuations.
+                commandScope.launch {
+                    alertFeed.status(status.isRecording, status.batteryLevel, status.remainingVideoTime)
+                }
 
                 // Apply parsed values to state flows (only if present in response)
                 status.isRecording?.let { recording ->

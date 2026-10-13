@@ -20,4 +20,26 @@
     <string name="diagnostics_error_expired">This report expired. Discard it and send a new report.</string>
     <string name="diagnostics_error_preparation">Could not prepare diagnostics. Discard and try again.</string>
     <string name="diagnostics_error_upload">Check Wi-Fi or a hotspot and retry. The service may be temporarily unavailable.</string>
+    <string name="camera_alert_settings">Camera alerts</string>
+    <string name="camera_alert_confirmations">Recording confirmations</string>
+    <string name="camera_alert_confirmations_help">Show verified starts and stops</string>
+    <string name="camera_alert_warnings">Camera warnings</string>
+    <string name="camera_alert_warnings_help">Failures, connection loss, low battery or space</string>
+    <string name="camera_alert_sound">Sound</string>
+    <string name="camera_alert_sound_help">Beep for camera events, even with visuals off</string>
+    <string name="camera_alert_settings_help">During active or paused rides only. Warn at 20% battery or 5 minutes remaining. Check the camera if its connection is lost.</string>
+    <string name="camera_alert_back">Back</string>
+    <string name="camera_alert_started">Recording started</string>
+    <string name="camera_alert_stopped">Recording stopped</string>
+    <string name="camera_alert_failed">Camera command failed</string>
+    <string name="camera_alert_disconnected">Camera connection lost</string>
+    <string name="camera_alert_low_resources">Camera running low</string>
+    <string name="camera_alert_check_camera">Check the camera</string>
+    <string name="camera_alert_unknown_recording">Recording state unknown; check the camera</string>
+    <string name="camera_alert_origin_manual">Manual control</string>
+    <string name="camera_alert_origin_descent">Descent recording</string>
+    <string name="camera_alert_origin_radar">Radar recording</string>
+    <string name="camera_alert_origin_camera">Camera shutter</string>
+    <string name="camera_alert_battery_detail">Battery %1$d%%</string>
+    <string name="camera_alert_capacity_detail">%1$d:%2$02d recording time left</string>
 </resources>

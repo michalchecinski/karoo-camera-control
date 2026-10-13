@@ -1,5 +1,7 @@
 package com.karoocameracontrol.recording
 
+import com.karoocameracontrol.alerts.CameraAlertInput
+import com.karoocameracontrol.alerts.RecordingOrigin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -27,6 +29,7 @@ class CameraCommandController(
     private val videoMode: () -> Boolean,
     private val startRecording: suspend () -> Unit,
     private val stopRecording: suspend () -> Unit,
+    private val alertEvent: (CameraAlertInput) -> Unit = {},
 ) {
     private val _state = MutableStateFlow(CameraCommandState())
     val state = _state.asStateFlow()
@@ -43,6 +46,8 @@ class CameraCommandController(
         automaticStartPending = true
         launchCommand(
             recordingCommand = true,
+            target = true,
+            origin = owner.alertOrigin(),
             onFinished = { succeeded ->
                 // Radar cleans up ambiguous starts even when encoding status is
                 // still false. Keep its ownership until that cleanup Stop.
@@ -63,6 +68,8 @@ class CameraCommandController(
         automaticStartPending = false
         launchCommand(
             recordingCommand = true,
+            target = false,
+            origin = owner.alertOrigin(),
             onFinished = { succeeded ->
                 automaticStartPending = !succeeded && owner == AutomaticRecordingOwner.RADAR
                 if (succeeded || (!recording() && owner == AutomaticRecordingOwner.DESCENT)) automaticOwner = null
@@ -96,9 +103,9 @@ class CameraCommandController(
         automaticStartPending = false
         if (stop) {
             _manualStopCount.value += 1
-            launchCommand(recordingCommand = true) { stopRecording() }
+            launchCommand(recordingCommand = true, target = false) { stopRecording() }
         } else {
-            launchCommand(recordingCommand = true) { startRecording() }
+            launchCommand(recordingCommand = true, target = true) { startRecording() }
         }
     }
 
@@ -120,8 +127,13 @@ class CameraCommandController(
         _state.value = CameraCommandState()
     }
 
+    private fun AutomaticRecordingOwner.alertOrigin(): RecordingOrigin =
+        if (this == AutomaticRecordingOwner.DESCENT) RecordingOrigin.DESCENT else RecordingOrigin.RADAR
+
     private fun launchCommand(
         recordingCommand: Boolean,
+        target: Boolean = false,
+        origin: RecordingOrigin = RecordingOrigin.MANUAL,
         onFinished: (Boolean) -> Unit = {},
         operation: suspend () -> Unit,
     ) {
@@ -129,10 +141,12 @@ class CameraCommandController(
         val currentGeneration = ++generation
         val previousJob = commandJob
         previousJob?.cancel()
+        if (recordingCommand) alertEvent(CameraAlertInput.CommandStarted(target, origin))
         _state.value = CameraCommandState(busy = true, recordingInFlight = recordingCommand)
         commandJob =
             scope.launch(start = CoroutineStart.LAZY) {
                 var succeeded = false
+                var cancelled = false
                 try {
                     // Wait for cancelled BLE operations to release their locks.
                     previousJob?.join()
@@ -145,6 +159,7 @@ class CameraCommandController(
                         _state.value = _state.value.copy(error = "Camera command timed out")
                     }
                 } catch (e: CancellationException) {
+                    cancelled = true
                     throw e
                 } catch (e: Exception) {
                     if (generation == currentGeneration) {
@@ -153,6 +168,7 @@ class CameraCommandController(
                 } finally {
                     if (generation == currentGeneration) {
                         onFinished(succeeded)
+                        if (recordingCommand) alertEvent(CameraAlertInput.CommandFinished(succeeded, cancelled))
                         _state.value = _state.value.copy(busy = false, recordingInFlight = false)
                         commandJob = null
                     }

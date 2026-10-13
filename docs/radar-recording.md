@@ -49,7 +49,9 @@ While enabled during an active ride, the controller sends Open GoPro
 keep-alive messages every three seconds to keep the connected camera ready
 between clips. This keeps the camera awake and uses battery. It does not
 change the camera's saved auto-power-off setting. Keep-alive failures appear
-in the status card and are retried on the next interval.
+in the status card and are retried on the next interval, including response
+timeouts. Cancelling the extension stops the loop without reporting a camera
+failure or sending another keep-alive.
 
 ## Recording lifecycle
 
@@ -64,7 +66,9 @@ in the status card and are retried on the next interval.
   Using the app's shutter, mode, or preset controls releases ownership and
   overrides the current encounter. Automation resumes after a fresh clear
   report followed by another vehicle. Stopping via the camera shutter also
-  suppresses a restart while that encounter remains detected.
+  suppresses a restart while that encounter remains detected, including when
+  the stopped recording was started manually. A physical stop while radar
+  is already clear leaves the next encounter armed.
 - A missing, searching, idle, errored, or invalid radar stream is unavailable,
   not a pass report. Silence for five seconds is also unavailable. An owned
   recording then stops after the configured delay; new valid detections
@@ -97,7 +101,9 @@ Build and formatting:
 The dependency-free Android instrumentation runner covers the radar decoder,
 start guards, recording ownership, the clear timer, repeated traffic, manual
 overrides, physical shutter stops, radar silence/loss, disconnection, and
-command failure cleanup/retry:
+command failure cleanup/retry. They also exercise a real coroutine timeout
+followed by a successful keep-alive retry and cancellation during an
+in-flight keep-alive:
 
 ```sh
 ./gradlew :app:connectedDebugAndroidTest
@@ -108,17 +114,18 @@ adjust the delay, verify the limits and saved values after relaunch, and test
 the on-screen and Android back buttons. App-only screenshots are stored in
 `screenshots/emulator-karoo-480x800/`.
 
-Verified on the 480×800 Karoo emulator profile (Android 16 / API 36): 16
+Verified on the 480×800 Karoo emulator profile (Android 16 / API 36): 21
 instrumentation checks passed, enable/disable and delay bounds worked,
 settings survived process restart, the setup dialog opened and closed, and
 both back controls returned to the main screen. Debug build, `ktlint`, and
 Android lint passed (lint reported warnings, no errors). Screenshots were
 visually inspected at 480×656 without Android system bars.
 
-CI explicitly requests `platform-tools` from the existing pinned Android
-setup action. Its default also requests the obsolete `tools` package, which
-is no longer served and caused setup to fail before compilation. No action
-or dependency versions were changed.
+CI explicitly requests `platform-tools` from the pinned Android setup
+action. This avoids the obsolete `tools` default of the earlier action,
+which caused setup to fail before compilation. The branch preserves main's
+runner and action updates when merging main; this feature does not introduce
+any additional action or dependency version changes.
 
 An Android emulator cannot validate Karoo's proprietary radar service or a
 physical GoPro BLE connection. Before release, test on a Karoo with a paired

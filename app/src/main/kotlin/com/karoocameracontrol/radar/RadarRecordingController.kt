@@ -70,23 +70,18 @@ class RadarRecordingController private constructor(context: Context) {
             }
         }
         controllerScope.launch {
-            while (isActive) {
-                if (settings.settings.value.enabled && systemConnected && rideActive &&
-                    camera.connectionState.value is ConnectionState.Connected &&
-                    manualOperations == 0 && policy.pendingAction == null
-                ) {
-                    try {
-                        camera.keepAlive()
-                        keepAliveFailed = false
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        keepAliveFailed = true
-                        Log.w(TAG, "GoPro keep-alive failed", error)
-                    }
-                }
-                delay(3_000)
-            }
+            keepAliveLoop(
+                shouldSend = {
+                    settings.settings.value.enabled && systemConnected && rideActive &&
+                        camera.connectionState.value is ConnectionState.Connected &&
+                        manualOperations == 0 && policy.pendingAction == null
+                },
+                send = camera::keepAlive,
+                onResult = { error ->
+                    keepAliveFailed = error != null
+                    if (error != null) Log.w(TAG, "GoPro keep-alive failed", error)
+                },
+            )
         }
     }
 

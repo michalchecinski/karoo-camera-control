@@ -18,6 +18,7 @@ class RadarRecordingPolicy {
     private var clearSince: Long? = null
     private var retryAfter = 0L
     private var startFailed = false
+    private var lastCameraRecording: Boolean? = null
 
     fun onRadar(
         presence: RadarPresence,
@@ -50,11 +51,18 @@ class RadarRecordingPolicy {
             ownsRecording = false
             pendingAction = null
             startFailed = false
+            lastCameraRecording = null
             return null
         }
-        if (pendingAction != null || now < retryAfter) return null
 
         val current = currentPresence(now)
+        if (lastCameraRecording == true && !cameraRecording && !ownsRecording && current != RadarPresence.CLEAR) {
+            // A manual recording stopped on the camera must also override radar.
+            suppressed = true
+        }
+        lastCameraRecording = cameraRecording
+        if (pendingAction != null || now < retryAfter) return null
+
         if (current == RadarPresence.UNKNOWN && clearSince == null) {
             clearSince = lastSampleAt?.plus(STALE_AFTER_MS) ?: now
         }
@@ -95,6 +103,8 @@ class RadarRecordingPolicy {
         if (action == RecordingAction.STOP && success) {
             ownsRecording = false
             startFailed = false
+            // This confirmed stop was automatic, not an external shutter override.
+            lastCameraRecording = false
         }
     }
 

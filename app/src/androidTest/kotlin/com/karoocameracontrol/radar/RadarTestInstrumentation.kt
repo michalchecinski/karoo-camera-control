@@ -6,6 +6,13 @@ import android.os.Bundle
 import io.hammerhead.karooext.models.DataPoint
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.StreamState
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 
 /** Runs deterministic policy checks on Android without adding a test dependency. */
 class RadarTestInstrumentation : Instrumentation() {
@@ -31,6 +38,11 @@ class RadarTestInstrumentation : Instrumentation() {
                 "failed start is cleaned up and failed stop retries" to ::commandFailures,
                 "disconnect drops ownership and cannot stop a later manual recording" to ::disconnect,
                 "camera shutter stop suppresses automatic restart" to ::physicalStop,
+                "physical stop of manual recording suppresses traffic encounter" to ::manualPhysicalStop,
+                "manual stop on clear radar leaves next detection armed" to ::manualStopOnClear,
+                "automatic stop leaves the next encounter armed" to ::automaticStopRearms,
+                "keep-alive timeout reports failure and retries" to ::keepAliveTimeout,
+                "keep-alive cancellation stops without reporting a camera failure" to ::keepAliveCancellation,
                 "decoder separates vehicles clear and unavailable data" to ::decoder,
                 "settings persist and enforce delay limits" to ::settingsPersistence,
             )
@@ -204,6 +216,94 @@ class RadarTestInstrumentation : Instrumentation() {
         check(policy.tick(2_000, recording = false) == null)
         check(policy.suppressed)
     }
+
+    private fun manualPhysicalStop() {
+        val policy = RadarRecordingPolicy()
+        policy.onRadar(RadarPresence.VEHICLE, 0)
+        check(policy.tick(0, recording = true) == null)
+        check(policy.tick(1_000, recording = false) == null)
+        check(policy.suppressed)
+        policy.onRadar(RadarPresence.VEHICLE, 2_000)
+        check(policy.tick(2_000, recording = false) == null)
+        policy.onRadar(RadarPresence.CLEAR, 3_000)
+        policy.onRadar(RadarPresence.VEHICLE, 4_000)
+        check(policy.tick(4_000, recording = false) == RecordingAction.START)
+    }
+
+    private fun manualStopOnClear() {
+        val policy = RadarRecordingPolicy()
+        policy.onRadar(RadarPresence.CLEAR, 0)
+        check(policy.tick(0, recording = true) == null)
+        check(policy.tick(1_000, recording = false) == null)
+        check(!policy.suppressed)
+        policy.onRadar(RadarPresence.VEHICLE, 2_000)
+        check(policy.tick(2_000, recording = false) == RecordingAction.START)
+    }
+
+    private fun automaticStopRearms() {
+        val policy = started()
+        policy.onRadar(RadarPresence.CLEAR, 1_000)
+        check(policy.tick(16_000) == RecordingAction.STOP)
+        policy.complete(RecordingAction.STOP, true, 16_100)
+        policy.onRadar(RadarPresence.VEHICLE, 16_200)
+        check(policy.tick(16_200, recording = false) == RecordingAction.START)
+    }
+
+    private fun keepAliveTimeout() =
+        runBlocking {
+            var attempts = 0
+            val failure = CompletableDeferred<Exception>()
+            val recovered = CompletableDeferred<Unit>()
+            val job =
+                launch {
+                    keepAliveLoop(
+                        intervalMs = 1,
+                        shouldSend = { true },
+                        send = {
+                            attempts++
+                            if (attempts == 1) withTimeout(1) { delay(Long.MAX_VALUE) }
+                        },
+                        onResult = { error ->
+                            if (error != null) failure.complete(error) else recovered.complete(Unit)
+                        },
+                    )
+                }
+            try {
+                withTimeout(2_000) { recovered.await() }
+                check(withTimeout(2_000) { failure.await() } is TimeoutCancellationException)
+                check(attempts >= 2)
+            } finally {
+                job.cancelAndJoin()
+            }
+        }
+
+    private fun keepAliveCancellation() =
+        runBlocking {
+            val started = CompletableDeferred<Unit>()
+            var reportedResults = 0
+            var attempts = 0
+            val job =
+                launch {
+                    keepAliveLoop(
+                        intervalMs = 1,
+                        shouldSend = { true },
+                        send = {
+                            attempts++
+                            started.complete(Unit)
+                            delay(Long.MAX_VALUE)
+                        },
+                        onResult = { reportedResults++ },
+                    )
+                }
+            try {
+                withTimeout(2_000) { started.await() }
+            } finally {
+                job.cancelAndJoin()
+            }
+            check(job.isCancelled)
+            check(attempts == 1)
+            check(reportedResults == 0)
+        }
 
     private fun decoder() {
         fun decode(vararg values: Pair<String, Double>) =

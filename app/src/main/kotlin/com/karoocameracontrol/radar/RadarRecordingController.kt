@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProManager
+import com.karoocameracontrol.recording.AutomaticRecordingOwner
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.KarooEvent
@@ -35,7 +36,6 @@ class RadarRecordingController private constructor(context: Context) {
     private var rideActive = false
     private var systemConnected = false
     private var commandError: String? = null
-    private var manualOperations = 0
     private var keepAliveFailed = false
     private val mutableStatus = MutableStateFlow("Waiting for Karoo extension")
     val status = mutableStatus.asStateFlow()
@@ -74,7 +74,7 @@ class RadarRecordingController private constructor(context: Context) {
                 shouldSend = {
                     settings.settings.value.enabled && systemConnected && rideActive &&
                         camera.connectionState.value is ConnectionState.Connected &&
-                        manualOperations == 0 && policy.pendingAction == null
+                        !camera.recordingCommands.state.value.busy && policy.pendingAction == null
                 },
                 send = camera::keepAlive,
                 onResult = { error ->
@@ -123,10 +123,15 @@ class RadarRecordingController private constructor(context: Context) {
             commandJob?.cancel()
             mutableOperationInFlight.value = false
         }
+        if (policy.ownsRecording && policy.pendingAction == null &&
+            !camera.recordingCommands.ownsRecording(AutomaticRecordingOwner.RADAR)
+        ) {
+            policy.manualOverride()
+        }
         val action =
             policy.nextAction(
                 now = now,
-                enabled = config.enabled && cameraReady && manualOperations == 0,
+                enabled = config.enabled && cameraReady && !camera.recordingCommands.state.value.busy,
                 rideActive = systemConnected && rideActive,
                 cameraConnected = connected,
                 cameraRecording = camera.isRecording.value,
@@ -140,7 +145,7 @@ class RadarRecordingController private constructor(context: Context) {
                 scope?.launch {
                     var success = false
                     try {
-                        if (action == RecordingAction.START) camera.startRecording() else camera.stopRecording()
+                        camera.recordingCommands.recordForRadar(start = action == RecordingAction.START)
                         success = true
                         commandError = null
                     } catch (cancelled: CancellationException) {
@@ -184,14 +189,6 @@ class RadarRecordingController private constructor(context: Context) {
         mutableOperationInFlight.value = false
         commandError = null
         return starting
-    }
-
-    fun manualOperationStarted() {
-        manualOperations++
-    }
-
-    fun manualOperationFinished() {
-        manualOperations = (manualOperations - 1).coerceAtLeast(0)
     }
 
     fun stop() {

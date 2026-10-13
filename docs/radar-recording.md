@@ -62,6 +62,11 @@ failure or sending another keep-alive.
   again after the next clear report. The timer runs independently of samples.
 - Disabling the feature, pausing/ending the ride, or losing Karoo System
   stops an owned recording without the normal tail delay.
+- Radar, descent automation, and manual controls share one camera command
+  controller. Each automation stops only recordings it started; a descent
+  recording is left running by radar and vice versa. Ambiguous radar starts
+  retain ownership until cleanup succeeds, preventing descent from claiming
+  the same recording.
 - Manual recordings that are already running are never stopped by radar.
   Using the app's shutter, mode, or preset controls releases ownership and
   overrides the current encounter. Automation resumes after a fresh clear
@@ -103,7 +108,8 @@ start guards, recording ownership, the clear timer, repeated traffic, manual
 overrides, physical shutter stops, radar silence/loss, disconnection, and
 command failure cleanup/retry. They also exercise a real coroutine timeout
 followed by a successful keep-alive retry and cancellation during an
-in-flight keep-alive:
+in-flight keep-alive. Shared command checks verify radar/descent ownership,
+manual cancellation, and failed radar cleanup retries:
 
 ```sh
 ./gradlew :app:connectedDebugAndroidTest
@@ -114,11 +120,13 @@ adjust the delay, verify the limits and saved values after relaunch, and test
 the on-screen and Android back buttons. App-only screenshots are stored in
 `screenshots/emulator-karoo-480x800/`.
 
-Verified on the 480×800 Karoo emulator profile (Android 16 / API 36): 21
+Verified on the 480×800 Karoo emulator profile (Android 16 / API 36): 25
 instrumentation checks passed, enable/disable and delay bounds worked,
 settings survived process restart, the setup dialog opened and closed, and
 both back controls returned to the main screen. Debug build, `ktlint`, and
-Android lint passed (lint reported warnings, no errors). Screenshots were
+Android lint passed (lint reported warnings, no errors). All 41 descent checks
+and the descent connected-screen instrumentation also passed after integration.
+Screenshots were
 visually inspected at 480×656 without Android system bars.
 
 CI explicitly requests `platform-tools` from the pinned Android setup

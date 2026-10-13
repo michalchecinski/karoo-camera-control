@@ -3,6 +3,8 @@ package com.karoocameracontrol.radar
 import android.app.Activity
 import android.app.Instrumentation
 import android.os.Bundle
+import com.karoocameracontrol.recording.AutomaticRecordingOwner
+import com.karoocameracontrol.recording.CameraCommandController
 import io.hammerhead.karooext.models.DataPoint
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.StreamState
@@ -10,6 +12,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -44,6 +47,10 @@ class RadarTestInstrumentation : Instrumentation() {
                 "keep-alive timeout reports failure and retries" to ::keepAliveTimeout,
                 "keep-alive cancellation stops without reporting a camera failure" to ::keepAliveCancellation,
                 "decoder separates vehicles clear and unavailable data" to ::decoder,
+                "descent cannot stop a radar recording" to ::radarOwnership,
+                "radar cannot stop a descent recording" to ::descentOwnership,
+                "manual Stop cancels a shared radar start" to ::sharedManualStop,
+                "ambiguous radar commands retain ownership until cleanup succeeds" to ::sharedRadarFailure,
                 "settings persist and enforce delay limits" to ::settingsPersistence,
             )
         var failures = 0
@@ -303,6 +310,111 @@ class RadarTestInstrumentation : Instrumentation() {
             check(job.isCancelled)
             check(attempts == 1)
             check(reportedResults == 0)
+        }
+
+    private fun radarOwnership() =
+        runBlocking {
+            var recording = false
+            var stops = 0
+            val controller =
+                CameraCommandController(
+                    this,
+                    { true },
+                    { recording },
+                    { true },
+                    { recording = true },
+                    {
+                        stops++
+                        recording = false
+                    },
+                )
+            controller.recordForRadar(true)
+            check(controller.ownsRecording(AutomaticRecordingOwner.RADAR))
+            check(!controller.stopAutomatically())
+            check(recording && stops == 0)
+            controller.recordForRadar(false)
+            check(!recording && stops == 1)
+            check(!controller.ownsRecording(AutomaticRecordingOwner.RADAR))
+        }
+
+    private fun descentOwnership() =
+        runBlocking {
+            var recording = false
+            var stops = 0
+            val controller =
+                CameraCommandController(
+                    this,
+                    { true },
+                    { recording },
+                    { true },
+                    { recording = true },
+                    {
+                        stops++
+                        recording = false
+                    },
+                )
+            check(controller.startAutomatically())
+            withTimeout(2_000) { controller.state.first { !it.busy } }
+            val result = runCatching { controller.recordForRadar(false) }
+            check(result.exceptionOrNull() is IllegalStateException)
+            check(recording && stops == 0)
+            check(controller.ownsRecording(AutomaticRecordingOwner.DESCENT))
+            check(controller.stopAutomatically())
+            withTimeout(2_000) { controller.state.first { !it.busy } }
+            check(!recording && stops == 1)
+        }
+
+    private fun sharedManualStop() =
+        runBlocking {
+            var stops = 0
+            val entered = CompletableDeferred<Unit>()
+            val controller =
+                CameraCommandController(
+                    this,
+                    { true },
+                    { false },
+                    { true },
+                    {
+                        entered.complete(Unit)
+                        delay(Long.MAX_VALUE)
+                    },
+                    { stops++ },
+                )
+            val radar = launch { controller.recordForRadar(true) }
+            withTimeout(2_000) { entered.await() }
+            controller.toggleManually(forceStop = true)
+            withTimeout(2_000) {
+                radar.join()
+                controller.state.first { !it.busy }
+            }
+            check(radar.isCancelled && stops == 1)
+            check(!controller.ownsRecording(AutomaticRecordingOwner.RADAR))
+            check(controller.manualStopCount.value == 1L)
+        }
+
+    private fun sharedRadarFailure() =
+        runBlocking {
+            var stops = 0
+            val controller =
+                CameraCommandController(
+                    this,
+                    { true },
+                    { false },
+                    { true },
+                    { withTimeout(1) { delay(Long.MAX_VALUE) } },
+                    {
+                        stops++
+                        if (stops == 1) error("Stop failed")
+                    },
+                )
+            check(runCatching { controller.recordForRadar(true) }.isFailure)
+            check(controller.ownsRecording(AutomaticRecordingOwner.RADAR))
+            check(!controller.startAutomatically())
+            check(runCatching { controller.recordForRadar(false) }.isFailure)
+            check(controller.ownsRecording(AutomaticRecordingOwner.RADAR))
+            controller.recordForRadar(false)
+            check(stops == 2)
+            check(!controller.ownsRecording(AutomaticRecordingOwner.RADAR))
         }
 
     private fun decoder() {

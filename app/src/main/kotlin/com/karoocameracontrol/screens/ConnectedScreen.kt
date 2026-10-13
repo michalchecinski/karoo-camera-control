@@ -39,7 +39,6 @@ import com.karoocameracontrol.R
 import com.karoocameracontrol.components.SimpleAlertDialog
 import com.karoocameracontrol.integrations.gopro.PresetGroup
 import com.karoocameracontrol.integrations.gopro.PresetIcon
-import com.karoocameracontrol.recording.DescentStatus
 import kotlin.time.Duration.Companion.seconds
 
 @Composable
@@ -56,8 +55,6 @@ fun ConnectedScreen(
     activePresetName: String?,
     // Added Icon ID
     activePresetIcon: Int?,
-    descentRecordingEnabled: Boolean = false,
-    descentStatus: DescentStatus = DescentStatus.OFF,
     onToggleRecording: () -> Unit,
     onSetMode: (Int) -> Unit,
     onOpenPresetSelection: () -> Unit,
@@ -84,14 +81,6 @@ fun ConnectedScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (descentRecordingEnabled) {
-                    Text(
-                        text = "Descent recording: ${descentStatus.message}",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        textAlign = TextAlign.Center,
-                    )
-                }
                 // Compact camera status leaves room for the controls on Karoo.
                 Row(
                     horizontalArrangement = Arrangement.SpaceEvenly,

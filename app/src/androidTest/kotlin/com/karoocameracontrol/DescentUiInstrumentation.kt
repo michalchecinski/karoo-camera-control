@@ -23,7 +23,6 @@ import com.karoocameracontrol.components.CompactTopAppBar
 import com.karoocameracontrol.integrations.gopro.Preset
 import com.karoocameracontrol.integrations.gopro.PresetGroup
 import com.karoocameracontrol.recording.CameraCommandController
-import com.karoocameracontrol.recording.DescentStatus
 import com.karoocameracontrol.screens.ConnectedScreen
 import com.karoocameracontrol.theme.AppTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -98,8 +97,6 @@ class DescentUiInstrumentation : Instrumentation() {
                                     availablePresets = listOf(PresetGroup(id = 1000, presets = listOf(Preset(id = 1)))),
                                     activePresetName = "Standard",
                                     activePresetIcon = null,
-                                    descentRecordingEnabled = true,
-                                    descentStatus = if (isRecording || command.recordingInFlight) DescentStatus.CONSUMED else DescentStatus.WAITING_FOR_RIDE,
                                     onToggleRecording = { controller.toggleManually() },
                                     onSetMode = {},
                                     onOpenPresetSelection = {},
@@ -141,6 +138,13 @@ class DescentUiInstrumentation : Instrumentation() {
             val bounds = android.graphics.Rect()
             recordingStop.getBoundsInScreen(bounds)
             check(bounds.bottom <= 704 && bounds.top >= 48) { "Stop clipped by system UI: $bounds" }
+            val activePresetBounds = android.graphics.Rect()
+            clickableParent(waitForText("Preset: Standard")).getBoundsInScreen(activePresetBounds)
+            val timerBounds = android.graphics.Rect()
+            waitForText("00:12").getBoundsInScreen(timerBounds)
+            check(activePresetBounds.height() >= 96 && activePresetBounds.bottom <= timerBounds.top - 16) {
+                "Preset clipped by fixed recording controls: $activePresetBounds / $timerBounds"
+            }
             capture("descent-recording-active")
             // Details can scroll, while the recording timer and Stop remain fixed.
             findScrollable(uiAutomation.rootInActiveWindow)?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)

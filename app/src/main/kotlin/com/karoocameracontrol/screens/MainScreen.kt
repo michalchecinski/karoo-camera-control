@@ -222,8 +222,6 @@ fun MainScreen(
                     availablePresets = uiState.availablePresets,
                     activePresetName = uiState.activePresetName,
                     activePresetIcon = uiState.activePresetIcon,
-                    descentRecordingEnabled = descentSettings.enabled,
-                    descentStatus = descentStatus,
                     onToggleRecording = { viewModel.toggleRecording() },
                     onSetMode = { mode -> viewModel.setMode(mode) },
                     onOpenPresetSelection = { viewModel.setShowPresetScreen(true) },

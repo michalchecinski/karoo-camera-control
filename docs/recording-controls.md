@@ -16,7 +16,8 @@ same application-scoped controller. Command progress remains visible when
 the screen is reopened, and failures appear in a snackbar. Record/Stop and Back
 share a fixed bottom row on the Karoo screen, with the recording timer above.
 Other camera details scroll when needed, with a gap above the fixed controls.
-Battery and storage share a compact row so the mode and preset controls fit
+Descent status appears in **More options → Descent recording**, keeping the
+camera controls clear. Battery and storage share a compact row so the mode and preset controls fit
 more comfortably. Tap the preset button, labelled with the current preset, to
 choose another preset. The 48 dp app header keeps its title on one line. It measures the available
 width and selects a text size from 12 down to 10 sp. Names that still do not
@@ -45,8 +46,9 @@ requires an explicit action in the Leave Feedback screen.
 ## Layout verification
 
 The connected screen was checked on the isolated 480×800 Karoo emulator with
-a sample camera, populated presets, and descent status enabled. The UI runner
-checks that the preset button is fully visible with a gap above Record, and
+a sample camera and populated presets. The UI runner checks that the preset
+button is fully visible both at rest and while recording, with a gap above
+the fixed recording controls, and
 that Stop stays available during pending commands and active recording. It
 uses the production header and checks a single-line normal title and a long
 title that ellipsizes at the 10 sp minimum.

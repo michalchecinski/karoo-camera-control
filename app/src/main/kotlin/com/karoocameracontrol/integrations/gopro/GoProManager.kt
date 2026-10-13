@@ -25,6 +25,7 @@ import android.os.ParcelUuid
 import android.os.SystemClock
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
+import com.karoocameracontrol.recording.CameraCommandController
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -89,6 +90,10 @@ class GoProManager private constructor(private val context: Context) {
 
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+    private val _recordingStateKnown = MutableStateFlow(false)
+    val recordingStateKnown: StateFlow<Boolean> = _recordingStateKnown.asStateFlow()
+    private val _cameraModeKnown = MutableStateFlow(false)
+    val cameraModeKnown: StateFlow<Boolean> = _cameraModeKnown.asStateFlow()
 
     private val _recordingDuration = MutableStateFlow(0)
     val recordingDuration: StateFlow<Int> = _recordingDuration.asStateFlow()
@@ -102,7 +107,7 @@ class GoProManager private constructor(private val context: Context) {
     private val _remainingVideoTime = MutableStateFlow(0)
     val remainingVideoTime: StateFlow<Int> = _remainingVideoTime.asStateFlow()
 
-    private val _cameraMode = MutableStateFlow(0)
+    private val _cameraMode = MutableStateFlow(-1)
     val cameraMode: StateFlow<Int> = _cameraMode.asStateFlow()
 
     private val _availablePresets = MutableStateFlow<List<PresetGroup>>(emptyList())
@@ -207,6 +212,28 @@ class GoProManager private constructor(private val context: Context) {
 
     // Coroutine scope for BLE operations
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val commandScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    val recordingCommands =
+        CameraCommandController(
+            scope = commandScope,
+            connected = { connectionState.value is ConnectionState.Connected },
+            recording = { isRecording.value },
+            videoMode = { cameraMode.value == 0 || cameraMode.value == PRESET_MODE_VIDEO },
+            startRecording = { startRecording() },
+            stopRecording = { stopRecording() },
+        )
+
+    init {
+        commandScope.launch {
+            connectionState.collect { state ->
+                if (state !is ConnectionState.Connected) {
+                    recordingCommands.disconnected()
+                    _cameraMode.value = -1
+                }
+            }
+        }
+    }
+
     private var connectionJob: Job? = null
     private var recordingTimerJob: Job? = null
     private var recordingStartTimeMs: Long = 0L
@@ -497,7 +524,11 @@ class GoProManager private constructor(private val context: Context) {
                         startRecordingTimer()
                     } else if (!recording && wasRecording) {
                         stopRecordingTimer()
+                        // Preserve every stop transition, even if StateFlow conflates
+                        // a rapid camera-side Stop followed by a manual Start.
+                        commandScope.launch { recordingCommands.recordingStopped() }
                     }
+                    _recordingStateKnown.value = true
                 }
 
                 status.recordingDuration?.let { duration ->
@@ -519,6 +550,7 @@ class GoProManager private constructor(private val context: Context) {
 
                 status.cameraMode?.let { mode ->
                     _cameraMode.value = mode
+                    _cameraModeKnown.value = true
                 }
 
                 status.activePresetId?.let { presetId ->
@@ -691,15 +723,29 @@ class GoProManager private constructor(private val context: Context) {
 
     suspend fun startRecording() {
         Log.i(TAG, "Recording start requested")
+        try {
+            writeAndAwaitResponseSuspend(
+                writeUuid = GoProUUID.COMMAND,
+                responseUuid = GoProUUID.COMMAND_RESPONSE,
+                messageType = COMMAND_ID_SET_SHUTTER,
+                value = GoProCommands.Recording.START,
+            )
+            Log.i(TAG, "Recording start command acknowledged")
+            awaitRecordingState(isRecording = true)
+            Log.i(TAG, "Recording start state confirmed")
+        } catch (error: Exception) {
+            Log.e(TAG, "Recording start interrupted or failed", error)
+            throw error
+        }
+    }
+
+    suspend fun keepAlive() {
         writeAndAwaitResponseSuspend(
-            writeUuid = GoProUUID.COMMAND,
-            responseUuid = GoProUUID.COMMAND_RESPONSE,
-            messageType = COMMAND_ID_SET_SHUTTER,
-            value = GoProCommands.Recording.START,
+            writeUuid = GoProUUID.SETTING,
+            responseUuid = GoProUUID.SETTING_RESPONSE,
+            messageType = 0x5B,
+            value = GoProCommands.KEEP_ALIVE,
         )
-        Log.i(TAG, "Recording start command acknowledged")
-        awaitRecordingState(isRecording = true)
-        Log.i(TAG, "Recording start state confirmed")
     }
 
     suspend fun stopRecording() {
@@ -715,6 +761,9 @@ class GoProManager private constructor(private val context: Context) {
             Log.i(TAG, "Recording stop command acknowledged")
             awaitRecordingState(isRecording = false)
             Log.i(TAG, "Recording stop state confirmed")
+        } catch (error: Exception) {
+            Log.e(TAG, "Recording stop interrupted or failed", error)
+            throw error
         } finally {
             // If we are still recording (stop failed or timed out), resume the timer
             if (_isRecording.value) {
@@ -929,6 +978,8 @@ class GoProManager private constructor(private val context: Context) {
                 _connectionState.value = ConnectionState.Connecting(device.name ?: device.address)
 
                 while (isActive) {
+                    _recordingStateKnown.value = false
+                    _cameraModeKnown.value = false
                     try {
                         // 1. Connect
                         connectGattSuspend(device, autoConnect = isPaired)
@@ -1009,6 +1060,7 @@ class GoProManager private constructor(private val context: Context) {
         connectedGatt = null
         _connectionState.value = ConnectionState.Disconnected
         _isRecording.value = false
+        _cameraMode.value = -1
         stopRecordingTimer()
     }
 

@@ -20,9 +20,11 @@ android {
         applicationId = "com.karoocameracontrol"
         minSdk = 23
         targetSdk = 34
+        testInstrumentationRunner =
+            providers.gradleProperty("cameraTestRunner")
+                .getOrElse("com.karoocameracontrol.radar.RadarTestInstrumentation")
         versionCode = (System.getenv("BUILD_NUMBER")?.toInt() ?: 1)
         versionName = System.getenv("RELEASE_VERSION") ?: "1.0"
-        testInstrumentationRunner = "com.karoocameracontrol.DescentUiInstrumentation"
     }
 
     signingConfigs {

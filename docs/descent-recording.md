@@ -85,10 +85,16 @@ dependencies. No library versions have changed.
 CI explicitly installs `platform-tools` through the pinned `setup-android`
 action so SDK package selection stays explicit across action updates.
 
-For UI checks, build `:app:assembleDebug :app:assembleDebugAndroidTest`, install
-both APKs on the isolated Karoo AVD, and run:
+For UI checks, select the descent UI instrumentation runner, build and install
+both APKs on the isolated Karoo AVD, and run. Grant the app's Bluetooth and
+location permissions before starting instrumentation so Android's permission
+dialog does not cover the test controls:
 
 ```sh
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest \
+  -PcameraTestRunner=com.karoocameracontrol.DescentUiInstrumentation
+adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s emulator-5554 install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb -s emulator-5554 shell am instrument -w \
   com.karoocameracontrol.test/com.karoocameracontrol.DescentUiInstrumentation
 python3 scripts/verify-descent-settings.py emulator-5554
@@ -113,3 +119,7 @@ values, and recording controls. The emulator does not provide real Karoo
 telemetry or GoPro BLE hardware. Before release, test on an actual Karoo and
 supported GoPro, including gradient responsiveness, recording acknowledgement,
 manual override, ride pauses, and Bluetooth disconnect/reconnect.
+
+Radar recording uses the same command controller. Automatic recordings retain
+their initiating owner: descent never stops a radar clip, and radar never
+stops a descent clip. Manual Stop overrides either automation.

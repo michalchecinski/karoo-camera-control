@@ -6,6 +6,8 @@ import com.karoocameracontrol.integrations.gopro.GoProBatteryDataType
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.GoProRecTimeDataType
 import com.karoocameracontrol.integrations.gopro.GoProStatusDataType
+import com.karoocameracontrol.radar.RadarRecordingController
+import com.karoocameracontrol.radar.RadarRecordingSettings
 import com.karoocameracontrol.recording.DescentRecordingMonitor
 import com.karoocameracontrol.recording.DescentSettingsStore
 import io.hammerhead.karooext.KarooSystemService
@@ -22,6 +24,7 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     private lateinit var goProManager: GoProManager
     private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
     private lateinit var descentMonitor: DescentRecordingMonitor
+    private val radarRecording by lazy { RadarRecordingController.getInstance(applicationContext) }
 
     private val karooSystem by lazy { KarooSystemService(applicationContext) }
 
@@ -45,12 +48,17 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
                 goProManager,
             )
         descentMonitor.start()
+        radarRecording.start(karooSystem)
 
         karooSystem.connect { connected ->
             scope.launch {
                 descentMonitor.systemConnectionChanged(connected)
+                radarRecording.onSystemConnection(connected)
                 if (connected) {
                     karooSystem.dispatch(RequestBluetooth(extension))
+                    if (RadarRecordingSettings.getInstance(applicationContext).settings.value.enabled) {
+                        goProManager.tryAutoConnect()
+                    }
                 }
             }
         }
@@ -69,6 +77,7 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     }
 
     override fun onDestroy() {
+        radarRecording.stop()
         descentMonitor.stop()
         scope.cancel()
         karooSystem.dispatch(ReleaseBluetooth(extension))

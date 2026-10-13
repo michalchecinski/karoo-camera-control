@@ -1,6 +1,9 @@
 package com.karoocameracontrol.integrations.gopro
 
 object GoProCommands {
+    // Setting 0x5B with the reserved keep-alive value 0x42 (Open GoPro).
+    val KEEP_ALIVE = byteArrayOf(0x03, 0x5B, 0x01, 0x42)
+
     // Command UUID actions
     object Recording {
         val START = byteArrayOf(0x03, 0x01, 0x01, 0x01)

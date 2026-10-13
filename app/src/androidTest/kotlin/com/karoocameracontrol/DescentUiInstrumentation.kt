@@ -96,7 +96,7 @@ class DescentUiInstrumentation : Instrumentation() {
                                     activePresetIcon = null,
                                     descentRecordingEnabled = true,
                                     descentStatus = if (isRecording || command.recordingInFlight) DescentStatus.CONSUMED else DescentStatus.READY,
-                                    onToggleRecording = controller::toggleManually,
+                                    onToggleRecording = { controller.toggleManually() },
                                     onSetMode = {},
                                     onOpenPresetSelection = {},
                                     onDisconnect = {},

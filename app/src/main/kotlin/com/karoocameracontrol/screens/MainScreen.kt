@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
@@ -55,6 +56,8 @@ fun MainScreen(
 ) {
     val viewModel: MainViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
+    val radarSettings by viewModel.radarSettings.settings.collectAsState()
+    val radarStatus by viewModel.radarStatus.collectAsState()
     val descentSettings by viewModel.descentSettings.collectAsState()
     val descentStatus by viewModel.descentStatus.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -88,7 +91,9 @@ fun MainScreen(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
                             text =
-                                if (uiState.showDescentSettings) {
+                                if (uiState.showRadarScreen) {
+                                    "Radar recording"
+                                } else if (uiState.showDescentSettings) {
                                     "Descent recording"
                                 } else if (uiState.showFeedbackScreen) {
                                     "Feedback"
@@ -104,7 +109,7 @@ fun MainScreen(
                     }
                 },
                 actions = {
-                    if (!uiState.showFeedbackScreen && !uiState.showDescentSettings) {
+                    if (!uiState.showFeedbackScreen && !uiState.showDescentSettings && !uiState.showRadarScreen) {
                         IconButton(onClick = { viewModel.setShowMenu(true) }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More options")
                         }
@@ -112,6 +117,11 @@ fun MainScreen(
                             expanded = uiState.showMenu,
                             onDismissRequest = { viewModel.setShowMenu(false) },
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("Radar recording") },
+                                onClick = { viewModel.setShowRadarScreen(true) },
+                                leadingIcon = { Icon(Icons.Default.Sensors, contentDescription = null) },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Descent recording") },
                                 onClick = { viewModel.setShowDescentSettings(true) },
@@ -179,7 +189,15 @@ fun MainScreen(
         ) {
             val currentState = uiState.connectionState
 
-            if (uiState.showDescentSettings) {
+            if (uiState.showRadarScreen) {
+                RadarRecordingScreen(
+                    settings = radarSettings,
+                    status = radarStatus,
+                    onEnabledChanged = viewModel.radarSettings::setEnabled,
+                    onDelayChanged = viewModel.radarSettings::setStopDelay,
+                    onBack = { viewModel.setShowRadarScreen(false) },
+                )
+            } else if (uiState.showDescentSettings) {
                 DescentRecordingScreen(
                     settings = descentSettings,
                     status = descentStatus,

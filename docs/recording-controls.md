@@ -28,3 +28,7 @@ automation, after confirmed flatter terrain or ride finish. It is off by
 default. Automatic stops use the same acknowledgement and progress path;
 manual Stop remains available while an automatic stop is pending. Manual clips
 and recordings found after reconnect are never stopped by this option.
+
+Optional [radar-triggered recording](radar-recording.md) uses the same shared
+command controller. Each automation stops only its own recordings. Manual
+controls override radar for the current encounter.

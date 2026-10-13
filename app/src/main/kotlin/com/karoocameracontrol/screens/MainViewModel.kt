@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.PresetGroup
+import com.karoocameracontrol.radar.RadarRecordingController
+import com.karoocameracontrol.radar.RadarRecordingSettings
 import com.karoocameracontrol.recording.DescentSettings
 import com.karoocameracontrol.recording.DescentSettingsStore
 import io.hammerhead.karooext.KarooSystemService
@@ -31,6 +33,7 @@ data class MainUiState(
     val showFeedbackScreen: Boolean = false,
     val showScanningScreen: Boolean = false,
     val showPresetScreen: Boolean = false,
+    val showRadarScreen: Boolean = false,
     val showDescentSettings: Boolean = false,
     val cameraCommandError: String? = null,
     // Device Data
@@ -50,6 +53,18 @@ data class MainUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val goProManager = GoProManager.getInstance(application)
     private val karooSystem = KarooSystemService(application)
+    private val radarRecording = RadarRecordingController.getInstance(application)
+    val radarSettings = RadarRecordingSettings.getInstance(application)
+    val radarStatus =
+        combine(radarRecording.status, radarSettings.settings) { status, settings ->
+            if (radarRecording.isRunning) {
+                status
+            } else if (settings.enabled) {
+                "Waiting for Karoo extension"
+            } else {
+                "Radar recording off"
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Waiting for Karoo extension")
     private val descentSettingsStore = DescentSettingsStore.getInstance(application)
     val descentSettings = descentSettingsStore.settings
     val descentStatus = descentSettingsStore.status
@@ -219,16 +234,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun removePairedDevice(address: String) = goProManager.removePairedDevice(address)
 
     fun toggleRecording() {
-        goProManager.recordingCommands.toggleManually()
+        val forceStop = radarRecording.manualOverride()
+        goProManager.recordingCommands.toggleManually(forceStop = forceStop)
     }
 
     fun setMode(mode: Int) {
+        if (goProManager.recordingCommands.state.value.busy || goProManager.isRecording.value) return
+        radarRecording.manualOverride()
         goProManager.recordingCommands.configure {
             goProManager.setMode(mode)
         }
     }
 
     fun loadPreset(presetId: Int) {
+        if (goProManager.recordingCommands.state.value.busy || goProManager.isRecording.value) return
+        radarRecording.manualOverride()
         goProManager.recordingCommands.configure {
             goProManager.loadPreset(presetId)
             _uiState.value = _uiState.value.copy(showPresetScreen = false)
@@ -240,7 +260,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateDescentSettings(settings: DescentSettings) = descentSettingsStore.update(settings)
 
     fun setShowDescentSettings(show: Boolean) {
-        _uiState.value = _uiState.value.copy(showDescentSettings = show, showMenu = false)
+        _uiState.value = _uiState.value.copy(showDescentSettings = show, showRadarScreen = false, showMenu = false)
+    }
+
+    fun setShowRadarScreen(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showRadarScreen = show, showDescentSettings = false, showMenu = false)
     }
 
     // UI Navigation / Dialog State Setters

@@ -23,8 +23,8 @@ notification access.
 
 If notification access is absent, the app does not start pairing. It shows the
 notification-access setup screen instead. If the expected Settings action is
-not available, it fails with an actionable error and records the available
-action titles in debug logs. It never calls privileged Bluetooth confirmation
+not available, it fails with an actionable error and records the number of available
+actions in diagnostic logs, without notification contents. It never calls privileged Bluetooth confirmation
 APIs or sends an unrecognised notification action.
 
 ## Scope and validation

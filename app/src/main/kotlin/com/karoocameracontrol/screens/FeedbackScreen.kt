@@ -9,13 +9,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -23,9 +31,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.karoocameracontrol.R
+import com.karoocameracontrol.diagnostics.DiagnosticReports
+import com.karoocameracontrol.diagnostics.ReportState
 
 @Composable
-fun FeedbackScreen(onFinish: () -> Unit) {
+fun FeedbackScreen(
+    onFinish: () -> Unit,
+    reportState: ReportState,
+    onSend: () -> Unit,
+    onRetry: () -> Unit,
+    onDiscard: () -> Unit,
+    configured: Boolean = DiagnosticReports.configured,
+) {
     val scrollState = rememberScrollState()
     Box(
         modifier =
@@ -44,24 +61,7 @@ fun FeedbackScreen(onFinish: () -> Unit) {
                     // Add padding for back button
                     .padding(bottom = 80.dp),
         ) {
-            Text(
-                text = "Like the app? Consider leaving a tip at:",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp),
-                textAlign = TextAlign.Center,
-            )
-            Box(
-                modifier =
-                    Modifier
-                        .size(150.dp)
-                        .background(MaterialTheme.colorScheme.surface),
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.qrcode_tip),
-                    contentDescription = "QR Code with buy a coffee link",
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
+            DiagnosticsControls(reportState, onSend, onRetry, onDiscard, configured)
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
@@ -79,6 +79,26 @@ fun FeedbackScreen(onFinish: () -> Unit) {
                 Image(
                     painter = painterResource(id = R.drawable.qrcode_feedback),
                     contentDescription = "QR Code with feedback link",
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Like the app? Consider leaving a tip at:",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp),
+                textAlign = TextAlign.Center,
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .size(150.dp)
+                        .background(MaterialTheme.colorScheme.surface),
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.qrcode_tip),
+                    contentDescription = "QR Code with buy a coffee link",
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
@@ -119,6 +139,61 @@ fun FeedbackScreen(onFinish: () -> Unit) {
                     .clickable {
                         onFinish()
                     },
+        )
+    }
+}
+
+@Composable
+fun DiagnosticsControls(
+    state: ReportState,
+    onSend: () -> Unit,
+    onRetry: () -> Unit,
+    onDiscard: () -> Unit,
+    configured: Boolean = DiagnosticReports.configured,
+) {
+    var confirm by remember { mutableStateOf(false) }
+    Text("Having a problem?", style = MaterialTheme.typography.titleMedium)
+    Button(
+        onClick = { confirm = true },
+        enabled = configured && (state == ReportState.Idle || state is ReportState.Sent),
+    ) { Text("Send diagnostics") }
+    if (!configured) {
+        Text("Diagnostics sending is unavailable in this build.", textAlign = TextAlign.Center)
+    }
+    when (state) {
+        ReportState.Loading -> Text("Checking saved report…")
+        ReportState.Sending -> Text("Sending diagnostics…", textAlign = TextAlign.Center)
+        is ReportState.Sent -> {
+            Text("Diagnostics sent", style = MaterialTheme.typography.titleMedium)
+            Text("Support code: ${state.code}", textAlign = TextAlign.Center)
+            Text("Include this code when reporting the problem using the feedback link below.", textAlign = TextAlign.Center)
+        }
+        is ReportState.Failed -> {
+            Text("Could not send diagnostics", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+            Text(state.message, textAlign = TextAlign.Center)
+            if (state.canRetry) Button(onClick = onRetry, enabled = configured) { Text("Retry") }
+            TextButton(onClick = onDiscard) { Text("Discard") }
+        }
+        ReportState.Idle -> Unit
+    }
+    if (confirm) {
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text("Send diagnostics?", style = MaterialTheme.typography.titleLarge) },
+            text = {
+                Text(
+                    "Send recent logs, app and Android versions, device model, and connection state privately to the developer via Sentry. Camera names, Bluetooth addresses, and passwords are omitted. Use Wi-Fi or a hotspot.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.heightIn(max = 140.dp).verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirm = false
+                    onSend()
+                }) { Text("Send") }
+            },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
         )
     }
 }

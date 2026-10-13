@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import com.karoocameracontrol.screens.MainScreen
 import com.karoocameracontrol.theme.AppTheme
+import com.karoocameracontrol.diagnostics.DiagnosticLog as Log
 
 class MainActivity : ComponentActivity() {
     private var permissionsGranted by mutableStateOf(false)

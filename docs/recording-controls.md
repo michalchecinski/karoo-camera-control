@@ -10,3 +10,7 @@ A second press stops or cancels the pending recording request even before the
 GoPro has reported that recording began. Mode and preset controls remain
 disabled while recording because the GoPro cannot safely switch them
 mid-recording.
+
+Recording requests, command acknowledgements, confirmed states, and failures are
+recorded in the local [diagnostic log](diagnostic-reports.md). Uploading that log
+requires an explicit action in the Leave Feedback screen.

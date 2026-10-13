@@ -51,6 +51,7 @@ fun MainScreen(
 ) {
     val viewModel: MainViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
+    val reportState by viewModel.reportState.collectAsState()
     var showUnpairDialog by remember { mutableStateOf(false) }
 
     // Auto-connect trigger
@@ -155,7 +156,13 @@ fun MainScreen(
             val currentState = uiState.connectionState
 
             if (uiState.showFeedbackScreen) {
-                FeedbackScreen(onFinish = { viewModel.setShowFeedbackScreen(false) })
+                FeedbackScreen(
+                    onFinish = { viewModel.setShowFeedbackScreen(false) },
+                    reportState = reportState,
+                    onSend = viewModel::sendDiagnostics,
+                    onRetry = viewModel::retryDiagnostics,
+                    onDiscard = viewModel::discardDiagnostics,
+                )
             } else if (uiState.showPresetScreen) {
                 val currentModeId = if (uiState.cameraMode < 1000) uiState.cameraMode + 1000 else uiState.cameraMode
                 val currentPresets = uiState.availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()

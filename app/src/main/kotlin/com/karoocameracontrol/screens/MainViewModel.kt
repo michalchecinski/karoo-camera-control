@@ -5,6 +5,8 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.karoocameracontrol.diagnostics.DiagnosticLog
+import com.karoocameracontrol.diagnostics.DiagnosticReports
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.PresetGroup
@@ -44,6 +46,30 @@ data class MainUiState(
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+    private val reports = DiagnosticReports.get(application)
+    val reportState = reports.state
+
+    fun sendDiagnostics() {
+        if (!DiagnosticReports.configured) return
+        val connection =
+            when (goProManager.connectionState.value) {
+                is ConnectionState.Connected -> "Connected"
+                is ConnectionState.Connecting -> "Connecting"
+                is ConnectionState.Pairing -> "Pairing"
+                is ConnectionState.PairingAccessRequired -> "PairingAccessRequired"
+                is ConnectionState.Error -> "Error"
+                ConnectionState.Scanning -> "Scanning"
+                ConnectionState.Disconnected -> "Disconnected"
+            }
+        reports.send(DiagnosticReports.metadata(connection))
+    }
+
+    fun retryDiagnostics() {
+        if (DiagnosticReports.configured) reports.retry()
+    }
+
+    fun discardDiagnostics() = reports.discard()
+
     private val goProManager = GoProManager.getInstance(application)
     private val karooSystem = KarooSystemService(application)
 
@@ -239,6 +265,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         goProManager.startRecording()
                     }
+                } catch (error: Exception) {
+                    DiagnosticLog.e("Recording", "Recording request interrupted or failed", error)
+                    throw error
                 } finally {
                     if (recordingCommandGeneration == commandGeneration) {
                         _uiState.value =

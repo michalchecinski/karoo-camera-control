@@ -1,7 +1,6 @@
 package com.karoocameracontrol.extension
 
 import android.content.Intent
-import android.util.Log
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProBatteryDataType
 import com.karoocameracontrol.integrations.gopro.GoProManager
@@ -16,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import com.karoocameracontrol.diagnostics.DiagnosticLog as Log
 
 class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0") {
     private lateinit var goProManager: GoProManager

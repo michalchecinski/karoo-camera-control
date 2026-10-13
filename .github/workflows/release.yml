@@ -248,6 +248,11 @@ jobs:
         with:
           name: karoo-camera-control.apk
 
+      - name: Download release obfuscation mapping
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: obfuscation-mapping-${{ needs.setup.outputs.version }}
+
       - name: Download draft release body
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -290,5 +295,6 @@ jobs:
           artifacts: |
             karoo-camera-control.apk
             manifest.json
+            mapping.txt
             resources/karoo-camera-control-icon.png
             resources/camera-controls.png

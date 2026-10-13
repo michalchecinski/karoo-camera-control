@@ -30,9 +30,20 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Validate diagnostics configuration for publishing
+        if: inputs.release_version != ''
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+        run: |
+          if [ -z "$SENTRY_DSN" ]; then
+            echo "Set the SENTRY_DSN repository variable before publishing."
+            exit 1
+          fi
+
       - name: Build
         run: ./gradlew build
         env:
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
           GH_USER: ${{ github.actor }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUILD_NUMBER: ${{ github.run_number }}
@@ -50,4 +61,11 @@ jobs:
         with:
           name: karoo-camera-control.apk
           path: app/build/outputs/apk/release/karoo-camera-control.apk
+          if-no-files-found: error
+
+      - name: Preserve release obfuscation mapping
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: obfuscation-mapping-${{ inputs.release_version || github.run_number }}
+          path: app/build/outputs/mapping/release/mapping.txt
           if-no-files-found: error

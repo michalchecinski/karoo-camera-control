@@ -1,6 +1,6 @@
 package com.karoocameracontrol.integrations.gopro
 
-import android.util.Log
+import com.karoocameracontrol.diagnostics.DiagnosticLog as Log
 
 /**
  * Parsed status values from GoPro TLV responses.

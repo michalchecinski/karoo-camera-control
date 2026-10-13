@@ -49,6 +49,14 @@ For now only GoPro cameras are supported.
 
 Up-to-date [supported GoPro cameras list can be found here](https://gopro.github.io/OpenGoPro/#compatibility).
 
+## Sharing diagnostics
+
+If something goes wrong, open the app menu's **Leave Feedback** screen and tap **Send diagnostics** while connected to Wi-Fi or a hotspot. Confirm the upload, then
+include the support code in your feedback or GitHub issue. A failed report stays
+available for manual **Retry** for 24 hours. Logs are sent privately through
+Sentry only when you choose to send them. See [diagnostic reports](docs/diagnostic-reports.md)
+for recorded data, limits, and maintainer setup.
+
 ## How can I help?
 
 Submit a GitHub issue with a feature request or bug report. If you want to help with the extension development please refer to the [contributing docs](https://github.com/michalchecinski/karoo-camera-control/blob/main/CONTRIBUTING.md).

@@ -41,6 +41,13 @@ Fallback gate derived from repository checks (JDK 17, installed Android SDK):
 - Run `RecordingFieldInstrumentation` on an isolated 480×800 emulator and inspect app-only screenshots.
 - Copilot CLI read-only review against `origin/main`, including compatibility, security, breaking-change, and scope checks.
 
+## Verification outcomes
+
+- Final combined gate passed: ktlintFormat/ktlintCheck, 30 unit tests (8 field tests), 41 descent/controller checks, lintDebug, assembleDebug, and assembleDebugAndroidTest.
+- Four isolated Karoo-sized emulator scenes passed real RemoteViews reapply/action guards, private receiver delivery while disconnected, 1Hz ViewEmitter updates and cancellation. All final 480×656 screenshots inspected; synthetic test-host states are explicitly identified on the PR.
+- GitHub Copilot CLI 1.0.97 reviewed source changes from b0c93dd through f907782 in read-only mode: **Approve; no concrete actionable defects**. No source edits followed that review.
+- Physical Karoo/GoPro touch, BLE, and day/night checks remain a disclosed pre-release QA requirement. Release signing was not attempted locally; GitHub CI handles the release build.
+
 ## Progress
 
 PR: #49

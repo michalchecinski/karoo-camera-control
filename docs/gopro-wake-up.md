@@ -6,6 +6,11 @@ The camera must have power, wireless connections enabled, and still be advertisi
 Open GoPro documents advertising for the first eight hours after sleep. A camera
 that is no longer advertising must be turned on manually.
 
+Startup uses a direct BLE connection for both new and saved cameras, with a
+10-second timeout per attempt. Saved cameras use the existing retry loop rather
+than Android's passive `autoConnect` mode, which can wait indefinitely and leave
+subsequent startup requests ignored while the app stays in Connecting.
+
 After service discovery, pairing, and subscribing to command responses, the app
 polls **Get Hardware Info** (command `0x3C`) until the camera acknowledges success.
 Only then does it register status updates, fetch initial state, and report the

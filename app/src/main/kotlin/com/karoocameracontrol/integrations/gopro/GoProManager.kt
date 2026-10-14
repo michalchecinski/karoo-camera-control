@@ -1008,7 +1008,7 @@ class GoProManager private constructor(private val context: Context) {
                     _cameraModeKnown.value = false
                     try {
                         // 1. Connect
-                        connectGattSuspend(device, autoConnect = isPaired)
+                        connectGattSuspend(device)
 
                         // 2. Discover Services
                         discoverServicesSuspend()
@@ -1218,29 +1218,11 @@ class GoProManager private constructor(private val context: Context) {
         }
     }
 
-    private suspend fun connectGattSuspend(
-        device: BluetoothDevice,
-        autoConnect: Boolean,
-    ) = operationMutex.withLock {
-        if (autoConnect) {
-            suspendCancellableCoroutine<Unit> { cont ->
-                synchronized(continuationLock) {
-                    currentOperationType = BleOperationType.CONNECT
-                    @Suppress("UNCHECKED_CAST")
-                    activeContinuation = cont as CancellableContinuation<Any?>
-                }
-                cont.invokeOnCancellation {
-                    synchronized(continuationLock) {
-                        activeContinuation = null
-                        currentOperationType = BleOperationType.NONE
-                    }
-                    // Clean up GATT on cancellation
-                    connectedGatt?.close()
-                    connectedGatt = null
-                }
-                connectedGatt = device.connectGatt(context, true, gattCallback)
-            }
-        } else {
+    private suspend fun connectGattSuspend(device: BluetoothDevice) =
+        operationMutex.withLock {
+            // Startup is an explicit wake/connect request, including for a saved
+            // camera. Android autoConnect is passive and can wait indefinitely.
+            Log.d(TAG, "Starting direct BLE connection attempt")
             withTimeout(CONNECT_TIMEOUT_MS) {
                 suspendCancellableCoroutine<Unit> { cont ->
                     synchronized(continuationLock) {
@@ -1256,11 +1238,10 @@ class GoProManager private constructor(private val context: Context) {
                         connectedGatt?.close()
                         connectedGatt = null
                     }
-                    connectedGatt = device.connectGatt(context, false, gattCallback)
+                    connectedGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
                 }
             }
         }
-    }
 
     private suspend fun discoverServicesSuspend() =
         operationMutex.withLock {

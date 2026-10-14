@@ -30,6 +30,13 @@ retries or ownership changes, other camera integrations.
 3.1 Run formatting, unit checks, debug build, lint and relevant emulator checks.
 3.2 Run GitHub Copilot CLI review, fix relevant findings, and publish the PR.
 
+## Outcome
+
+PR: https://github.com/michalchecinski/karoo-camera-control/pull/50
+Status: complete. Native alert policy, SDK effects, persisted settings and documentation
+implemented; Copilot review findings fixed and follow-up clean. All available local
+checks passed. Physical Karoo/GoPro validation and remote CI remain external gates.
+
 ## Risks
 
 Native rendering, beep audibility and live BLE interactions require physical Karoo/GoPro checks.
@@ -64,6 +71,8 @@ unnecessary polling barrier was removed to keep the change scoped to event appli
 
 ## Progress
 
+PR: #50
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: Event policy and integration
@@ -79,4 +88,4 @@ unnecessary polling barrier was removed to keep the change scoped to event appli
 ### Phase 3: Validation and review
 
 - [x] 3.1 Run formatting, unit checks, debug build, lint and relevant emulator checks. — 8b967d5
-- [ ] 3.2 Run GitHub Copilot CLI review, fix relevant findings, and publish the PR.
+- [x] 3.2 Run GitHub Copilot CLI review, fix relevant findings, and publish the PR. — add238c (review fixes), 368ce79 (scope cleanup); PR #50

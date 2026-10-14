@@ -102,7 +102,9 @@ Its text, icon, and colors come directly from production `InRideAlert` payloads.
 The test-only card layout is illustrative; it is **not** the proprietary Karoo
 ride-alert renderer and does not verify native positioning, dismissal, or sound.
 
-Reproduce on the isolated 480×800 Karoo AVD after installing the debug APK:
+Reproduce on the isolated 480×800 Karoo AVD after installing the debug APK.
+Wake/unlock the emulator and grant the app Bluetooth Scan, Bluetooth Connect,
+and Fine Location permissions first, so Android dialogs cannot cover the preview.
 
 ```sh
 ./gradlew :app:assembleDebugAndroidTest \

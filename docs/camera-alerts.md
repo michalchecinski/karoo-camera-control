@@ -25,7 +25,12 @@ Whole-ride recording can use this policy when that separate feature exists.
 
 An initial connected snapshot establishes a baseline; it never confirms a new
 start/stop. Rejected, timed-out and cancelled commands do not produce success
-messages, including a late matching state update. Repeated command failures
+messages. A matching transition immediately after a failed/cancelled request
+is ambiguous because GoPro status does not identify the shutter initiator. It
+is conservatively suppressed for up to five seconds (the existing command
+confirmation window), or until a fresh recording-state report establishes the
+opposite baseline. Later independent physical changes are reported with camera
+origin; stale suppression never hides them indefinitely. Repeated command failures
 are suppressed until a successful command, independent physical transition,
 or new connection. Commands and automation ownership are unchanged.
 
@@ -39,8 +44,10 @@ at **five minutes or below**. These are camera-reported values, not predictions.
 Unknown or invalid values are ignored; zero is a valid warning value. Each
 warning fires once and rearms after recovery to at least **25% battery** or
 **more than six minutes** remaining. This hysteresis avoids threshold chatter.
-Battery and capacity warnings arriving within 300 ms are combined. A pending
-combined warning is discarded when the ride or Karoo connection ends.
+Battery and capacity warnings arriving within 300 ms are combined. Warning
+latches are tracked per camera with opaque in-memory IDs, so Bluetooth flapping
+or switching away and back does not rearm a low value without recovery. A pending
+combined warning is discarded when the ride, camera or Karoo connection ends.
 
 Confirmations automatically dismiss after three seconds; failures/warnings
 after six seconds. Alerts use a camera icon and readable text. Start and stop

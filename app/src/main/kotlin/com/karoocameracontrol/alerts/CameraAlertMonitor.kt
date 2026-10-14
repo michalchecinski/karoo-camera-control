@@ -31,6 +31,7 @@ class CameraAlertMonitor(
     fun start() {
         policy.seed(feed.snapshot)
         feed.listener = { input ->
+            if (input is CameraAlertInput.Snapshot && !input.value.connected) clearWarnings()
             policy.settings = settings.settings.value
             policy.accept(input).forEach(::notify)
         }

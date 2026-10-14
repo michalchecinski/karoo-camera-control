@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
@@ -520,51 +521,54 @@ class GoProManager private constructor(private val context: Context) {
                 // remaining bytes are status TLVs.
                 val status = GoProStatusParser.parse(value.copyOfRange(RESPONSE_HEADER_SIZE, value.size))
 
-                // Preserve status packet order before waking recording command continuations.
+                // Feed and observed state must change atomically on Main before a
+                // command continuation can read the confirmed state.
+                val statusGatt = connectedGatt
                 commandScope.launch {
+                    if (statusGatt == null || statusGatt !== connectedGatt) return@launch
                     alertFeed.status(status.isRecording, status.batteryLevel, status.remainingVideoTime)
-                }
 
-                // Apply parsed values to state flows (only if present in response)
-                status.isRecording?.let { recording ->
-                    val wasRecording = _isRecording.value
-                    _isRecording.value = recording
-                    if (recording && !wasRecording) {
-                        startRecordingTimer()
-                    } else if (!recording && wasRecording) {
-                        stopRecordingTimer()
-                        // Preserve every stop transition, even if StateFlow conflates
-                        // a rapid camera-side Stop followed by a manual Start.
-                        commandScope.launch { recordingCommands.recordingStopped() }
+                    // Apply parsed values to state flows (only if present in response)
+                    status.isRecording?.let { recording ->
+                        val wasRecording = _isRecording.value
+                        _isRecording.value = recording
+                        if (recording && !wasRecording) {
+                            startRecordingTimer()
+                        } else if (!recording && wasRecording) {
+                            stopRecordingTimer()
+                            // Preserve every stop transition, even if StateFlow conflates
+                            // a rapid camera-side Stop followed by a manual Start.
+                            recordingCommands.recordingStopped()
+                        }
+                        _recordingStateKnown.value = true
                     }
-                    _recordingStateKnown.value = true
-                }
 
-                status.recordingDuration?.let { duration ->
-                    _recordingDuration.value = duration
-                    recordingStartTimeMs = SystemClock.elapsedRealtime() - (duration * 1000L)
-                }
+                    status.recordingDuration?.let { duration ->
+                        _recordingDuration.value = duration
+                        recordingStartTimeMs = SystemClock.elapsedRealtime() - (duration * 1000L)
+                    }
 
-                status.batteryLevel?.let { battery ->
-                    _batteryLevel.value = battery
-                }
+                    status.batteryLevel?.let { battery ->
+                        _batteryLevel.value = battery
+                    }
 
-                status.remainingSpace?.let { space ->
-                    _remainingSpace.value = space
-                }
+                    status.remainingSpace?.let { space ->
+                        _remainingSpace.value = space
+                    }
 
-                status.remainingVideoTime?.let { time ->
-                    _remainingVideoTime.value = time
-                }
+                    status.remainingVideoTime?.let { time ->
+                        _remainingVideoTime.value = time
+                    }
 
-                status.cameraMode?.let { mode ->
-                    _cameraMode.value = mode
-                    _cameraModeKnown.value = true
-                }
+                    status.cameraMode?.let { mode ->
+                        _cameraMode.value = mode
+                        _cameraModeKnown.value = true
+                    }
 
-                status.activePresetId?.let { presetId ->
-                    _activePresetId.value = presetId
-                    updateActivePresetName()
+                    status.activePresetId?.let { presetId ->
+                        _activePresetId.value = presetId
+                        updateActivePresetName()
+                    }
                 }
             }
 
@@ -824,13 +828,16 @@ class GoProManager private constructor(private val context: Context) {
         _activePresetIcon.value = loadedPreset?.iconId
     }
 
-    private suspend fun pollRecordingState() {
+    private suspend fun pollRecordingState(): Boolean {
         writeAndAwaitResponseSuspend(
             writeUuid = GoProUUID.QUERY,
             responseUuid = GoProUUID.QUERY_RESPONSE,
             messageType = QUERY_ID_GET_STATUS,
             value = GoProCommands.Query.STATUS,
         )
+        // Initial polling runs on IO; wait behind queued Main status application
+        // before its caller decides whether to query the existing clip duration.
+        return withContext(Dispatchers.Main.immediate) { _isRecording.value }
     }
 
     private suspend fun awaitRecordingState(isRecording: Boolean) {
@@ -980,6 +987,7 @@ class GoProManager private constructor(private val context: Context) {
         }
 
         stopScan()
+        commandScope.launch { alertFeed.selectCamera(device.address) }
 
         connectionJob?.cancel()
         connectionJob =

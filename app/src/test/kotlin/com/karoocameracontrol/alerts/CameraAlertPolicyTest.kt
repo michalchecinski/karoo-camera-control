@@ -219,6 +219,82 @@ class CameraAlertPolicyTest {
         assertEquals(CameraAlertSnapshot(), feed.snapshot)
     }
 
+    @Test fun failureSuppressionExpiresForLaterPhysicalShutterChanges() {
+        for (cancelled in listOf(false, true)) {
+            var now = 0L
+            val p =
+                CameraAlertPolicy { now }.apply {
+                    settings = CameraAlertSettings(true, true, true)
+                    rideActive = true
+                }
+            p.status(false)
+            p.accept(CameraAlertInput.CommandStarted(true, RecordingOrigin.DESCENT))
+            if (cancelled) {
+                p.accept(CameraAlertInput.CommandStarted(false, RecordingOrigin.MANUAL))
+                p.accept(CameraAlertInput.CommandFinished(true))
+            } else {
+                p.accept(CameraAlertInput.CommandFinished(false))
+            }
+            now = 5001
+            val alert = p.status(true).single()
+            assertEquals(CameraAlertKind.STARTED, alert.kind)
+            assertEquals(null, alert.origin)
+        }
+    }
+
+    @Test fun freshRecordingBaselineClearsAmbiguityButBatteryOnlyPacketsDoNot() {
+        val p = policy()
+        p.status(false)
+        p.accept(CameraAlertInput.CommandStarted(true, RecordingOrigin.MANUAL))
+        p.accept(CameraAlertInput.CommandFinished(false))
+        p.accept(CameraAlertInput.Snapshot(CameraAlertSnapshot(true, false, 80), recordingReported = false))
+        assertTrue(p.status(true).isEmpty())
+
+        val fresh = policy()
+        fresh.status(false)
+        fresh.accept(CameraAlertInput.CommandStarted(true, RecordingOrigin.MANUAL))
+        fresh.accept(CameraAlertInput.CommandFinished(false))
+        fresh.status(false)
+        assertEquals(CameraAlertKind.STARTED, fresh.status(true).single().kind)
+    }
+
+    @Test fun reconnectDoesNotRearmLowResourcesButRecoveryAndDifferentCamerasDo() {
+        val p = policy()
+
+        fun status(
+            id: Long,
+            connected: Boolean,
+            battery: Int? = null,
+            capacity: Int? = null,
+        ) =
+            p.accept(CameraAlertInput.Snapshot(CameraAlertSnapshot(connected, false, battery, capacity, id)))
+        assertEquals(CameraAlertKind.LOW_RESOURCES, status(1, true, 20, 300).single().kind)
+        status(1, false)
+        assertTrue(status(1, true, 19, 299).isEmpty())
+        status(1, false)
+        assertEquals(CameraAlertKind.LOW_RESOURCES, status(2, true, 19, 299).single().kind)
+        status(2, false)
+        assertTrue(status(1, true, 19, 299).isEmpty())
+        assertTrue(status(1, true, 25, 361).isEmpty())
+        assertEquals(CameraAlertKind.LOW_RESOURCES, status(1, true, 20, 300).single().kind)
+    }
+
+    @Test fun liveFeedUsesStableOpaqueCameraIdsAcrossReconnectAndCameraSelection() {
+        val feed = CameraAlertFeed()
+        feed.selectCamera("camera-a")
+        val a = feed.snapshot.cameraId
+        feed.status(false, 10, 100)
+        feed.connection(true)
+        feed.connection(false)
+        feed.selectCamera("camera-a")
+        assertEquals(a, feed.snapshot.cameraId)
+        assertEquals(null, feed.snapshot.battery)
+        feed.selectCamera("camera-b")
+        assertFalse(a == feed.snapshot.cameraId)
+        feed.selectCamera("camera-a")
+        assertEquals(a, feed.snapshot.cameraId)
+    }
+
     @Test fun sharedControllerEventsGateManualAndAutomaticConfirmations() =
         runBlocking {
             for (owner in listOf(null, AutomaticRecordingOwner.DESCENT, AutomaticRecordingOwner.RADAR)) {

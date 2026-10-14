@@ -94,6 +94,33 @@ The UI script requires an isolated Karoo AVD at 480×800, checks navigation,
 defaults and persistence across process restart, restores defaults, and
 captures app-only screenshots.
 
+### Alert payload preview
+
+The PR includes [a labelled emulator screenshot](../screenshots/emulator-karoo-480x800/camera-alert-preview.png)
+showing recording confirmation, connection loss, and a combined low-resource alert.
+Its text, icon, and colors come directly from production `InRideAlert` payloads.
+The test-only card layout is illustrative; it is **not** the proprietary Karoo
+ride-alert renderer and does not verify native positioning, dismissal, or sound.
+
+Reproduce on the isolated 480×800 Karoo AVD after installing the debug APK:
+
+```sh
+./gradlew :app:assembleDebugAndroidTest \
+  -PcameraTestRunner=com.karoocameracontrol.CameraAlertPreviewInstrumentation
+adb -s <isolated-emulator> install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb -s <isolated-emulator> shell am instrument -w \
+  com.karoocameracontrol.test/com.karoocameracontrol.CameraAlertPreviewInstrumentation
+adb -s <isolated-emulator> exec-out run-as com.karoocameracontrol \
+  cat cache/camera-alert-preview.png > /tmp/camera-alert-preview-raw.png
+sips --cropToHeightWidth 656 480 --cropOffset 48 0 \
+  /tmp/camera-alert-preview-raw.png \
+  --out screenshots/emulator-karoo-480x800/camera-alert-preview.png
+```
+
+Instrumentation verifies all three alert titles/details are visible within the
+app area before capturing the Android surface. Inspect the final 480×656 asset
+and retain the visible emulator-preview label when publishing it.
+
 An emulator cannot establish proprietary Karoo ride-alert rendering or beep
 audibility, nor live GoPro BLE behavior. Before release, validate on a physical
 Karoo and supported GoPro: manual/descent/radar starts and stops, physical

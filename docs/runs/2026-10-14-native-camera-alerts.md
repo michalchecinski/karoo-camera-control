@@ -30,6 +30,15 @@ retries or ownership changes, other camera integrations.
 3.1 Run formatting, unit checks, debug build, lint and relevant emulator checks.
 3.2 Run GitHub Copilot CLI review, fix relevant findings, and publish the PR.
 
+## Alert screenshot follow-up
+
+Added a test-only emulator preview of three production InRideAlert payloads:
+recording confirmation, connection loss, and combined battery/capacity warning.
+The image visibly states that native Karoo layout may differ. Instrumentation
+checks all titles/details are inside the app area, captures the Android surface,
+and the asset is cropped/inspected at 480×656. Build and ktlint checks passed.
+This preview does not replace the outstanding physical Karoo rendering checks.
+
 ## Outcome
 
 PR: https://github.com/michalchecinski/karoo-camera-control/pull/50

@@ -33,12 +33,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.karoocameracontrol.R
 import com.karoocameracontrol.components.SimpleAlertDialog
 import com.karoocameracontrol.integrations.gopro.PresetGroup
 import com.karoocameracontrol.integrations.gopro.PresetIcon
-import com.karoocameracontrol.recording.DescentStatus
 import kotlin.time.Duration.Companion.seconds
 
 @Composable
@@ -55,8 +55,6 @@ fun ConnectedScreen(
     activePresetName: String?,
     // Added Icon ID
     activePresetIcon: Int?,
-    descentRecordingEnabled: Boolean = false,
-    descentStatus: DescentStatus = DescentStatus.OFF,
     onToggleRecording: () -> Unit,
     onSetMode: (Int) -> Unit,
     onOpenPresetSelection: () -> Unit,
@@ -75,28 +73,22 @@ fun ConnectedScreen(
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(bottom = 64.dp),
+            modifier = Modifier.fillMaxSize().padding(bottom = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(
-                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (descentRecordingEnabled) {
-                    Text(
-                        text = "Descent recording: ${descentStatus.message}",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    )
-                }
-                // Status Row
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(bottom = 16.dp),
+                // Compact camera status leaves room for the controls on Karoo.
+                Row(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 ) {
                     Text(
                         text = "Battery: $batteryLevel%",
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodySmall,
                     )
 
                     val hours = remainingTime / 3600
@@ -112,13 +104,13 @@ fun ConnectedScreen(
 
                     Text(
                         text = "Storage: $timeText",
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
 
                 // Mode Selection
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
@@ -166,10 +158,15 @@ fun ConnectedScreen(
                     }
                 }
 
-                activePresetName?.let {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 8.dp),
+                val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
+                val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
+
+                if (currentPresets.isNotEmpty()) {
+                    Button(
+                        onClick = onOpenPresetSelection,
+                        enabled = !isProcessing && !isRecording,
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
                     ) {
                         activePresetIcon?.let { iconId ->
                             Icon(
@@ -179,29 +176,25 @@ fun ConnectedScreen(
                             )
                         }
                         Text(
+                            text = activePresetName?.let { "Preset: $it" } ?: "Change Preset",
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    activePresetName?.let {
+                        Text(
                             text = "Preset: $it",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
-
-                val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
-                val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
-
-                if (currentPresets.isNotEmpty()) {
-                    Button(
-                        onClick = onOpenPresetSelection,
-                        enabled = !isProcessing && !isRecording,
-                        modifier = Modifier.padding(bottom = 16.dp),
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.tertiary,
-                            ),
-                    ) {
-                        Text("Change Preset")
-                    }
-                }
             }
+
+            // Keep scrollable details clear of the fixed recording control.
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (isRecording) {
                 val duration = recordingDuration.seconds
@@ -216,58 +209,69 @@ fun ConnectedScreen(
                 )
             }
 
-            Button(
-                onClick = onToggleRecording,
-                // A second press is always available to stop or cancel a recording
-                // request, even before the camera sends its encoding-state update.
-                enabled = !isProcessing || isRecording || isRecordingOperationInFlight,
-                modifier =
-                    Modifier
-                        .width(200.dp)
-                        .height(72.dp),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor =
-                            if (isRecording || isRecordingOperationInFlight) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            },
-                        disabledContainerColor =
-                            if (isRecording || isRecordingOperationInFlight) {
-                                MaterialTheme.colorScheme.error.copy(
-                                    alpha = 0.5f,
-                                )
-                            } else {
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                            },
-                    ),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (isProcessing && !isRecording && !isRecordingOperationInFlight) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 3.dp,
-                    )
-                } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .size(24.dp)
-                                    .background(
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        shape = if (isRecording || isRecordingOperationInFlight) RectangleShape else CircleShape,
-                                    ),
+                Image(
+                    painter = painterResource(id = R.drawable.back),
+                    contentDescription = "Back",
+                    modifier = Modifier.size(54.dp).clickable { onFinish() },
+                )
+                Button(
+                    onClick = onToggleRecording,
+                    // A second press is always available to stop or cancel a recording
+                    // request, even before the camera sends its encoding-state update.
+                    enabled = !isProcessing || isRecording || isRecordingOperationInFlight,
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(64.dp),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor =
+                                if (isRecording || isRecordingOperationInFlight) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                            disabledContainerColor =
+                                if (isRecording || isRecordingOperationInFlight) {
+                                    MaterialTheme.colorScheme.error.copy(
+                                        alpha = 0.5f,
+                                    )
+                                } else {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                },
+                        ),
+                ) {
+                    if (isProcessing && !isRecording && !isRecordingOperationInFlight) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 3.dp,
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(
-                            text = if (isRecording || isRecordingOperationInFlight) "Stop" else "Record",
-                            style = MaterialTheme.typography.titleLarge,
-                        )
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(24.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            shape = if (isRecording || isRecordingOperationInFlight) RectangleShape else CircleShape,
+                                        ),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isRecording || isRecordingOperationInFlight) "Stop" else "Record",
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                        }
                     }
                 }
             }
@@ -284,18 +288,5 @@ fun ConnectedScreen(
                 },
             )
         }
-
-        Image(
-            painter = painterResource(id = R.drawable.back),
-            contentDescription = "Back",
-            modifier =
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(bottom = 10.dp)
-                    .size(54.dp)
-                    .clickable {
-                        onFinish()
-                    },
-        )
     }
 }

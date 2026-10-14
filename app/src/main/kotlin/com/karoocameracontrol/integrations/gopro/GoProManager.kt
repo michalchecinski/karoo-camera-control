@@ -33,7 +33,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -321,6 +323,7 @@ class GoProManager private constructor(private val context: Context) {
                 newState: Int,
             ) {
                 super.onConnectionStateChange(gatt, status, newState)
+                if (connectedGatt !== gatt) return
                 val deviceName = gatt.device.name
 
                 // GATT_CONN_TERMINATE_PEER_USER means remote device disconnected - treat as normal disconnect
@@ -364,6 +367,7 @@ class GoProManager private constructor(private val context: Context) {
                 status: Int,
             ) {
                 super.onServicesDiscovered(gatt, status)
+                if (connectedGatt !== gatt) return
                 synchronized(continuationLock) {
                     if (currentOperationType == BleOperationType.DISCOVER_SERVICES) {
                         if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -384,6 +388,7 @@ class GoProManager private constructor(private val context: Context) {
                 value: ByteArray,
                 status: Int,
             ) {
+                if (connectedGatt !== gatt) return
                 handleCharacteristicRead(characteristic, status)
             }
 
@@ -395,6 +400,7 @@ class GoProManager private constructor(private val context: Context) {
                 characteristic: BluetoothGattCharacteristic,
                 status: Int,
             ) {
+                if (connectedGatt !== gatt) return
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                     handleCharacteristicRead(characteristic, status)
                 }
@@ -423,6 +429,7 @@ class GoProManager private constructor(private val context: Context) {
                 status: Int,
             ) {
                 super.onCharacteristicWrite(gatt, characteristic, status)
+                if (connectedGatt !== gatt) return
                 synchronized(continuationLock) {
                     if (currentOperationType == BleOperationType.WRITE_CHARACTERISTIC) {
                         if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -442,6 +449,7 @@ class GoProManager private constructor(private val context: Context) {
                 status: Int,
             ) {
                 super.onDescriptorWrite(gatt, descriptor, status)
+                if (connectedGatt !== gatt) return
                 synchronized(continuationLock) {
                     if (currentOperationType == BleOperationType.WRITE_DESCRIPTOR) {
                         if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -1013,6 +1021,19 @@ class GoProManager private constructor(private val context: Context) {
                         enableNotificationSuspend(GoProUUID.SETTING_RESPONSE)
                         enableNotificationSuspend(GoProUUID.QUERY_RESPONSE)
 
+                        // Connecting wakes a sleeping GoPro, but its command processor
+                        // may still be booting. Wait for a camera acknowledgement.
+                        Log.i(TAG, "Waiting for GoPro BLE readiness")
+                        awaitGoProBleReadiness {
+                            writeAndAwaitResponseSuspend(
+                                writeUuid = GoProUUID.COMMAND,
+                                responseUuid = GoProUUID.COMMAND_RESPONSE,
+                                messageType = 0x3C,
+                                value = GoProCommands.GET_HARDWARE_INFO,
+                            )
+                        }
+                        Log.i(TAG, "GoPro BLE ready")
+
                         // 5. Register for Status Updates
                         registerForStatusUpdatesSuspend()
 
@@ -1027,7 +1048,9 @@ class GoProManager private constructor(private val context: Context) {
 
                         break
                     } catch (e: Exception) {
-                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        // withTimeout also throws CancellationException; an operation
+                        // timing out must not silently abandon saved-device retries.
+                        currentCoroutineContext().ensureActive()
                         Log.e(TAG, "Connection failed", e)
                         disconnectGatt()
 

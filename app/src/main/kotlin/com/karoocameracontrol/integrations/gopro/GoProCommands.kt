@@ -1,6 +1,9 @@
 package com.karoocameracontrol.integrations.gopro
 
 object GoProCommands {
+    // Open GoPro BLE readiness probe (command 0x3C, no parameters).
+    val GET_HARDWARE_INFO = byteArrayOf(0x01, 0x3C)
+
     // Setting 0x5B with the reserved keep-alive value 0x42 (Open GoPro).
     val KEEP_ALIVE = byteArrayOf(0x03, 0x5B, 0x01, 0x42)
 

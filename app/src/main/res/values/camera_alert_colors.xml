@@ -1,0 +1,5 @@
+<resources>
+    <color name="camera_alert_confirmation">#124E3B</color>
+    <color name="camera_alert_warning">#842617</color>
+    <color name="camera_alert_text">#FFFFFF</color>
+</resources>

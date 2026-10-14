@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material3.DropdownMenu
@@ -38,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.karoocameracontrol.R
@@ -55,6 +57,7 @@ fun MainScreen(
     val viewModel: MainViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
     val reportState by viewModel.reportState.collectAsState()
+    val cameraAlertSettings by viewModel.cameraAlertSettings.settings.collectAsState()
     val radarSettings by viewModel.radarSettings.settings.collectAsState()
     val radarStatus by viewModel.radarStatus.collectAsState()
     val descentSettings by viewModel.descentSettings.collectAsState()
@@ -62,6 +65,7 @@ fun MainScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showUnpairDialog by remember { mutableStateOf(false) }
 
+    BackHandler(enabled = uiState.showCameraAlertSettings) { viewModel.setShowCameraAlertSettings(false) }
     BackHandler(enabled = uiState.showDescentSettings) { viewModel.setShowDescentSettings(false) }
     LaunchedEffect(uiState.cameraCommandError) {
         uiState.cameraCommandError?.let { message ->
@@ -87,7 +91,9 @@ fun MainScreen(
             val currentState = uiState.connectionState
             CompactTopAppBar(
                 title =
-                    if (uiState.showRadarScreen) {
+                    if (uiState.showCameraAlertSettings) {
+                        stringResource(R.string.camera_alert_settings)
+                    } else if (uiState.showRadarScreen) {
                         "Radar recording"
                     } else if (uiState.showDescentSettings) {
                         "Descent recording"
@@ -101,7 +107,7 @@ fun MainScreen(
                         "Karoo Camera Control"
                     },
                 actions = {
-                    if (!uiState.showFeedbackScreen && !uiState.showDescentSettings && !uiState.showRadarScreen) {
+                    if (!uiState.showFeedbackScreen && !uiState.showDescentSettings && !uiState.showRadarScreen && !uiState.showCameraAlertSettings) {
                         IconButton(onClick = { viewModel.setShowMenu(true) }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More options")
                         }
@@ -109,6 +115,11 @@ fun MainScreen(
                             expanded = uiState.showMenu,
                             onDismissRequest = { viewModel.setShowMenu(false) },
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.camera_alert_settings)) },
+                                onClick = { viewModel.setShowCameraAlertSettings(true) },
+                                leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Radar recording") },
                                 onClick = { viewModel.setShowRadarScreen(true) },
@@ -174,7 +185,13 @@ fun MainScreen(
         ) {
             val currentState = uiState.connectionState
 
-            if (uiState.showRadarScreen) {
+            if (uiState.showCameraAlertSettings) {
+                CameraAlertSettingsScreen(
+                    settings = cameraAlertSettings,
+                    onSettingsChanged = viewModel.cameraAlertSettings::update,
+                    onBack = { viewModel.setShowCameraAlertSettings(false) },
+                )
+            } else if (uiState.showRadarScreen) {
                 RadarRecordingScreen(
                     settings = radarSettings,
                     status = radarStatus,

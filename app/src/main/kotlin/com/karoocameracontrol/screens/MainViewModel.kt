@@ -5,6 +5,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.karoocameracontrol.alerts.CameraAlertSettingsStore
 import com.karoocameracontrol.diagnostics.DiagnosticReports
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProManager
@@ -36,6 +37,7 @@ data class MainUiState(
     val showPresetScreen: Boolean = false,
     val showRadarScreen: Boolean = false,
     val showDescentSettings: Boolean = false,
+    val showCameraAlertSettings: Boolean = false,
     val cameraCommandError: String? = null,
     // Device Data
     val scannedDevices: List<android.bluetooth.BluetoothDevice> = emptyList(),
@@ -79,6 +81,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val goProManager = GoProManager.getInstance(application)
     private val karooSystem = KarooSystemService(application)
     private val radarRecording = RadarRecordingController.getInstance(application)
+    val cameraAlertSettings = CameraAlertSettingsStore.getInstance(application)
     val radarSettings = RadarRecordingSettings.getInstance(application)
     val radarStatus =
         combine(radarRecording.status, radarSettings.settings) { status, settings ->
@@ -283,6 +286,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearCameraCommandError() = goProManager.recordingCommands.clearError()
 
     fun updateDescentSettings(settings: DescentSettings) = descentSettingsStore.update(settings)
+
+    fun setShowCameraAlertSettings(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showCameraAlertSettings = show, showMenu = false)
+    }
 
     fun setShowDescentSettings(show: Boolean) {
         _uiState.value = _uiState.value.copy(showDescentSettings = show, showRadarScreen = false, showMenu = false)

@@ -1,5 +1,7 @@
 package com.karoocameracontrol.recording
 
+import com.karoocameracontrol.alerts.CameraAlertInput
+import com.karoocameracontrol.alerts.RecordingOrigin
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -162,6 +164,45 @@ class RecordingFieldStateTest {
                 assertTrue(performRecordingFieldAction(ready, RecordingFieldAction.START, controller) { true })
                 assertEquals(2, stops)
                 assertFalse(recording)
+            } finally {
+                scope.cancel()
+            }
+        }
+
+    @Test
+    fun `field command target and native alert events stay synchronized during manual cancellation`() =
+        runBlocking {
+            val scope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
+            val events = mutableListOf<CameraAlertInput>()
+            val startGate = CompletableDeferred<Unit>()
+            val stopGate = CompletableDeferred<Unit>()
+            val controller =
+                CameraCommandController(
+                    scope,
+                    connected = { true },
+                    recording = { false },
+                    videoMode = { true },
+                    startRecording = { startGate.await() },
+                    stopRecording = { stopGate.await() },
+                    alertEvent = events::add,
+                )
+            try {
+                assertTrue(controller.startAutomatically(AutomaticRecordingOwner.DESCENT))
+                assertEquals(true, controller.state.value.targetRecording)
+                assertEquals(CameraAlertInput.CommandStarted(true, RecordingOrigin.DESCENT), events.single())
+                assertTrue(
+                    performRecordingFieldAction(ready.copy(command = controller.state.value), RecordingFieldAction.STOP, controller) { false },
+                )
+                yield()
+                assertEquals(false, controller.state.value.targetRecording)
+                assertEquals(RecordingFieldStatus.STOPPING, recordingFieldState(ready.copy(command = controller.state.value)).status)
+                assertEquals(CameraAlertInput.CommandStarted(false, RecordingOrigin.MANUAL), events.last())
+                assertEquals(2, events.size)
+                stopGate.complete(Unit)
+                yield()
+                assertEquals(CameraAlertInput.CommandFinished(true, false), events.last())
+                assertNull(controller.state.value.targetRecording)
+                assertEquals(3, events.size)
             } finally {
                 scope.cancel()
             }

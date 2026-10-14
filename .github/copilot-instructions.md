@@ -17,7 +17,7 @@ them.
   and presets, and reporting battery and remaining storage. Do not silently
   substitute a missing, changed, or disconnected camera with another camera.
 - Changes to current behaviour must agree with the relevant project
-  documentation, including `README.md` and the GoPro integration README.
+  documentation.
 
 ## Security and action safety
 
@@ -28,9 +28,11 @@ them.
 - Bluetooth permissions and pairing flows must not be weakened or bypassed.
   Do not introduce workarounds that require privileged Bluetooth APIs or
   unsafe pairing confirmation.
-- Recording, mode changes, and preset selection must result from an explicit
-  user action. Flag automatic command replay after a disconnect, timeout, or
-  failed command, and automatic retries of state-changing camera commands.
+- Recording must result from an explicit user action or an enabled, opt-in
+  automation following the relevant project documentation.
+  Mode changes and preset selection remain explicit user actions. Flag stale
+  command replay after a disconnect, timeout, or failure; evaluate automation
+  cleanup and keep-alive retries against the documented bounded policies.
 - Do not show a state-changing command as successful until the expected camera
   state is confirmed. Preserve the distinction between a definite failure and
   an uncertain result after a command may have reached the camera.

@@ -45,8 +45,14 @@ Fallback gate derived from repository checks (JDK 17, installed Android SDK):
 
 - Final combined gate passed: ktlintFormat/ktlintCheck, 30 unit tests (8 field tests), 41 descent/controller checks, lintDebug, assembleDebug, and assembleDebugAndroidTest.
 - Four isolated Karoo-sized emulator scenes passed real RemoteViews reapply/action guards, private receiver delivery while disconnected, 1Hz ViewEmitter updates and cancellation. All final 480×656 screenshots inspected; synthetic test-host states are explicitly identified on the PR.
-- GitHub Copilot CLI 1.0.97 reviewed source changes from b0c93dd through f907782 in read-only mode: **Approve; no concrete actionable defects**. No source edits followed that review.
+- GitHub Copilot CLI 1.0.97 reviewed source changes from b0c93dd through f907782 in read-only mode: **Approve; no concrete actionable defects**. No source edits followed that review during the initial implementation; subsequent base-branch integration is recorded below.
 - Physical Karoo/GoPro touch, BLE, and day/night checks remain a disclosed pre-release QA requirement. Release signing was not attempted locally; GitHub CI handles the release build.
+
+## Base-branch integration
+
+Merged `origin/main` at `68d489c` after native camera alerts and the connected-screen layout landed. Preserved both sets of strings and roadmap implementation statuses. The field's `targetRecording` now derives from the same command target emitted to native alerts, preserving start/stop origins, terminal events, and cancellation guards. A regression test covers descent Start overridden by field Stop and verifies both the alert events and field command state.
+
+The combined formatting, 62 unit tests (including nine field tests), 41 controller checks, Android lint, debug APK and test APK validation gate passed after resolution. Copilot CLI approved the merged controller; all constructor consumers were checked and remain compatible with the optional trailing state property. Existing field layouts and screenshots are unchanged.
 
 ## Progress
 

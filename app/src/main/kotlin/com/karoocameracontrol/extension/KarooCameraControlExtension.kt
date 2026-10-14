@@ -1,6 +1,8 @@
 package com.karoocameracontrol.extension
 
 import android.content.Intent
+import com.karoocameracontrol.alerts.CameraAlertMonitor
+import com.karoocameracontrol.alerts.CameraAlertSettingsStore
 import com.karoocameracontrol.integrations.gopro.GoProBatteryDataType
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.GoProRecTimeDataType
@@ -24,6 +26,7 @@ import com.karoocameracontrol.diagnostics.DiagnosticLog as Log
 class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0") {
     private lateinit var goProManager: GoProManager
     private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    private lateinit var alertMonitor: CameraAlertMonitor
     private lateinit var descentMonitor: DescentRecordingMonitor
     private val radarRecording by lazy { RadarRecordingController.getInstance(applicationContext) }
 
@@ -49,11 +52,14 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
                 DescentSettingsStore.getInstance(applicationContext),
                 goProManager,
             )
+        alertMonitor = CameraAlertMonitor(applicationContext, scope, karooSystem, goProManager.alertFeed, CameraAlertSettingsStore.getInstance(applicationContext))
+        alertMonitor.start()
         descentMonitor.start()
         radarRecording.start(karooSystem)
 
         karooSystem.connect { connected ->
             scope.launch {
+                alertMonitor.systemConnectionChanged(connected)
                 descentMonitor.systemConnectionChanged(connected)
                 radarRecording.onSystemConnection(connected)
                 if (connected) {
@@ -79,6 +85,7 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     }
 
     override fun onDestroy() {
+        alertMonitor.stop()
         radarRecording.stop()
         descentMonitor.stop()
         scope.cancel()

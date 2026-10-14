@@ -26,7 +26,9 @@ A command request is not shown as confirmed recording. Start/Stop use the same
 acknowledgement and recording-state confirmation as the app. No mode or preset
 is changed automatically. Manual actions release automation ownership and apply
 the existing radar/descent overrides. Stop cancels a pending start before the
-camera confirms recording. Physical shutter changes and reconnects are reflected
+camera confirms recording. When [camera alerts](camera-alerts.md) are enabled,
+field commands use the same native confirmations and failure alerts as app commands.
+Physical shutter changes and reconnects are reflected
 from the manager's live state.
 
 Every action is explicitly Start or Stop and revalidated on the main thread

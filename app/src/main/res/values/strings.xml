@@ -33,4 +33,26 @@
     <string name="recording_field_start">Start recording</string>
     <string name="recording_field_cancel">Stop / cancel</string>
     <string name="recording_field_stop">Stop recording</string>
+    <string name="camera_alert_settings">Camera alerts</string>
+    <string name="camera_alert_confirmations">Recording confirmations</string>
+    <string name="camera_alert_confirmations_help">Show verified starts and stops</string>
+    <string name="camera_alert_warnings">Camera warnings</string>
+    <string name="camera_alert_warnings_help">Failures, connection loss, low battery or space</string>
+    <string name="camera_alert_sound">Sound</string>
+    <string name="camera_alert_sound_help">Beep for camera events, even with visuals off</string>
+    <string name="camera_alert_settings_help" formatted="false">Active or paused rides only. Warn at 20% battery or 5 minutes left.</string>
+    <string name="camera_alert_back">Back</string>
+    <string name="camera_alert_started">Recording started</string>
+    <string name="camera_alert_stopped">Recording stopped</string>
+    <string name="camera_alert_failed">Camera command failed</string>
+    <string name="camera_alert_disconnected">Camera connection lost</string>
+    <string name="camera_alert_low_resources">Camera running low</string>
+    <string name="camera_alert_check_camera">Check the camera</string>
+    <string name="camera_alert_unknown_recording">Recording state unknown; check the camera</string>
+    <string name="camera_alert_origin_manual">Manual control</string>
+    <string name="camera_alert_origin_descent">Descent recording</string>
+    <string name="camera_alert_origin_radar">Radar recording</string>
+    <string name="camera_alert_origin_camera">Camera shutter</string>
+    <string name="camera_alert_battery_detail">Battery %1$d%%</string>
+    <string name="camera_alert_capacity_detail">%1$d:%2$02d recording time left</string>
 </resources>

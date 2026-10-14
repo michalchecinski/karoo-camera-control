@@ -25,6 +25,7 @@ import android.os.ParcelUuid
 import android.os.SystemClock
 import androidx.core.app.ActivityCompat
 import androidx.core.content.edit
+import com.karoocameracontrol.alerts.CameraAlertFeed
 import com.karoocameracontrol.recording.CameraCommandController
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CompletableDeferred
@@ -213,6 +214,7 @@ class GoProManager private constructor(private val context: Context) {
     // Coroutine scope for BLE operations
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val commandScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    val alertFeed = CameraAlertFeed()
     val recordingCommands =
         CameraCommandController(
             scope = commandScope,
@@ -221,11 +223,13 @@ class GoProManager private constructor(private val context: Context) {
             videoMode = { cameraMode.value == 0 || cameraMode.value == PRESET_MODE_VIDEO },
             startRecording = { startRecording() },
             stopRecording = { stopRecording() },
+            alertEvent = alertFeed::command,
         )
 
     init {
         commandScope.launch {
             connectionState.collect { state ->
+                alertFeed.connection(state is ConnectionState.Connected)
                 if (state !is ConnectionState.Connected) {
                     recordingCommands.disconnected()
                     _cameraMode.value = -1
@@ -239,7 +243,8 @@ class GoProManager private constructor(private val context: Context) {
     private var recordingStartTimeMs: Long = 0L
 
     // BLE Operation Management
-    private var connectedGatt: BluetoothGatt? = null
+    @Volatile private var connectedGatt: BluetoothGatt? = null
+    private val connectionCallbacks = ConnectionCallbacks { connectedGatt }
     private val operationMutex = Mutex()
 
     // Holds the continuation for the currently active BLE operation (Connect, Read, Write, etc.)
@@ -456,7 +461,7 @@ class GoProManager private constructor(private val context: Context) {
                 characteristic: BluetoothGattCharacteristic,
                 value: ByteArray,
             ) {
-                handleCharacteristicChanged(characteristic.uuid, value)
+                handleCharacteristicChanged(gatt, characteristic.uuid, value)
             }
 
             // Legacy callback for API < 33
@@ -468,22 +473,26 @@ class GoProManager private constructor(private val context: Context) {
             ) {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                     val value = characteristic.value ?: return
-                    handleCharacteristicChanged(characteristic.uuid, value)
+                    handleCharacteristicChanged(gatt, characteristic.uuid, value)
                 }
             }
 
             private fun handleCharacteristicChanged(
+                sourceGatt: BluetoothGatt,
                 uuid: java.util.UUID,
                 value: ByteArray,
             ) {
-                val fullData = responseParser.processCharacteristicChange(uuid, value)
-                if (fullData != null) {
-                    processCharacteristicData(uuid, fullData)
-                    completePendingResponse(uuid, fullData)
+                connectionCallbacks.runIfCurrent(sourceGatt) {
+                    val fullData = responseParser.processCharacteristicChange(uuid, value)
+                    if (fullData != null) {
+                        processCharacteristicData(sourceGatt, uuid, fullData)
+                        connectionCallbacks.runIfCurrent(sourceGatt) { completePendingResponse(uuid, fullData) }
+                    }
                 }
             }
 
             private fun processCharacteristicData(
+                sourceGatt: BluetoothGatt,
                 uuid: UUID,
                 value: ByteArray,
             ) {
@@ -516,46 +525,54 @@ class GoProManager private constructor(private val context: Context) {
                 // remaining bytes are status TLVs.
                 val status = GoProStatusParser.parse(value.copyOfRange(RESPONSE_HEADER_SIZE, value.size))
 
-                // Apply parsed values to state flows (only if present in response)
-                status.isRecording?.let { recording ->
-                    val wasRecording = _isRecording.value
-                    _isRecording.value = recording
-                    if (recording && !wasRecording) {
-                        startRecordingTimer()
-                    } else if (!recording && wasRecording) {
-                        stopRecordingTimer()
-                        // Preserve every stop transition, even if StateFlow conflates
-                        // a rapid camera-side Stop followed by a manual Start.
-                        commandScope.launch { recordingCommands.recordingStopped() }
+                // Feed and observed state must change atomically on Main before a
+                // command continuation can read the confirmed state.
+                commandScope.launch {
+                    connectionCallbacks.runIfCurrent(sourceGatt) {
+                        alertFeed.status(status.isRecording, status.batteryLevel, status.remainingVideoTime)
+
+                        // Apply parsed values to state flows (only if present in response)
+                        status.isRecording?.let { recording ->
+                            val wasRecording = _isRecording.value
+                            _isRecording.value = recording
+                            if (recording && !wasRecording) {
+                                startRecordingTimer()
+                            } else if (!recording && wasRecording) {
+                                stopRecordingTimer()
+                                // Preserve every stop transition, even if StateFlow conflates
+                                // a rapid camera-side Stop followed by a manual Start.
+                                recordingCommands.recordingStopped()
+                            }
+                            _recordingStateKnown.value = true
+                        }
+
+                        status.recordingDuration?.let { duration ->
+                            _recordingDuration.value = duration
+                            recordingStartTimeMs = SystemClock.elapsedRealtime() - (duration * 1000L)
+                        }
+
+                        status.batteryLevel?.let { battery ->
+                            _batteryLevel.value = battery
+                        }
+
+                        status.remainingSpace?.let { space ->
+                            _remainingSpace.value = space
+                        }
+
+                        status.remainingVideoTime?.let { time ->
+                            _remainingVideoTime.value = time
+                        }
+
+                        status.cameraMode?.let { mode ->
+                            _cameraMode.value = mode
+                            _cameraModeKnown.value = true
+                        }
+
+                        status.activePresetId?.let { presetId ->
+                            _activePresetId.value = presetId
+                            updateActivePresetName()
+                        }
                     }
-                    _recordingStateKnown.value = true
-                }
-
-                status.recordingDuration?.let { duration ->
-                    _recordingDuration.value = duration
-                    recordingStartTimeMs = SystemClock.elapsedRealtime() - (duration * 1000L)
-                }
-
-                status.batteryLevel?.let { battery ->
-                    _batteryLevel.value = battery
-                }
-
-                status.remainingSpace?.let { space ->
-                    _remainingSpace.value = space
-                }
-
-                status.remainingVideoTime?.let { time ->
-                    _remainingVideoTime.value = time
-                }
-
-                status.cameraMode?.let { mode ->
-                    _cameraMode.value = mode
-                    _cameraModeKnown.value = true
-                }
-
-                status.activePresetId?.let { presetId ->
-                    _activePresetId.value = presetId
-                    updateActivePresetName()
                 }
             }
 
@@ -971,6 +988,7 @@ class GoProManager private constructor(private val context: Context) {
         }
 
         stopScan()
+        commandScope.launch { alertFeed.selectCamera(device.address) }
 
         connectionJob?.cancel()
         connectionJob =

@@ -37,7 +37,7 @@ fun CameraAlertSettingsScreen(
             modifier =
                 Modifier.fillMaxSize().padding(bottom = 64.dp)
                     .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             AlertPreference(
                 stringResource(R.string.camera_alert_confirmations),

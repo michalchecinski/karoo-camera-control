@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +18,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Terrain
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,7 +28,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.karoocameracontrol.R
+import com.karoocameracontrol.components.CompactTopAppBar
 import com.karoocameracontrol.components.SimpleAlertDialog
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.PairedDevice
@@ -91,30 +89,23 @@ fun MainScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             val currentState = uiState.connectionState
-            CenterAlignedTopAppBar(
-                title = {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text =
-                                if (uiState.showCameraAlertSettings) {
-                                    stringResource(R.string.camera_alert_settings)
-                                } else if (uiState.showRadarScreen) {
-                                    "Radar recording"
-                                } else if (uiState.showDescentSettings) {
-                                    "Descent recording"
-                                } else if (uiState.showFeedbackScreen) {
-                                    "Feedback"
-                                } else if (uiState.showScanningScreen) {
-                                    "Scan Devices"
-                                } else if (currentState is ConnectionState.Connected) {
-                                    "Connected to ${currentState.deviceName ?: "Unknown Device"}"
-                                } else {
-                                    "Karoo Camera Control"
-                                },
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
-                },
+            CompactTopAppBar(
+                title =
+                    if (uiState.showCameraAlertSettings) {
+                        stringResource(R.string.camera_alert_settings)
+                    } else if (uiState.showRadarScreen) {
+                        "Radar recording"
+                    } else if (uiState.showDescentSettings) {
+                        "Descent recording"
+                    } else if (uiState.showFeedbackScreen) {
+                        "Feedback"
+                    } else if (uiState.showScanningScreen) {
+                        "Scan Devices"
+                    } else if (currentState is ConnectionState.Connected) {
+                        "Connected to ${currentState.deviceName ?: "Unknown Device"}"
+                    } else {
+                        "Karoo Camera Control"
+                    },
                 actions = {
                     if (!uiState.showFeedbackScreen && !uiState.showDescentSettings && !uiState.showRadarScreen && !uiState.showCameraAlertSettings) {
                         IconButton(onClick = { viewModel.setShowMenu(true) }) {
@@ -182,13 +173,6 @@ fun MainScreen(
                         }
                     }
                 },
-                colors =
-                    TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                modifier = Modifier.height(36.dp),
             )
         },
     ) { paddingValues ->
@@ -255,8 +239,6 @@ fun MainScreen(
                     availablePresets = uiState.availablePresets,
                     activePresetName = uiState.activePresetName,
                     activePresetIcon = uiState.activePresetIcon,
-                    descentRecordingEnabled = descentSettings.enabled,
-                    descentStatus = descentStatus,
                     onToggleRecording = { viewModel.toggleRecording() },
                     onSetMode = { mode -> viewModel.setMode(mode) },
                     onOpenPresetSelection = { viewModel.setShowPresetScreen(true) },

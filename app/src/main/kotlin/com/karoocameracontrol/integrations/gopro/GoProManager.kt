@@ -42,7 +42,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
@@ -828,16 +827,13 @@ class GoProManager private constructor(private val context: Context) {
         _activePresetIcon.value = loadedPreset?.iconId
     }
 
-    private suspend fun pollRecordingState(): Boolean {
+    private suspend fun pollRecordingState() {
         writeAndAwaitResponseSuspend(
             writeUuid = GoProUUID.QUERY,
             responseUuid = GoProUUID.QUERY_RESPONSE,
             messageType = QUERY_ID_GET_STATUS,
             value = GoProCommands.Query.STATUS,
         )
-        // Initial polling runs on IO; wait behind queued Main status application
-        // before its caller decides whether to query the existing clip duration.
-        return withContext(Dispatchers.Main.immediate) { _isRecording.value }
     }
 
     private suspend fun awaitRecordingState(isRecording: Boolean) {

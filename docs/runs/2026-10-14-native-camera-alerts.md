@@ -40,12 +40,27 @@ assembleDebug, lintDebug, and focused emulator instrumentation.
 
 ## Verification evidence
 
-Local gate passed: ktlintFormat, ktlintCheck, testDebugUnitTest (42 tests, including 20 alert
+Local gate passed: ktlintFormat, ktlintCheck, testDebugUnitTest (46 tests, including 24 alert
 checks), verifyDescentRecording (41 checks), assembleDebug and lintDebug (0 errors,
 30 warnings). CameraAlertInstrumentation passed 12 preferences/SDK effect checks.
 Settings UI script passed defaults, independent toggles, restart persistence and both
 Back controls. All three changed-screen screenshots were inspected at 480×656.
-Copilot CLI review is running before PR creation, as explicitly requested by the operator.
+Copilot CLI identified two medium and one low finding. All were accepted:
+
+- Stale failed/cancelled-command suppression: bound ambiguity to five seconds or a fresh
+  opposite recording baseline; add physical-shutter/expiry and non-encoding packet tests.
+- Status-feed vs observed-state race: apply feed and all parsed state values atomically
+  in one Main coroutine, guarding against a GATT connection replaced before application.
+- Reconnect warning repeats: retain per-camera resource latches across reconnect/selection
+  with stable opaque IDs; test reconnect, camera switching and recovery. Cancel grouped
+  warnings on camera disconnection so old camera resources cannot appear after reconnect.
+
+Fixes landed in add238c. The full post-fix local gate passed with 46 JUnit tests,
+including 24 alert checks, plus 41 descent checks. Radar regression instrumentation
+also passed 25 checks. The Copilot CLI follow-up verdict was clean: no remaining actionable defects introduced
+by the feature or fixes. Its non-blocking note about initial status polling was checked:
+that path already issues its status query without awaiting the response and is outside this feature. The
+unnecessary polling barrier was removed to keep the change scoped to event application.
 
 ## Progress
 

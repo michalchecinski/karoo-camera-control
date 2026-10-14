@@ -39,6 +39,34 @@ checks all titles/details are inside the app area, captures the Android surface,
 and the asset is cropped/inspected at 480×656. Build and ktlint checks passed.
 This preview does not replace the outstanding physical Karoo rendering checks.
 
+## PR review and merge follow-up
+
+Merged origin/main 2c637e3: retain the compact header and connected-control layout,
+while preserving Camera alerts navigation/title and both documentation additions.
+Tighter settings spacing and a UI bounds assertion keep help fully above Back with
+main's taller header. Refreshed all three settings/menu screenshots and inspected them.
+The updated DescentUiInstrumentation and settings persistence/navigation checks passed.
+
+Both Copilot PR review findings were valid and fixed:
+
+- [Ride/transport boundaries retained pending command alerts](https://github.com/michalchecinski/karoo-camera-control/pull/50#discussion_r4268228294):
+  rebaseline on unsubscribe and ride eligibility transitions; mark any existing
+  request ineligible, retaining only ignored status/terminal bookkeeping. Preserve
+  bounded late-status suppression and resource hysteresis. Add four regression
+  tests covering old start/stop completions, inactive starts, late failed status,
+  and warning latches across boundaries.
+- [Wrong GATT provenance for queued notifications](https://github.com/michalchecinski/karoo-camera-control/pull/50#discussion_r4268228337):
+  carry the callback's actual source instance from both Android API overloads;
+  guard before packet parsing/response completion and again on Main. Add three
+  regression tests for stale replacement callbacks, deferred delivery, disconnect
+  and accepting current callbacks, including equal camera identities on distinct
+  connection instances.
+
+Full validation passed: 53 JUnit tests (28 alert, 3 callback, 22 diagnostics),
+41 deterministic descent checks, debug build, formatting/ktlint and lint. The
+first merge gate hit an unrelated existing diagnostics timing test; the rerun
+and the subsequent full post-fix gate passed without diagnostics changes.
+
 ## Outcome
 
 PR: https://github.com/michalchecinski/karoo-camera-control/pull/50

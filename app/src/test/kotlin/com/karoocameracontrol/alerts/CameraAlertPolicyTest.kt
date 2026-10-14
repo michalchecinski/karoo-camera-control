@@ -295,6 +295,69 @@ class CameraAlertPolicyTest {
         assertEquals(a, feed.snapshot.cameraId)
     }
 
+    @Test fun pendingCommandsCannotConfirmAcrossRideOrTransportBoundaries() {
+        for (target in listOf(false, true)) {
+            for (succeeded in listOf(false, true)) {
+                for (origin in RecordingOrigin.entries) {
+                    val p = policy()
+                    p.status(!target)
+                    p.accept(CameraAlertInput.CommandStarted(target, origin))
+                    p.rideActive = false
+                    p.resetTransient(CameraAlertSnapshot(true, !target))
+                    // A subscription reconnect or rapid new ride restores eligibility.
+                    p.resetTransient(CameraAlertSnapshot(true, !target))
+                    p.rideActive = true
+                    assertTrue(p.status(target).isEmpty())
+                    assertTrue(p.accept(CameraAlertInput.CommandFinished(succeeded)).isEmpty())
+                    // New commands in the restored ride still confirm normally.
+                    p.accept(CameraAlertInput.CommandStarted(!target, RecordingOrigin.MANUAL))
+                    assertTrue(p.status(!target).isEmpty())
+                    assertEquals(
+                        if (target) CameraAlertKind.STOPPED else CameraAlertKind.STARTED,
+                        p.accept(CameraAlertInput.CommandFinished(true)).single().kind,
+                    )
+                }
+            }
+        }
+    }
+
+    @Test fun lateFailedCommandStatusStaysSuppressedAcrossARideBoundary() {
+        val p = policy()
+        p.status(false)
+        p.accept(CameraAlertInput.CommandStarted(true, RecordingOrigin.MANUAL))
+        p.accept(CameraAlertInput.CommandFinished(false))
+        p.rideActive = false
+        p.resetTransient(CameraAlertSnapshot(true, false))
+        p.resetTransient(CameraAlertSnapshot(true, false))
+        p.rideActive = true
+        assertTrue(p.status(true).isEmpty())
+        assertEquals(CameraAlertKind.STOPPED, p.status(false).single().kind)
+    }
+
+    @Test fun commandsStartedWhileInactiveCannotConfirmAfterRideBegins() {
+        val p = policy()
+        p.rideActive = false
+        p.status(false)
+        p.accept(CameraAlertInput.CommandStarted(true, RecordingOrigin.MANUAL))
+        p.resetTransient(CameraAlertSnapshot(true, false))
+        p.rideActive = true
+        assertTrue(p.status(true).isEmpty())
+        assertTrue(p.accept(CameraAlertInput.CommandFinished(true)).isEmpty())
+    }
+
+    @Test fun rideBoundaryRebaselineDoesNotRearmWarningsInsideTheHysteresisBand() {
+        val p = policy()
+        p.status(false, 20, 300)
+        p.status(false, 21, 301)
+        p.resetTransient(CameraAlertSnapshot(true, false, 21, 301))
+        p.rideActive = false
+        p.resetTransient(CameraAlertSnapshot(true, false, 21, 301))
+        p.rideActive = true
+        assertTrue(p.status(false, 20, 300).isEmpty())
+        p.status(false, 25, 361)
+        assertEquals(CameraAlertKind.LOW_RESOURCES, p.status(false, 20, 300).single().kind)
+    }
+
     @Test fun sharedControllerEventsGateManualAndAutomaticConfirmations() =
         runBlocking {
             for (owner in listOf(null, AutomaticRecordingOwner.DESCENT, AutomaticRecordingOwner.RADAR)) {

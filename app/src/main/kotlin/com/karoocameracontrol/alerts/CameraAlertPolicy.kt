@@ -41,7 +41,7 @@ class CameraAlertPolicy(private val nowMs: () -> Long = { System.nanoTime() / 1_
     var rideActive = false
     private var snapshot = CameraAlertSnapshot()
 
-    private data class Pending(val target: Boolean, val origin: RecordingOrigin, val before: Boolean?)
+    private data class Pending(val target: Boolean, val origin: RecordingOrigin, val before: Boolean?, val eligible: Boolean)
 
     private var pending: Pending? = null
     private var suppressedTarget: Boolean? = null
@@ -65,19 +65,33 @@ class CameraAlertPolicy(private val nowMs: () -> Long = { System.nanoTime() / 1_
         failureWarned = false
     }
 
+    /** Rebaseline at ride/transport boundaries without rearming resource warning latches. */
+    fun resetTransient(value: CameraAlertSnapshot) {
+        snapshot = value
+        // Retain only an ineligible request until its terminal event. Clearing it
+        // outright could misclassify its late status as a physical shutter change.
+        pending = pending?.copy(eligible = false)
+        // Bounded ambiguity suppression still protects against a late status
+        // from a request that already finished while ride alerts were unavailable.
+        failureWarned = false
+    }
+
     fun accept(input: CameraAlertInput): List<CameraAlert> =
         when (input) {
             is CameraAlertInput.Snapshot -> update(input.value, input.recordingReported)
             is CameraAlertInput.CommandStarted -> {
                 // Replacement cancels the old request; its eventual status is not success.
                 pending?.let { suppress(it.target) }
-                pending = Pending(input.target, input.origin, snapshot.recording)
+                pending = Pending(input.target, input.origin, snapshot.recording, eligible = rideActive)
                 emptyList()
             }
             is CameraAlertInput.CommandFinished -> {
                 val command = pending
                 pending = null
                 if (command == null) {
+                    emptyList()
+                } else if (!command.eligible) {
+                    suppress(command.target)
                     emptyList()
                 } else if (input.succeeded) {
                     failureWarned = false

@@ -60,7 +60,19 @@ separated by silence.
 `RideState`, accepts only `Recording`/`Paused`, cancels delayed warnings on ride
 end or Karoo loss, and removes its consumer/live listener on destruction.
 Failed/completed ride subscriptions retry after three seconds without retaining
-ride eligibility. Events come from a main-thread live feed; detached monitors
+ride eligibility. Unsubscribing, leaving a ride, or restoring eligibility
+rebaselines from the current camera snapshot. Commands originating before that
+boundary become ineligible for later confirmations or failure alerts; only their
+ignored terminal/state bookkeeping remains so a late update is not mistaken for
+a physical shutter change. Resource warning hysteresis is preserved. Camera
+commands themselves are not cancelled or replayed by the notification policy.
+
+BLE notifications retain their originating GATT instance through packet parsing
+and deferred Main application. Callbacks from a replaced/disconnected instance
+are discarded before packet parsing and response completion, and checked again
+when applying the Main state update.
+
+Events come from a main-thread live feed; detached monitors
 receive no replay. Initial monitoring seeds the latest known snapshot.
 
 Only public SDK `InRideAlert` and `PlayBeepPattern` effects are used, following

@@ -244,6 +244,7 @@ class GoProManager private constructor(private val context: Context) {
 
     // BLE Operation Management
     private var connectedGatt: BluetoothGatt? = null
+    private val connectionCallbacks = ConnectionCallbacks { connectedGatt }
     private val operationMutex = Mutex()
 
     // Holds the continuation for the currently active BLE operation (Connect, Read, Write, etc.)
@@ -460,7 +461,7 @@ class GoProManager private constructor(private val context: Context) {
                 characteristic: BluetoothGattCharacteristic,
                 value: ByteArray,
             ) {
-                handleCharacteristicChanged(characteristic.uuid, value)
+                handleCharacteristicChanged(gatt, characteristic.uuid, value)
             }
 
             // Legacy callback for API < 33
@@ -472,22 +473,26 @@ class GoProManager private constructor(private val context: Context) {
             ) {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                     val value = characteristic.value ?: return
-                    handleCharacteristicChanged(characteristic.uuid, value)
+                    handleCharacteristicChanged(gatt, characteristic.uuid, value)
                 }
             }
 
             private fun handleCharacteristicChanged(
+                sourceGatt: BluetoothGatt,
                 uuid: java.util.UUID,
                 value: ByteArray,
             ) {
-                val fullData = responseParser.processCharacteristicChange(uuid, value)
-                if (fullData != null) {
-                    processCharacteristicData(uuid, fullData)
-                    completePendingResponse(uuid, fullData)
+                connectionCallbacks.runIfCurrent(sourceGatt) {
+                    val fullData = responseParser.processCharacteristicChange(uuid, value)
+                    if (fullData != null) {
+                        processCharacteristicData(sourceGatt, uuid, fullData)
+                        connectionCallbacks.runIfCurrent(sourceGatt) { completePendingResponse(uuid, fullData) }
+                    }
                 }
             }
 
             private fun processCharacteristicData(
+                sourceGatt: BluetoothGatt,
                 uuid: UUID,
                 value: ByteArray,
             ) {
@@ -522,51 +527,51 @@ class GoProManager private constructor(private val context: Context) {
 
                 // Feed and observed state must change atomically on Main before a
                 // command continuation can read the confirmed state.
-                val statusGatt = connectedGatt
                 commandScope.launch {
-                    if (statusGatt == null || statusGatt !== connectedGatt) return@launch
-                    alertFeed.status(status.isRecording, status.batteryLevel, status.remainingVideoTime)
+                    connectionCallbacks.runIfCurrent(sourceGatt) {
+                        alertFeed.status(status.isRecording, status.batteryLevel, status.remainingVideoTime)
 
-                    // Apply parsed values to state flows (only if present in response)
-                    status.isRecording?.let { recording ->
-                        val wasRecording = _isRecording.value
-                        _isRecording.value = recording
-                        if (recording && !wasRecording) {
-                            startRecordingTimer()
-                        } else if (!recording && wasRecording) {
-                            stopRecordingTimer()
-                            // Preserve every stop transition, even if StateFlow conflates
-                            // a rapid camera-side Stop followed by a manual Start.
-                            recordingCommands.recordingStopped()
+                        // Apply parsed values to state flows (only if present in response)
+                        status.isRecording?.let { recording ->
+                            val wasRecording = _isRecording.value
+                            _isRecording.value = recording
+                            if (recording && !wasRecording) {
+                                startRecordingTimer()
+                            } else if (!recording && wasRecording) {
+                                stopRecordingTimer()
+                                // Preserve every stop transition, even if StateFlow conflates
+                                // a rapid camera-side Stop followed by a manual Start.
+                                recordingCommands.recordingStopped()
+                            }
+                            _recordingStateKnown.value = true
                         }
-                        _recordingStateKnown.value = true
-                    }
 
-                    status.recordingDuration?.let { duration ->
-                        _recordingDuration.value = duration
-                        recordingStartTimeMs = SystemClock.elapsedRealtime() - (duration * 1000L)
-                    }
+                        status.recordingDuration?.let { duration ->
+                            _recordingDuration.value = duration
+                            recordingStartTimeMs = SystemClock.elapsedRealtime() - (duration * 1000L)
+                        }
 
-                    status.batteryLevel?.let { battery ->
-                        _batteryLevel.value = battery
-                    }
+                        status.batteryLevel?.let { battery ->
+                            _batteryLevel.value = battery
+                        }
 
-                    status.remainingSpace?.let { space ->
-                        _remainingSpace.value = space
-                    }
+                        status.remainingSpace?.let { space ->
+                            _remainingSpace.value = space
+                        }
 
-                    status.remainingVideoTime?.let { time ->
-                        _remainingVideoTime.value = time
-                    }
+                        status.remainingVideoTime?.let { time ->
+                            _remainingVideoTime.value = time
+                        }
 
-                    status.cameraMode?.let { mode ->
-                        _cameraMode.value = mode
-                        _cameraModeKnown.value = true
-                    }
+                        status.cameraMode?.let { mode ->
+                            _cameraMode.value = mode
+                            _cameraModeKnown.value = true
+                        }
 
-                    status.activePresetId?.let { presetId ->
-                        _activePresetId.value = presetId
-                        updateActivePresetName()
+                        status.activePresetId?.let { presetId ->
+                            _activePresetId.value = presetId
+                            updateActivePresetName()
+                        }
                     }
                 }
             }

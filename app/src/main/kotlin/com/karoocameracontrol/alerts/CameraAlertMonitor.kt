@@ -59,7 +59,9 @@ class CameraAlertMonitor(
             ) { ride ->
                 scope.launch {
                     if (current != generation) return@launch
-                    policy.rideActive = connected && (ride is RideState.Recording || ride is RideState.Paused)
+                    val active = connected && (ride is RideState.Recording || ride is RideState.Paused)
+                    if (active != policy.rideActive || !active) policy.resetTransient(feed.snapshot)
+                    policy.rideActive = active
                     if (!policy.rideActive) clearWarnings()
                 }
             }
@@ -82,6 +84,7 @@ class CameraAlertMonitor(
         consumerId = null
         retryJob?.cancel()
         retryJob = null
+        policy.resetTransient(feed.snapshot)
         policy.rideActive = false
         clearWarnings()
     }

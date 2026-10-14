@@ -243,7 +243,7 @@ class GoProManager private constructor(private val context: Context) {
     private var recordingStartTimeMs: Long = 0L
 
     // BLE Operation Management
-    private var connectedGatt: BluetoothGatt? = null
+    @Volatile private var connectedGatt: BluetoothGatt? = null
     private val connectionCallbacks = ConnectionCallbacks { connectedGatt }
     private val operationMutex = Mutex()
 

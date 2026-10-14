@@ -62,6 +62,11 @@ Both Copilot PR review findings were valid and fixed:
   and accepting current callbacks, including equal camera identities on distinct
   connection instances.
 
+The current GATT reference is volatile so the identity guard observes replacements
+across BLE callback, IO and Main threads. Copilot CLI follow-up returned a clean
+source-only verdict; it did not independently inspect tests or merged UI. Both
+technical PR threads received fix/test replies and were resolved.
+
 Full validation passed: 53 JUnit tests (28 alert, 3 callback, 22 diagnostics),
 41 deterministic descent checks, debug build, formatting/ktlint and lint. The
 first merge gate hit an unrelated existing diagnostics timing test; the rerun

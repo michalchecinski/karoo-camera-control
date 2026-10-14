@@ -9,19 +9,24 @@ import kotlinx.coroutines.withTimeout
 internal suspend fun awaitGoProBleReadiness(
     timeoutMs: Long = 30_000L,
     retryDelayMs: Long = 500L,
+    isConnected: () -> Boolean = { true },
     probe: suspend () -> Unit,
 ) {
     withTimeout(timeoutMs) {
         while (true) {
+            check(isConnected()) { "GoPro BLE connection lost during readiness" }
             try {
                 probe()
-                return@withTimeout
             } catch (error: Exception) {
                 // A probe's own timeout is retryable. Cancellation of this readiness
                 // window or its caller must still stop all work immediately.
                 currentCoroutineContext().ensureActive()
+                if (!isConnected()) throw error
+                delay(retryDelayMs)
+                continue
             }
-            delay(retryDelayMs)
+            check(isConnected()) { "GoPro BLE connection lost during readiness" }
+            return@withTimeout
         }
     }
 }

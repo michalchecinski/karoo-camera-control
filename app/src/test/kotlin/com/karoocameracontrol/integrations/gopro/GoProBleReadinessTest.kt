@@ -84,4 +84,49 @@ class GoProBleReadinessTest {
             assertTrue(wakeup.isCancelled)
             assertEquals(1, probes)
         }
+
+    @Test fun lostConnectionBeforeProbeStopsReadiness() =
+        runBlocking {
+            var probes = 0
+            try {
+                awaitGoProBleReadiness(isConnected = { false }) { probes++ }
+                fail("A lost connection must not continue setup")
+            } catch (_: IllegalStateException) {
+                assertEquals(0, probes)
+            }
+        }
+
+    @Test fun connectionLossDuringFailedProbePropagatesWithoutRetryDelay() =
+        runBlocking {
+            var connected = true
+            var probes = 0
+            val connectionError = IllegalStateException("Disconnected unexpectedly")
+            try {
+                withTimeout(1_000) {
+                    awaitGoProBleReadiness(retryDelayMs = 10_000, isConnected = { connected }) {
+                        probes++
+                        connected = false
+                        throw connectionError
+                    }
+                }
+                fail("Connection loss must reach the reconnection loop")
+            } catch (error: Exception) {
+                assertEquals(connectionError.javaClass, error.javaClass)
+                assertEquals(connectionError.message, error.message)
+                assertEquals(1, probes)
+            }
+        }
+
+    @Test fun connectionLossAfterAcknowledgementDoesNotContinueSetup() =
+        runBlocking {
+            var connected = true
+            var setupContinued = false
+            try {
+                awaitGoProBleReadiness(isConnected = { connected }) { connected = false }
+                setupContinued = true
+                fail("An acknowledgement from a lost connection must not continue setup")
+            } catch (_: IllegalStateException) {
+                assertFalse(setupContinued)
+            }
+        }
 }

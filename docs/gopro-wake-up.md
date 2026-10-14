@@ -21,13 +21,19 @@ Readiness probes retry after 500 ms for up to 30 seconds, including when a probe
 times out or the camera returns a failure status. A failed connection attempt,
 including an operation or readiness timeout, closes the connection and retries
 after two seconds for a saved, bonded camera. Disconnect cancels the attempt.
+Readiness retries apply only while the original BLE connection is current. If
+the link is lost or replaced, the readiness loop exits at its next connection
+check instead of waiting out the 30-second window. An in-flight response can
+still take up to its five-second timeout before that check; saved cameras then
+enter the existing two-second reconnection delay.
 Diagnostic logs record the start and completion of readiness and command result
 codes, without recording the hardware-info payload.
 
 ## Validation
 
 Unit tests cover an awake camera, boot-time failures followed by success, a probe
-timeout followed by success, bounded readiness waiting, and cancellation.
+timeout followed by success, bounded readiness waiting, cancellation, and link
+loss before a probe, during a failed probe, or after an acknowledged probe.
 
 Hardware validation is still required: pair a GoPro, put it to sleep, open the
 app, and verify it wakes, reaches Connected, displays camera status, and accepts

@@ -1024,7 +1024,8 @@ class GoProManager private constructor(private val context: Context) {
                         // Connecting wakes a sleeping GoPro, but its command processor
                         // may still be booting. Wait for a camera acknowledgement.
                         Log.i(TAG, "Waiting for GoPro BLE readiness")
-                        awaitGoProBleReadiness {
+                        val readinessGatt = connectedGatt ?: throw IllegalStateException("Not connected")
+                        awaitGoProBleReadiness(isConnected = { connectedGatt === readinessGatt }) {
                             writeAndAwaitResponseSuspend(
                                 writeUuid = GoProUUID.COMMAND,
                                 responseUuid = GoProUUID.COMMAND_RESPONSE,

@@ -20,6 +20,9 @@ class RadarRecordingPolicy {
     private var startFailed = false
     private var lastCameraRecording: Boolean? = null
 
+    /** A start may have reached the camera and needs an explicit Stop/cancel. */
+    val manualStopRequired: Boolean get() = pendingAction == RecordingAction.START || startFailed
+
     fun onRadar(
         presence: RadarPresence,
         now: Long,
@@ -110,7 +113,7 @@ class RadarRecordingPolicy {
 
     /** Returns true if a start may already have reached the camera. */
     fun manualOverride(): Boolean {
-        val starting = pendingAction == RecordingAction.START || startFailed
+        val starting = manualStopRequired
         ownsRecording = false
         pendingAction = null
         startFailed = false

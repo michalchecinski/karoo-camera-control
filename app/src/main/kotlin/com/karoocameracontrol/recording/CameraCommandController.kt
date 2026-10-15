@@ -17,6 +17,7 @@ data class CameraCommandState(
     val busy: Boolean = false,
     val recordingInFlight: Boolean = false,
     val error: String? = null,
+    val targetRecording: Boolean? = null,
 )
 
 enum class AutomaticRecordingOwner { DESCENT, RADAR }
@@ -142,7 +143,7 @@ class CameraCommandController(
         val previousJob = commandJob
         previousJob?.cancel()
         if (recordingCommand) alertEvent(CameraAlertInput.CommandStarted(target, origin))
-        _state.value = CameraCommandState(busy = true, recordingInFlight = recordingCommand)
+        _state.value = CameraCommandState(busy = true, recordingInFlight = recordingCommand, targetRecording = target.takeIf { recordingCommand })
         commandJob =
             scope.launch(start = CoroutineStart.LAZY) {
                 var succeeded = false
@@ -169,7 +170,7 @@ class CameraCommandController(
                     if (generation == currentGeneration) {
                         onFinished(succeeded)
                         if (recordingCommand) alertEvent(CameraAlertInput.CommandFinished(succeeded, cancelled))
-                        _state.value = _state.value.copy(busy = false, recordingInFlight = false)
+                        _state.value = _state.value.copy(busy = false, recordingInFlight = false, targetRecording = null)
                         commandJob = null
                     }
                 }

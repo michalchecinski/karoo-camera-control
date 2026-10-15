@@ -14,6 +14,7 @@ import com.karoocameracontrol.radar.RadarRecordingController
 import com.karoocameracontrol.radar.RadarRecordingSettings
 import com.karoocameracontrol.recording.DescentSettings
 import com.karoocameracontrol.recording.DescentSettingsStore
+import com.karoocameracontrol.recording.ManualRecording
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.ReleaseBluetooth
 import io.hammerhead.karooext.models.RequestBluetooth
@@ -262,8 +263,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun removePairedDevice(address: String) = goProManager.removePairedDevice(address)
 
     fun toggleRecording() {
-        val forceStop = radarRecording.manualOverride()
-        goProManager.recordingCommands.toggleManually(forceStop = forceStop)
+        ManualRecording.toggle(getApplication())
     }
 
     fun setMode(mode: Int) {

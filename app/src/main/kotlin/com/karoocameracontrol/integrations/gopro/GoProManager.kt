@@ -1479,7 +1479,7 @@ class GoProManager private constructor(private val context: Context) {
         private const val GATT_CONN_TERMINATE_PEER_USER = 19
 
         // GoPro preset mode IDs
-        private const val PRESET_MODE_VIDEO = 1000
+        internal const val PRESET_MODE_VIDEO = 1000
         private const val PRESET_MODE_PHOTO = 1001
         private const val PRESET_MODE_TIMELAPSE = 1002
 

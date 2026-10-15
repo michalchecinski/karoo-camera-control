@@ -11,7 +11,7 @@ GoPro has reported that recording began. Mode and preset controls remain
 disabled while recording because the GoPro cannot safely switch them
 mid-recording.
 
-Manual commands and [automatic descent starts](descent-recording.md) use the
+Manual commands from the app and the [ride-screen recording field](ride-screen-recording-controls.md), and [automatic descent starts](descent-recording.md) use the
 same application-scoped controller. Command progress remains visible when
 the screen is reopened, and failures appear in a snackbar. Record/Stop and Back
 share a fixed bottom row on the Karoo screen, with the recording timer above.

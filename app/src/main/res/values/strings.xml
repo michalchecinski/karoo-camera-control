@@ -2,6 +2,12 @@
     <string name="app_name">Camera Control</string>
     <string name="extension_name">Camera Control</string>
     <string name="pair_your_camera">Pair your action cam</string>
+    <string name="camera_scan_scanning">Scanning…</string>
+    <string name="camera_scan_finished">Scan finished</string>
+    <string name="camera_scan_pairing_heading">Pair your GoPro</string>
+    <string name="camera_scan_pairing_instructions">Turn on the camera. Open Connections → Connect Device → GoPro Quik and keep that screen open. Menu names vary by model. Keep the camera nearby, then select it here.</string>
+    <string name="camera_scan_help_heading">Camera not found?</string>
+    <string name="camera_scan_help_instructions">Check wireless connections are on. Reopen the camera’s pairing screen, or restart it and try again.\n\nAlready saved this camera? Go back to your saved cameras.\n\nWhen scanning stops, tap the retry icon below.</string>
     <string name="diagnostics_problem_heading">Having a problem?</string>
     <string name="diagnostics_send">Send diagnostics</string>
     <string name="diagnostics_unavailable">Diagnostics sending is unavailable in this build.</string>

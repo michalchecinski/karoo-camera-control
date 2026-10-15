@@ -17,6 +17,7 @@ API. It does not require a dependency update or a Bonus Action mapping.
 | Confirmed recording | Recording and elapsed time | Stop recording |
 | Stop awaiting confirmation | Stopping… | Wait; repeated taps are ignored |
 | Command failed | Command failed with reason | Retry Start or Stop when confirmed camera state permits |
+| Radar Start failed or remains unconfirmed | Command failed (or Starting… if the error was cleared) | Stop / cancel; Start is rejected until cleanup |
 | Camera disconnected | Camera disconnected | Unavailable |
 | Recording state or stopped camera mode unknown | Waiting for camera state | Unavailable |
 | Stopped in another mode | Select Video on camera | Unavailable |
@@ -33,7 +34,13 @@ from the manager's live state.
 
 Every action is explicitly Start or Stop and revalidated on the main thread
 against current camera/command state. A stale Start cannot become Stop and a
-repeated Stop cannot restart a pending stop. Actions are delivered through an
+repeated Stop cannot restart a pending stop.
+After an ambiguous radar Start, the field offers Stop even if the last confirmed
+camera state is stopped. A stale Start tap is rejected before releasing radar
+ownership, so radar can still complete its cleanup Stop. Once cleanup succeeds,
+Start becomes available again when the confirmed state and mode permit it.
+
+Actions are delivered through an
 explicit immutable PendingIntent to a non-exported receiver, without opening the
 app activity. Removing the field cancels its rendering coroutine.
 
@@ -52,7 +59,7 @@ state immediately.
 ## Verification and hardware limits
 
 Unit tests cover state guards, failures, timer formatting, stale/repeated actions,
-pending-start cancellation, and automation ownership. Emulator instrumentation
+pending-start cancellation, ambiguous radar-start cleanup, and automation ownership. Emulator instrumentation
 applies and reapplies the actual RemoteViews, checks preview/small-size guards,
 checks that the receiver is private, and safely clicks an action while disconnected.
 PR screenshots show production RemoteViews with synthetic camera states in a test

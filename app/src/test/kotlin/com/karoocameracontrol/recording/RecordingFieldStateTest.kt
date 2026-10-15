@@ -2,6 +2,9 @@ package com.karoocameracontrol.recording
 
 import com.karoocameracontrol.alerts.CameraAlertInput
 import com.karoocameracontrol.alerts.RecordingOrigin
+import com.karoocameracontrol.radar.RadarPresence
+import com.karoocameracontrol.radar.RadarRecordingPolicy
+import com.karoocameracontrol.radar.RecordingAction
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -161,9 +164,61 @@ class RecordingFieldStateTest {
                 )
                 assertFalse(controller.ownsRecording(AutomaticRecordingOwner.DESCENT))
                 assertEquals(1, stops)
-                assertTrue(performRecordingFieldAction(ready, RecordingFieldAction.START, controller) { true })
+                val ambiguous = ready.copy(radarStopRequired = true)
+                assertFalse(performRecordingFieldAction(ambiguous, RecordingFieldAction.START, controller) { error("Stale Start released ownership") })
+                assertTrue(performRecordingFieldAction(ambiguous, RecordingFieldAction.STOP, controller) { true })
                 assertEquals(2, stops)
                 assertFalse(recording)
+            } finally {
+                scope.cancel()
+            }
+        }
+
+    @Test
+    fun `failed radar start offers cleanup Stop and rejects stale Start without releasing ownership`() =
+        runBlocking {
+            val scope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
+            val policy = RadarRecordingPolicy()
+            var starts = 0
+            var stops = 0
+            var overrides = 0
+            val controller =
+                CameraCommandController(scope, { true }, { false }, { true }, {
+                    starts++
+                    error("Camera command timed out")
+                }, { stops++ })
+
+            fun snapshot() = ready.copy(command = controller.state.value, radarStopRequired = policy.manualStopRequired)
+
+            fun tap(action: RecordingFieldAction) =
+                performRecordingFieldAction(snapshot(), action, controller) {
+                    overrides++
+                    policy.manualOverride()
+                }
+            try {
+                policy.onRadar(RadarPresence.VEHICLE, 0)
+                assertEquals(RecordingAction.START, policy.nextAction(0, true, true, true, false, true, 15_000))
+                assertTrue(controller.startAutomatically(AutomaticRecordingOwner.RADAR))
+                policy.complete(RecordingAction.START, false, 0)
+                assertEquals(
+                    RecordingFieldState(RecordingFieldStatus.FAILED, RecordingFieldAction.STOP, "Camera command timed out"),
+                    recordingFieldState(snapshot()),
+                )
+                assertFalse(tap(RecordingFieldAction.START))
+                assertEquals(0, overrides)
+                assertEquals(0, stops)
+                assertTrue(policy.ownsRecording)
+                assertTrue(controller.ownsRecording(AutomaticRecordingOwner.RADAR))
+                // Clearing the error must not expose Start, even with unknown camera state/mode.
+                controller.clearError()
+                assertEquals(RecordingFieldAction.STOP, recordingFieldState(snapshot().copy(recordingKnown = false, videoModeKnown = false)).action)
+                assertTrue(tap(RecordingFieldAction.STOP))
+                assertEquals(1, starts)
+                assertEquals(1, stops)
+                assertEquals(1, overrides)
+                assertFalse(policy.ownsRecording)
+                assertFalse(controller.ownsRecording(AutomaticRecordingOwner.RADAR))
+                assertEquals(RecordingFieldAction.START, recordingFieldState(snapshot()).action)
             } finally {
                 scope.cancel()
             }

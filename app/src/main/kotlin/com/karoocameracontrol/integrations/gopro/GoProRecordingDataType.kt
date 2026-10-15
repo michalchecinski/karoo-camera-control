@@ -38,7 +38,7 @@ class GoProRecordingDataType(extension: String) : DataTypeImpl(extension, "gopro
                         if (config.preview) {
                             RecordingFieldState(RecordingFieldStatus.READY, RecordingFieldAction.START)
                         } else {
-                            recordingFieldState(ManualRecording.snapshot(camera))
+                            recordingFieldState(ManualRecording.snapshot(context, camera))
                         }
                     emitter.updateView(recordingFieldView(context, state, config.viewSize, config.preview))
                     // SDK drops emissions faster than 1Hz. Read the latest complete snapshot

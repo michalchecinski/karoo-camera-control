@@ -9,6 +9,7 @@ data class RecordingFieldInput(
     val videoMode: Boolean,
     val command: CameraCommandState = CameraCommandState(),
     val seconds: Int = 0,
+    val radarStopRequired: Boolean = false,
 )
 
 enum class RecordingFieldStatus { DISCONNECTED, UNKNOWN, VIDEO_REQUIRED, READY, STARTING, RECORDING, STOPPING, BUSY, FAILED }
@@ -35,12 +36,14 @@ fun recordingFieldState(input: RecordingFieldInput): RecordingFieldState {
     if (command.busy) return RecordingFieldState(RecordingFieldStatus.BUSY)
     val action =
         when {
+            input.radarStopRequired -> RecordingFieldAction.STOP
             !input.recordingKnown -> null
             input.recording -> RecordingFieldAction.STOP
             input.videoModeKnown && input.videoMode -> RecordingFieldAction.START
             else -> null
         }
     if (command.error != null) return RecordingFieldState(RecordingFieldStatus.FAILED, action, command.error)
+    if (input.radarStopRequired) return RecordingFieldState(RecordingFieldStatus.STARTING, action)
     if (!input.recordingKnown) return RecordingFieldState(RecordingFieldStatus.UNKNOWN)
     if (input.recording) return RecordingFieldState(RecordingFieldStatus.RECORDING, action, seconds = input.seconds)
     if (!input.videoModeKnown) return RecordingFieldState(RecordingFieldStatus.UNKNOWN)

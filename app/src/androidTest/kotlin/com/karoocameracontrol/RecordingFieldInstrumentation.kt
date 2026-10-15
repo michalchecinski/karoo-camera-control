@@ -14,10 +14,13 @@ import android.widget.TextView
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.GoProRecordingDataType
 import com.karoocameracontrol.integrations.gopro.recordingFieldView
+import com.karoocameracontrol.recording.CameraCommandState
 import com.karoocameracontrol.recording.RecordingFieldAction
+import com.karoocameracontrol.recording.RecordingFieldInput
 import com.karoocameracontrol.recording.RecordingFieldReceiver
 import com.karoocameracontrol.recording.RecordingFieldState
 import com.karoocameracontrol.recording.RecordingFieldStatus
+import com.karoocameracontrol.recording.recordingFieldState
 import io.hammerhead.karooext.aidl.IHandler
 import io.hammerhead.karooext.internal.ViewEmitter
 import io.hammerhead.karooext.models.ViewConfig
@@ -60,8 +63,24 @@ class RecordingFieldInstrumentation : Instrumentation() {
                 // Production receiver sees a disconnected emulator camera; a click must be safe.
                 action.performClick()
 
+                val radarCleanup =
+                    recordingFieldState(
+                        RecordingFieldInput(
+                            connected = true,
+                            recordingKnown = true,
+                            recording = false,
+                            videoModeKnown = true,
+                            videoMode = true,
+                            command = CameraCommandState(error = "Camera command timed out"),
+                            radarStopRequired = true,
+                        ),
+                    )
+                recordingFieldView(activity, radarCleanup, 480 to 288, false).reapply(activity, view)
+                check(action.isEnabled && action.text.toString() == activity.getString(R.string.recording_field_stop))
+
                 val states =
                     when (scene) {
+                        "radar-cleanup" -> listOf(radarCleanup, RecordingFieldState(RecordingFieldStatus.STOPPING))
                         "pending" -> listOf(RecordingFieldState(RecordingFieldStatus.STARTING, RecordingFieldAction.STOP), RecordingFieldState(RecordingFieldStatus.STOPPING))
                         "unavailable" -> listOf(RecordingFieldState(RecordingFieldStatus.DISCONNECTED), RecordingFieldState(RecordingFieldStatus.UNKNOWN))
                         "failure" -> listOf(RecordingFieldState(RecordingFieldStatus.FAILED, RecordingFieldAction.START, "Camera command timed out"), RecordingFieldState(RecordingFieldStatus.VIDEO_REQUIRED))

@@ -13,7 +13,10 @@ object ManualRecording {
         camera.recordingCommands.toggleManually(forceStop = forceStop)
     }
 
-    fun snapshot(camera: GoProManager): RecordingFieldInput =
+    fun snapshot(
+        context: Context,
+        camera: GoProManager,
+    ): RecordingFieldInput =
         RecordingFieldInput(
             connected = camera.connectionState.value is ConnectionState.Connected,
             recordingKnown = camera.recordingStateKnown.value,
@@ -22,6 +25,7 @@ object ManualRecording {
             videoMode = camera.cameraMode.value == 0 || camera.cameraMode.value == GoProManager.PRESET_MODE_VIDEO,
             command = camera.recordingCommands.state.value,
             seconds = camera.recordingDuration.value,
+            radarStopRequired = RadarRecordingController.getInstance(context).manualStopRequired,
         )
 
     fun perform(
@@ -30,7 +34,7 @@ object ManualRecording {
     ) {
         val camera = GoProManager.getInstance(context)
         // Explicit actions reject stale Start taps and repeated Stop taps while stopping.
-        performRecordingFieldAction(snapshot(camera), action, camera.recordingCommands) {
+        performRecordingFieldAction(snapshot(context, camera), action, camera.recordingCommands) {
             RadarRecordingController.getInstance(context).manualOverride()
         }
     }

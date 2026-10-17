@@ -11,15 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LinkOff
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Sensors
-import androidx.compose.material.icons.filled.Terrain
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,12 +21,12 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,10 +55,25 @@ fun MainScreen(
     val descentSettings by viewModel.descentSettings.collectAsState()
     val descentStatus by viewModel.descentStatus.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showUnpairDialog by remember { mutableStateOf(false) }
-
-    BackHandler(enabled = uiState.showCameraAlertSettings) { viewModel.setShowCameraAlertSettings(false) }
-    BackHandler(enabled = uiState.showDescentSettings) { viewModel.setShowDescentSettings(false) }
+    var connectionToForget by remember { mutableStateOf<ConnectionState.Connected?>(null) }
+    val destination = uiState.navigation.destination
+    val screenStateHolder = rememberSaveableStateHolder()
+    val onBack: () -> Unit = {
+        if (destination != ScreenDestination.MAIN) {
+            viewModel.navigateBack()
+        } else {
+            when (uiState.connectionState) {
+                is ConnectionState.Connecting, is ConnectionState.Pairing -> viewModel.cancelAutoConnect()
+                is ConnectionState.PairingAccessRequired -> viewModel.disconnect()
+                ConnectionState.Disconnected -> if (uiState.isAutoConnecting) viewModel.cancelAutoConnect() else onFinish()
+                else -> onFinish()
+            }
+        }
+    }
+    BackHandler(onBack = onBack)
+    LaunchedEffect(uiState.connectionState) {
+        if (uiState.connectionState !== connectionToForget) connectionToForget = null
+    }
     LaunchedEffect(uiState.cameraCommandError) {
         uiState.cameraCommandError?.let { message ->
             snackbarHostState.showSnackbar(message)
@@ -79,97 +86,33 @@ fun MainScreen(
         viewModel.tryAutoConnect()
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            viewModel.stopScan()
-        }
-    }
-
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             val currentState = uiState.connectionState
             CompactTopAppBar(
                 title =
-                    if (uiState.showCameraAlertSettings) {
-                        stringResource(R.string.camera_alert_settings)
-                    } else if (uiState.showRadarScreen) {
-                        "Radar recording"
-                    } else if (uiState.showDescentSettings) {
-                        "Descent recording"
-                    } else if (uiState.showFeedbackScreen) {
-                        "Feedback"
-                    } else if (uiState.showScanningScreen) {
-                        "Scan Devices"
-                    } else if (currentState is ConnectionState.Connected) {
-                        "Connected to ${currentState.deviceName ?: "Unknown Device"}"
-                    } else {
-                        "Karoo Camera Control"
+                    when (destination) {
+                        ScreenDestination.SETTINGS -> stringResource(R.string.settings_title)
+                        ScreenDestination.AUTOMATIC_RECORDING -> stringResource(R.string.settings_automatic_recording)
+                        ScreenDestination.RADAR -> stringResource(R.string.settings_radar_recording)
+                        ScreenDestination.DESCENT -> stringResource(R.string.settings_descent_recording)
+                        ScreenDestination.ALERTS -> stringResource(R.string.settings_alerts_sound)
+                        ScreenDestination.CAMERA_CONNECTION -> stringResource(R.string.settings_camera_connection)
+                        ScreenDestination.FEEDBACK -> stringResource(R.string.settings_feedback)
+                        ScreenDestination.SCANNING -> "Scan Devices"
+                        ScreenDestination.PRESETS -> stringResource(R.string.settings_presets)
+                        ScreenDestination.MAIN ->
+                            if (currentState is ConnectionState.Connected) {
+                                "Connected to ${currentState.deviceName ?: "Unknown Device"}"
+                            } else {
+                                "Karoo Camera Control"
+                            }
                     },
                 actions = {
-                    if (!uiState.showFeedbackScreen && !uiState.showDescentSettings && !uiState.showRadarScreen && !uiState.showCameraAlertSettings) {
-                        IconButton(onClick = { viewModel.setShowMenu(true) }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
-                        }
-                        DropdownMenu(
-                            expanded = uiState.showMenu,
-                            onDismissRequest = { viewModel.setShowMenu(false) },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.camera_alert_settings)) },
-                                onClick = { viewModel.setShowCameraAlertSettings(true) },
-                                leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Radar recording") },
-                                onClick = { viewModel.setShowRadarScreen(true) },
-                                leadingIcon = { Icon(Icons.Default.Sensors, contentDescription = null) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Descent recording") },
-                                onClick = { viewModel.setShowDescentSettings(true) },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Terrain, contentDescription = null)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Disconnect") },
-                                onClick = { viewModel.disconnect() },
-                                enabled = currentState is ConnectionState.Connected,
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.LinkOff,
-                                        contentDescription = "Disconnect",
-                                    )
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Unpair / Forget") },
-                                onClick = {
-                                    showUnpairDialog = true
-                                    viewModel.setShowMenu(false)
-                                },
-                                enabled = currentState is ConnectionState.Connected,
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Unpair / Forget",
-                                    )
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Leave Feedback") },
-                                onClick = {
-                                    viewModel.setShowFeedbackScreen(true)
-                                    viewModel.setShowMenu(false)
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Info,
-                                        contentDescription = "Leave Feedback",
-                                    )
-                                },
-                            )
+                    if (uiState.navigation.showsSettingsAction) {
+                        IconButton(onClick = { viewModel.navigate(ScreenDestination.SETTINGS) }) {
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_accessibility))
                         }
                     }
                 },
@@ -185,115 +128,141 @@ fun MainScreen(
         ) {
             val currentState = uiState.connectionState
 
-            if (uiState.showCameraAlertSettings) {
-                CameraAlertSettingsScreen(
-                    settings = cameraAlertSettings,
-                    onSettingsChanged = viewModel.cameraAlertSettings::update,
-                    onBack = { viewModel.setShowCameraAlertSettings(false) },
-                )
-            } else if (uiState.showRadarScreen) {
-                RadarRecordingScreen(
-                    settings = radarSettings,
-                    status = radarStatus,
-                    onEnabledChanged = viewModel.radarSettings::setEnabled,
-                    onDelayChanged = viewModel.radarSettings::setStopDelay,
-                    onBack = { viewModel.setShowRadarScreen(false) },
-                )
-            } else if (uiState.showDescentSettings) {
-                DescentRecordingScreen(
-                    settings = descentSettings,
-                    status = descentStatus,
-                    onSettingsChanged = viewModel::updateDescentSettings,
-                    onBack = { viewModel.setShowDescentSettings(false) },
-                )
-            } else if (uiState.showFeedbackScreen) {
-                FeedbackScreen(
-                    onFinish = { viewModel.setShowFeedbackScreen(false) },
-                    reportState = reportState,
-                    onSend = viewModel::sendDiagnostics,
-                    onRetry = viewModel::retryDiagnostics,
-                    onDiscard = viewModel::discardDiagnostics,
-                )
-            } else if (uiState.showPresetScreen) {
-                val currentModeId = if (uiState.cameraMode < 1000) uiState.cameraMode + 1000 else uiState.cameraMode
-                val currentPresets = uiState.availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
+            screenStateHolder.SaveableStateProvider(destination.name) {
+                if (destination == ScreenDestination.SETTINGS) {
+                    SettingsHubScreen(
+                        radarEnabled = radarSettings.enabled,
+                        descentEnabled = descentSettings.enabled,
+                        alerts = cameraAlertSettings,
+                        connectionState = currentState,
+                        onNavigate = viewModel::navigate,
+                        onBack = onBack,
+                    )
+                } else if (destination == ScreenDestination.AUTOMATIC_RECORDING) {
+                    AutomaticRecordingScreen(
+                        radarEnabled = radarSettings.enabled,
+                        radarStatus = radarStatus,
+                        descentEnabled = descentSettings.enabled,
+                        descentStatus = descentStatus,
+                        onNavigate = viewModel::navigate,
+                        onBack = onBack,
+                    )
+                } else if (destination == ScreenDestination.CAMERA_CONNECTION) {
+                    CameraConnectionScreen(
+                        connectionState = currentState,
+                        onDisconnect = viewModel::disconnect,
+                        onForget = { connectionToForget = currentState as? ConnectionState.Connected },
+                        onBack = onBack,
+                    )
+                } else if (destination == ScreenDestination.ALERTS) {
+                    CameraAlertSettingsScreen(
+                        settings = cameraAlertSettings,
+                        onSettingsChanged = viewModel.cameraAlertSettings::update,
+                        onBack = onBack,
+                    )
+                } else if (destination == ScreenDestination.RADAR) {
+                    RadarRecordingScreen(
+                        settings = radarSettings,
+                        status = radarStatus,
+                        onEnabledChanged = viewModel.radarSettings::setEnabled,
+                        onDelayChanged = viewModel.radarSettings::setStopDelay,
+                        onBack = onBack,
+                    )
+                } else if (destination == ScreenDestination.DESCENT) {
+                    DescentRecordingScreen(
+                        settings = descentSettings,
+                        status = descentStatus,
+                        onSettingsChanged = viewModel::updateDescentSettings,
+                        onBack = onBack,
+                    )
+                } else if (destination == ScreenDestination.FEEDBACK) {
+                    FeedbackScreen(
+                        onFinish = onBack,
+                        reportState = reportState,
+                        onSend = viewModel::sendDiagnostics,
+                        onRetry = viewModel::retryDiagnostics,
+                        onDiscard = viewModel::discardDiagnostics,
+                    )
+                } else if (destination == ScreenDestination.PRESETS) {
+                    val currentModeId = if (uiState.cameraMode < 1000) uiState.cameraMode + 1000 else uiState.cameraMode
+                    val currentPresets = uiState.availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
 
-                PresetSelectionScreen(
-                    presets = currentPresets,
-                    activePresetId = uiState.activePresetId,
-                    onPresetSelected = { preset ->
-                        viewModel.loadPreset(preset.id)
-                    },
-                    onBack = { viewModel.setShowPresetScreen(false) },
-                )
-            } else if (currentState is ConnectionState.Connected) {
-                ConnectedScreen(
-                    deviceName = currentState.deviceName,
-                    isRecording = uiState.isRecording,
-                    isProcessing = uiState.isProcessing,
-                    isRecordingOperationInFlight = uiState.isRecordingOperationInFlight,
-                    recordingDuration = uiState.recordingDuration,
-                    batteryLevel = uiState.batteryLevel,
-                    remainingTime = uiState.remainingVideoTime,
-                    cameraMode = uiState.cameraMode,
-                    availablePresets = uiState.availablePresets,
-                    activePresetName = uiState.activePresetName,
-                    activePresetIcon = uiState.activePresetIcon,
-                    onToggleRecording = { viewModel.toggleRecording() },
-                    onSetMode = { mode -> viewModel.setMode(mode) },
-                    onOpenPresetSelection = { viewModel.setShowPresetScreen(true) },
-                    onDisconnect = { viewModel.disconnect() },
-                    onForget = { showUnpairDialog = true },
-                    onFinish = { onFinish() },
-                )
-            } else if (uiState.showScanningScreen) {
-                ScanningScreen(
-                    connectionState = currentState,
-                    scannedDevices = uiState.scannedDevices,
-                    pairedDevices = uiState.pairedDevices,
-                    permissionsGranted = permissionsGranted,
-                    onStartScan = { viewModel.startScan() },
-                    onStopScan = { viewModel.stopScan() },
-                    onConnect = { device -> viewModel.connect(device) },
-                    onOpenNotificationAccess = { viewModel.openNotificationAccess() },
-                    onFinish = { viewModel.setShowScanningScreen(false) },
-                )
-            } else {
-                when (val state = currentState) {
-                    is ConnectionState.Connecting -> {
-                        ConnectingScreen(
-                            deviceName = state.deviceName,
-                            onCancel = { viewModel.cancelAutoConnect() },
-                        )
-                    }
-                    is ConnectionState.Pairing -> {
-                        ConnectingScreen(
-                            deviceName = state.deviceName,
-                            status = "Confirming Bluetooth pairing for",
-                            onCancel = { viewModel.cancelAutoConnect() },
-                        )
-                    }
-                    is ConnectionState.PairingAccessRequired -> {
-                        PairingAccessScreen(
-                            deviceName = state.deviceName,
-                            onOpenSettings = { viewModel.openNotificationAccess() },
-                            onBack = { viewModel.disconnect() },
-                        )
-                    }
-                    else -> {
-                        if (uiState.isAutoConnecting && currentState is ConnectionState.Disconnected) {
+                    PresetSelectionScreen(
+                        presets = currentPresets,
+                        activePresetId = uiState.activePresetId,
+                        onPresetSelected = { preset ->
+                            viewModel.loadPreset(preset.id)
+                        },
+                        onBack = onBack,
+                    )
+                } else if (currentState is ConnectionState.Connected) {
+                    ConnectedScreen(
+                        deviceName = currentState.deviceName,
+                        isRecording = uiState.isRecording,
+                        isProcessing = uiState.isProcessing,
+                        isRecordingOperationInFlight = uiState.isRecordingOperationInFlight,
+                        recordingDuration = uiState.recordingDuration,
+                        batteryLevel = uiState.batteryLevel,
+                        remainingTime = uiState.remainingVideoTime,
+                        cameraMode = uiState.cameraMode,
+                        availablePresets = uiState.availablePresets,
+                        activePresetName = uiState.activePresetName,
+                        activePresetIcon = uiState.activePresetIcon,
+                        onToggleRecording = { viewModel.toggleRecording() },
+                        onSetMode = { mode -> viewModel.setMode(mode) },
+                        onOpenPresetSelection = { viewModel.navigate(ScreenDestination.PRESETS) },
+                        onDisconnect = { viewModel.disconnect() },
+                        onForget = { connectionToForget = currentState },
+                        onFinish = onBack,
+                    )
+                } else if (destination == ScreenDestination.SCANNING) {
+                    ScanningScreen(
+                        connectionState = currentState,
+                        scannedDevices = uiState.scannedDevices,
+                        pairedDevices = uiState.pairedDevices,
+                        permissionsGranted = permissionsGranted,
+                        onStartScan = { viewModel.startScan() },
+                        onConnect = { device -> viewModel.connect(device) },
+                        onOpenNotificationAccess = { viewModel.openNotificationAccess() },
+                        onFinish = onBack,
+                    )
+                } else {
+                    when (val state = currentState) {
+                        is ConnectionState.Connecting -> {
                             ConnectingScreen(
-                                deviceName = null,
+                                deviceName = state.deviceName,
                                 onCancel = { viewModel.cancelAutoConnect() },
                             )
-                        } else {
-                            PairedDevicesScreen(
-                                pairedDevices = uiState.pairedDevices,
-                                onConnectToPaired = { address -> viewModel.connectToPaired(address) },
-                                onRemovePaired = { address -> viewModel.removePairedDevice(address) },
-                                onAddDevice = { viewModel.setShowScanningScreen(true) },
-                                onFinish = { onFinish() },
+                        }
+                        is ConnectionState.Pairing -> {
+                            ConnectingScreen(
+                                deviceName = state.deviceName,
+                                status = "Confirming Bluetooth pairing for",
+                                onCancel = { viewModel.cancelAutoConnect() },
                             )
+                        }
+                        is ConnectionState.PairingAccessRequired -> {
+                            PairingAccessScreen(
+                                deviceName = state.deviceName,
+                                onOpenSettings = { viewModel.openNotificationAccess() },
+                                onBack = { viewModel.disconnect() },
+                            )
+                        }
+                        else -> {
+                            if (uiState.isAutoConnecting && currentState is ConnectionState.Disconnected) {
+                                ConnectingScreen(
+                                    deviceName = null,
+                                    onCancel = { viewModel.cancelAutoConnect() },
+                                )
+                            } else {
+                                PairedDevicesScreen(
+                                    pairedDevices = uiState.pairedDevices,
+                                    onConnectToPaired = { address -> viewModel.connectToPaired(address) },
+                                    onRemovePaired = { address -> viewModel.removePairedDevice(address) },
+                                    onAddDevice = { viewModel.navigate(ScreenDestination.SCANNING) },
+                                    onFinish = onBack,
+                                )
+                            }
                         }
                     }
                 }
@@ -301,16 +270,14 @@ fun MainScreen(
         }
     }
 
-    if (showUnpairDialog) {
-        val currentState = uiState.connectionState
-        val deviceName = (currentState as? ConnectionState.Connected)?.deviceName ?: "this device"
+    connectionToForget?.let { expectedConnection ->
         SimpleAlertDialog(
-            dialogTitle = "Confirm Unpair",
-            dialogSubTitle = "Are you sure you want to unpair and forget $deviceName?",
-            onDismissRequest = { showUnpairDialog = false },
+            dialogTitle = stringResource(R.string.settings_forget_title),
+            dialogSubTitle = stringResource(R.string.settings_forget_body, expectedConnection.deviceName ?: stringResource(R.string.settings_unknown_camera)),
+            onDismissRequest = { connectionToForget = null },
             onConfirmation = {
-                viewModel.forgetDevice()
-                showUnpairDialog = false
+                viewModel.forgetDevice(expectedConnection)
+                connectionToForget = null
             },
         )
     }

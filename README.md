@@ -7,6 +7,7 @@ This is an extension to control sports action cameras using Hammerhead Karoo cyc
 ## Features
 
 - Connect and manage multiple GoPro cameras.
+- Configure automatic recording, alerts, and camera connection from the grouped [Settings & features](docs/settings-and-features.md) hub.
 - Start and stop recording and monitor recording time.
 - Optionally start video recording when a descent begins and stop at descent end; [configure descent recording](docs/descent-recording.md).
 - Change camera modes (Video, Photo, Timelapse).
@@ -62,7 +63,7 @@ Up-to-date [supported GoPro cameras list can be found here](https://gopro.github
 
 ## Sharing diagnostics
 
-If something goes wrong, open the app menu's **Leave Feedback** screen and tap **Send diagnostics** while connected to Wi-Fi or a hotspot. Confirm the upload, then
+If something goes wrong, open **Settings & features → Feedback & diagnostics** from the gear icon and tap **Send diagnostics** while connected to Wi-Fi or a hotspot. Confirm the upload, then
 include the support code in your feedback or GitHub issue. A failed report stays
 available for manual **Retry** for 24 hours. Logs are sent privately through
 Sentry only when you choose to send them. See [diagnostic reports](docs/diagnostic-reports.md)

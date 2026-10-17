@@ -47,8 +47,9 @@ def description(value):
 
 
 def open_settings():
-    tap(description("More options"))
-    tap(node("text", "Descent recording"))
+    tap(description("Settings and features"))
+    tap(description("Automatic recording"))
+    tap(description("Descent recording"))
 
 
 def screenshot(filename):
@@ -70,10 +71,11 @@ assert "Karoo" == command("emu", "avd", "name").splitlines()[0]
 assert "480x800" in command("shell", "wm", "size")
 # These checks change settings only in a freshly installed, isolated emulator app.
 launch()
-tap(description("More options"))
-node("text", "Descent recording")
-screenshot("descent-menu.png")
-tap(node("text", "Descent recording"))
+tap(description("Settings and features"))
+tap(description("Automatic recording"))
+description("Descent recording")
+screenshot("automatic-recording.png")
+tap(description("Descent recording"))
 assert description("Start on descents").get("checked") == "false"
 assert description("Stop at descent end").get("checked") == "false"
 assert description("Stop at descent end").get("enabled") == "false"
@@ -126,7 +128,10 @@ tap(description("Start on descents"))
 assert description("Stop at descent end").get("enabled") == "false"
 assert description("Stop at descent end").get("checked") == "true"
 command("shell", "input", "keyevent", "KEYCODE_BACK")
-node("content-desc", "More options")
+description("Descent recording")
+tap(description("Back"))
+tap(description("Back"))
+node("content-desc", "Settings and features")
 open_settings()
 assert description("Start on descents").get("checked") == "false"
 assert description("Stop at descent end").get("checked") == "true"
@@ -137,5 +142,8 @@ tap(description("Stop at descent end"))
 assert description("Stop at descent end").get("checked") == "false"
 tap(description("Start on descents"))
 tap(description("Back"))
-node("content-desc", "More options")
+description("Descent recording")
+tap(description("Back"))
+tap(description("Back"))
+node("content-desc", "Settings and features")
 print("PASS: system Back, in-app Back, and restored default settings", flush=True)

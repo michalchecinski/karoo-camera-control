@@ -1,6 +1,6 @@
 # Native camera alerts and sound
 
-Open **More options → Camera alerts**. Three preferences save immediately and
+Open **Settings & features → Alerts & sound**. Three preferences save immediately and
 survive app/device restarts:
 
 - **Recording confirmations**: visual start/stop messages; off by default.

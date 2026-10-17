@@ -32,7 +32,7 @@ Sources:
 
 ## Configuration
 
-Open **More options > Radar recording**. Enable **Record detected traffic**
+Open **Settings & features → Automatic recording → Radar recording**. Enable **Record detected traffic**
 and choose **Stop after radar clears** with the −5s/+5s buttons. The delay is
 5–120 seconds, defaulting to 15 seconds. The feature is off by default.
 Settings save immediately and survive app/device restarts. The status card

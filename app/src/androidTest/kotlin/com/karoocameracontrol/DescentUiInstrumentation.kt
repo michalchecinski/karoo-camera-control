@@ -9,7 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -81,7 +81,7 @@ class DescentUiInstrumentation : Instrumentation() {
                                     title = cameraTitle,
                                     onTitleLayout = { titleLayout.set(it) },
                                     actions = {
-                                        IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
+                                        IconButton(onClick = {}) { Icon(Icons.Default.Settings, contentDescription = "Settings and features") }
                                     },
                                 )
                             },

@@ -5,6 +5,15 @@ the intended experience, proposed behaviour, and acceptance criteria. Defaults
 and design choices marked as proposals can be refined before implementation.
 There are no release dates or dependency updates committed by this roadmap.
 
+## Settings navigation
+
+The implemented [Settings and features navigation redesign](settings-and-features-navigation.md)
+replaces the growing overflow menu with a full-screen hub and grouped settings.
+Its first release reorganizes existing screens; physical-device validation is
+pending. It also defines destinations
+for future recording, HiLight, capture and button features. This is a separate
+navigation track and does not change the integration delivery order below.
+
 ## Features and proposed delivery order
 
 | Order | Feature | Purpose | Status |

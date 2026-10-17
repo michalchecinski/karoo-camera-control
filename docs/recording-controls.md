@@ -16,12 +16,12 @@ same application-scoped controller. Command progress remains visible when
 the screen is reopened, and failures appear in a snackbar. Record/Stop and Back
 share a fixed bottom row on the Karoo screen, with the recording timer above.
 Other camera details scroll when needed, with a gap above the fixed controls.
-Descent status appears in **More options → Descent recording**, keeping the
+Descent status appears in **Settings & features → Automatic recording → Descent recording**, keeping the
 camera controls clear. Battery and storage share a compact row so the mode and preset controls fit
 more comfortably. Tap the preset button, labelled with the current preset, to
 choose another preset. The 48 dp app header keeps its title on one line. It measures the available
 width and selects a text size from 12 down to 10 sp. Names that still do not
-fit at 10 sp are ellipsized, preserving a readable minimum and the menu target. A manual Stop suppresses
+fit at 10 sp are ellipsized, preserving a readable minimum and the settings target. A manual Stop suppresses
 automatic starts until the next descent.
 
 If the shutter response or recording-state confirmation times out, the shared
@@ -41,7 +41,7 @@ controls override radar for the current encounter.
 
 Recording requests, command acknowledgements, confirmed states, and failures are
 recorded in the local [diagnostic log](diagnostic-reports.md). Uploading that log
-requires an explicit action in the Leave Feedback screen.
+requires an explicit action in the Feedback & diagnostics screen.
 
 Optional [native camera alerts and sound](camera-alerts.md) confirm verified
 recording transitions and warn about failed recording commands, connection
@@ -58,7 +58,7 @@ that Stop stays available during pending commands and active recording. It
 uses the production header and checks a single-line normal title and a long
 title that ellipsizes at the 10 sp minimum.
 Debug app/test APK builds, formatting checks, and Android lint passed, along
-with 22 unit tests and all 41 deterministic descent-recording checks. Physical
+with 58 unit tests and all 41 deterministic descent-recording checks. Physical
 Karoo/GoPro regression testing remains a release validation step.
 
 ![Connected camera ready](../screenshots/emulator-karoo-480x800/connected-layout-ready.png)

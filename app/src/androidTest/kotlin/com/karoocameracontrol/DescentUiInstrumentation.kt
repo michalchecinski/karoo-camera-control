@@ -3,6 +3,7 @@ package com.karoocameracontrol
 import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
@@ -10,7 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,7 +80,7 @@ class DescentUiInstrumentation : Instrumentation() {
                                     title = cameraTitle,
                                     onTitleLayout = { titleLayout.set(it) },
                                     actions = {
-                                        IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, contentDescription = "More options") }
+                                        IconButton(onClick = {}) { Icon(Icons.Default.Settings, contentDescription = "Settings and features") }
                                     },
                                 )
                             },
@@ -147,7 +148,7 @@ class DescentUiInstrumentation : Instrumentation() {
             }
             capture("descent-recording-active")
             // Details can scroll, while the recording timer and Stop remain fixed.
-            findScrollable(uiAutomation.rootInActiveWindow)?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+            findScrollable(freshRoot())?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
             check(!clickableParent(waitForText("Photo")).isEnabled)
             recordingStop.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             waitForText("Record")
@@ -213,10 +214,15 @@ class DescentUiInstrumentation : Instrumentation() {
         error("Manual override did not arrive")
     }
 
+    private fun freshRoot(): AccessibilityNodeInfo? {
+        if (Build.VERSION.SDK_INT >= 33) uiAutomation.clearCache()
+        return uiAutomation.rootInActiveWindow
+    }
+
     private fun waitForText(text: String): AccessibilityNodeInfo {
         val deadline = SystemClock.elapsedRealtime() + 10000
         while (SystemClock.elapsedRealtime() < deadline) {
-            findText(uiAutomation.rootInActiveWindow, text)?.let { return it }
+            findText(freshRoot(), text)?.let { return it }
             SystemClock.sleep(100)
         }
         error("UI text did not appear: $text")

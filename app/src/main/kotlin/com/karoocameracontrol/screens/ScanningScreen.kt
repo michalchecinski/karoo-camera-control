@@ -19,7 +19,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,7 +36,6 @@ fun ScanningScreen(
     pairedDevices: List<PairedDevice>,
     permissionsGranted: Boolean,
     onStartScan: () -> Unit,
-    onStopScan: () -> Unit,
     onConnect: (BluetoothDevice) -> Unit,
     onOpenNotificationAccess: () -> Unit,
     onFinish: () -> Unit,
@@ -46,15 +44,11 @@ fun ScanningScreen(
         if (permissionsGranted &&
             connectionState !is ConnectionState.Scanning &&
             connectionState !is ConnectionState.Connecting &&
-            connectionState !is ConnectionState.Connected
+            connectionState !is ConnectionState.Connected &&
+            connectionState !is ConnectionState.Pairing &&
+            connectionState !is ConnectionState.PairingAccessRequired
         ) {
             onStartScan()
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            onStopScan()
         }
     }
 

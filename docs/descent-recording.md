@@ -16,7 +16,7 @@
 
 ## Behaviour
 
-Open **More options → Descent recording** to enable automatic starts. It is off
+Open **Settings & features → Automatic recording → Descent recording** to enable automatic starts. It is off
 by default. The default trigger is a gradient of **−3% or steeper for 3 seconds**
 while moving at **5 km/h or faster**. Gradient and confirmation duration are
 adjustable from 1 to 10 percent and 1 to 10 seconds. Changes save immediately.
@@ -25,7 +25,7 @@ The feature starts video recording only during an actively recording Karoo
 ride, with a connected GoPro in Video mode. It does not change the selected
 mode or preset or wake a disconnected camera.
 The normal Stop control remains available during an automatic start.
-The descent status message is shown in **More options → Descent recording**.
+The descent status message is shown in **Settings & features → Automatic recording → Descent recording**.
 It is omitted from the connected-camera controls to leave space for the preset
 selector and recording controls on Karoo.
 

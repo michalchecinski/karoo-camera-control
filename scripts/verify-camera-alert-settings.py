@@ -68,8 +68,8 @@ def launch():
 
 
 def open_settings():
-    tap(control("More options"))
-    tap(node("text", "Camera alerts"))
+    tap(control("Settings and features"))
+    tap(control("Alerts & sound"))
 
 
 def assert_settings(confirmations, warnings, sound):
@@ -82,10 +82,10 @@ def assert_settings(confirmations, warnings, sound):
 assert command("emu", "avd", "name").splitlines()[0] == "Karoo"
 assert "480x800" in command("shell", "wm", "size")
 launch()
-tap(control("More options"))
-node("text", "Camera alerts")
-screenshot("camera-alert-menu.png")
-tap(node("text", "Camera alerts"))
+tap(control("Settings and features"))
+control("Alerts & sound")
+screenshot("settings-hub.png")
+tap(control("Alerts & sound"))
 assert_settings(False, True, False)
 help_text = node("text", "Active or paused rides only. Warn at 20% battery or 5 minutes left.")
 left, top, right, bottom = map(int, re.findall(r"\d+", help_text.get("bounds")))
@@ -109,9 +109,13 @@ assert_settings(False, False, False)
 tap(control("Camera warnings"))
 assert_settings(False, True, False)
 command("shell", "input", "keyevent", "KEYCODE_BACK")
-control("More options")
+control("Alerts & sound")
+tap(control("Back"))
+control("Settings and features")
 open_settings()
 assert_settings(False, True, False)
 tap(control("Back"))
-control("More options")
+control("Alerts & sound")
+tap(control("Back"))
+control("Settings and features")
 print("PASS: visual and sound switches are independent; both Back controls work; defaults restored", flush=True)

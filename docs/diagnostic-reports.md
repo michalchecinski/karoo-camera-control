@@ -2,7 +2,7 @@
 
 ## Sending a report
 
-Open the app menu and select **Leave Feedback** (the screen with feedback and tip QR
+Open the gear icon, then **Settings & features → Feedback & diagnostics** (the screen with feedback and tip QR
 codes). Tap **Send diagnostics**, review the explanation, and tap **Send**.
 Connect the Karoo to Wi-Fi or a hotspot first; uploads do not use the companion
 Bluetooth relay. You do not need an account, ADB, or a file manager.

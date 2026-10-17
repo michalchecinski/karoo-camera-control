@@ -31,13 +31,7 @@ data class MainUiState(
     val isAutoConnecting: Boolean = false,
     val isProcessing: Boolean = false,
     val isRecordingOperationInFlight: Boolean = false,
-    val showMenu: Boolean = false,
-    val showFeedbackScreen: Boolean = false,
-    val showScanningScreen: Boolean = false,
-    val showPresetScreen: Boolean = false,
-    val showRadarScreen: Boolean = false,
-    val showDescentSettings: Boolean = false,
-    val showCameraAlertSettings: Boolean = false,
+    val navigation: ScreenNavigation = ScreenNavigation(),
     val cameraCommandError: String? = null,
     // Device Data
     val scannedDevices: List<android.bluetooth.BluetoothDevice> = emptyList(),
@@ -203,20 +197,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // New logic: When connected, automatically dismiss scanning screen
             goProManager.connectionState.collect { connectionState ->
                 if (connectionState is ConnectionState.Connected) {
-                    _uiState.value = _uiState.value.copy(showScanningScreen = false)
+                    _uiState.value = _uiState.value.copy(navigation = _uiState.value.navigation.cameraConnected())
                 }
             }
         }
     }
 
     override fun onCleared() {
+        stopScan()
         karooSystem.dispatch(ReleaseBluetooth("karoo-camera-control-ui"))
         karooSystem.disconnect()
         super.onCleared()
     }
 
     // Explicit AutoConnect trigger
+    private var autoConnectAttempted = false
+
     fun tryAutoConnect() {
+        if (autoConnectAttempted) return
+        autoConnectAttempted = true
         if (goProManager.pairedDevices.value.isNotEmpty()) {
             _uiState.value = _uiState.value.copy(isAutoConnecting = true)
             goProManager.tryAutoConnect()
@@ -251,12 +250,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun disconnect() {
         goProManager.disconnect()
-        _uiState.value = _uiState.value.copy(showMenu = false, isAutoConnecting = false)
+        _uiState.value = _uiState.value.copy(navigation = ScreenNavigation(), isAutoConnecting = false)
     }
 
-    fun forgetDevice() {
+    fun forgetDevice(expectedConnection: ConnectionState.Connected) {
+        if (goProManager.connectionState.value !== expectedConnection) return
         goProManager.forgetConnectedDevice()
-        _uiState.value = _uiState.value.copy(showMenu = false, isAutoConnecting = false)
+        _uiState.value = _uiState.value.copy(navigation = ScreenNavigation(), isAutoConnecting = false)
     }
 
     fun removePairedDevice(address: String) = goProManager.removePairedDevice(address)
@@ -279,7 +279,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         radarRecording.manualOverride()
         goProManager.recordingCommands.configure {
             goProManager.loadPreset(presetId)
-            _uiState.value = _uiState.value.copy(showPresetScreen = false)
+            if (_uiState.value.navigation.destination == ScreenDestination.PRESETS) navigateBack()
         }
     }
 
@@ -287,40 +287,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateDescentSettings(settings: DescentSettings) = descentSettingsStore.update(settings)
 
-    fun setShowCameraAlertSettings(show: Boolean) {
-        _uiState.value = _uiState.value.copy(showCameraAlertSettings = show, showMenu = false)
+    fun navigate(destination: ScreenDestination) {
+        _uiState.value = _uiState.value.copy(navigation = _uiState.value.navigation.open(destination))
     }
 
-    fun setShowDescentSettings(show: Boolean) {
-        _uiState.value = _uiState.value.copy(showDescentSettings = show, showRadarScreen = false, showMenu = false)
-    }
-
-    fun setShowRadarScreen(show: Boolean) {
-        _uiState.value = _uiState.value.copy(showRadarScreen = show, showDescentSettings = false, showMenu = false)
-    }
-
-    // UI Navigation / Dialog State Setters
-    fun setShowMenu(show: Boolean) {
-        _uiState.value = _uiState.value.copy(showMenu = show)
-    }
-
-    fun setShowFeedbackScreen(show: Boolean) {
-        _uiState.value = _uiState.value.copy(showFeedbackScreen = show)
-    }
-
-    fun setShowScanningScreen(show: Boolean) {
-        _uiState.value = _uiState.value.copy(showScanningScreen = show)
-        if (!show) {
-            stopScan()
-        }
-    }
-
-    fun setShowPresetScreen(show: Boolean) {
-        _uiState.value = _uiState.value.copy(showPresetScreen = show)
+    fun navigateBack() {
+        if (_uiState.value.navigation.destination == ScreenDestination.SCANNING) stopScan()
+        _uiState.value = _uiState.value.copy(navigation = _uiState.value.navigation.back())
     }
 
     fun cancelAutoConnect() {
         goProManager.disconnect()
-        _uiState.value = _uiState.value.copy(isAutoConnecting = false, showMenu = false)
+        _uiState.value = _uiState.value.copy(isAutoConnecting = false, navigation = ScreenNavigation())
     }
 }

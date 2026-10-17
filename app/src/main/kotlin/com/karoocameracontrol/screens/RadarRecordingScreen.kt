@@ -1,6 +1,5 @@
 package com.karoocameracontrol.screens
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,7 +43,6 @@ fun RadarRecordingScreen(
     onDelayChanged: (Int) -> Unit,
     onBack: () -> Unit,
 ) {
-    BackHandler(onBack = onBack)
     var showSetup by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         Column(

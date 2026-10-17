@@ -8,7 +8,7 @@ Offer a persistent, off-by-default setting to start GoPro video recording when
 a Karoo ride starts and stop it when that ride finishes. The rider should not
 need to remember a separate camera start before each ride.
 
-Expose the option under **More options → Whole-ride recording**, with a short
+Expose the option under **Settings & features → Automatic recording → Whole-ride recording**, with a short
 explanation of camera battery/storage use, connection requirements, and manual
 override. Closing the settings screen must not stop monitoring.
 

@@ -3,10 +3,8 @@ package com.karoocameracontrol
 import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
-import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -36,6 +34,8 @@ import java.util.concurrent.atomic.AtomicReference
 
 /** Runs the production connected composable with an isolated test camera on an AVD. */
 class DescentUiInstrumentation : Instrumentation() {
+    private lateinit var ui: UiTestSupport
+
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
         start()
@@ -43,6 +43,7 @@ class DescentUiInstrumentation : Instrumentation() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onStart() {
+        ui = UiTestSupport(this)
         val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
         try {
             val activity = startActivitySync(Intent(targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
@@ -110,71 +111,71 @@ class DescentUiInstrumentation : Instrumentation() {
                     }
                 }
             }
-            val readyRecord = clickableParent(waitForText("Record"))
+            val readyRecord = ui.clickableParent(ui.waitForText("Record"))
             val measuredTitle = checkNotNull(titleLayout.get())
             check(measuredTitle.lineCount == 1 && !measuredTitle.hasVisualOverflow) { "Camera title must fit one line" }
             check(measuredTitle.layoutInput.style.fontSize.value <= 12f) { "Camera title too large" }
             val presetBounds = android.graphics.Rect()
-            clickableParent(waitForText("Preset: Standard")).getBoundsInScreen(presetBounds)
+            ui.clickableParent(ui.waitForText("Preset: Standard")).getBoundsInScreen(presetBounds)
             val recordBounds = android.graphics.Rect()
             readyRecord.getBoundsInScreen(recordBounds)
             capture("connected-layout-ready")
             check(presetBounds.height() >= 96) { "Preset button clipped: $presetBounds" }
             check(presetBounds.bottom <= recordBounds.top - 16) { "Preset touches recording control: $presetBounds / $recordBounds" }
             runOnMainSync { check(controller.startAutomatically()) }
-            val pendingStop = waitForText("Stop")
-            check(clickableParent(pendingStop).isEnabled) { "Stop unavailable during automatic start" }
-            check(!clickableParent(waitForText("Photo")).isEnabled) { "Mode change available during start" }
+            val pendingStop = ui.waitForText("Stop")
+            check(ui.clickableParent(pendingStop).isEnabled) { "Stop unavailable during automatic start" }
+            check(!ui.clickableParent(ui.waitForText("Photo")).isEnabled) { "Mode change available during start" }
             capture("descent-start-pending")
-            clickableParent(pendingStop).performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            waitForText("Record")
+            ui.clickText("Stop")
+            ui.waitForText("Record")
             runOnMainSync { check(stops == 1 && controller.manualStopCount.value == 1L) }
             runOnMainSync {
                 startGate = CompletableDeferred(Unit)
                 check(controller.startAutomatically())
             }
-            waitForText("00:12")
-            val recordingStop = clickableParent(waitForText("Stop"))
+            ui.waitForText("00:12")
+            val recordingStop = ui.clickableParent(ui.waitForText("Stop"))
             check(recordingStop.isEnabled)
             val bounds = android.graphics.Rect()
             recordingStop.getBoundsInScreen(bounds)
             check(bounds.bottom <= 704 && bounds.top >= 48) { "Stop clipped by system UI: $bounds" }
             val activePresetBounds = android.graphics.Rect()
-            clickableParent(waitForText("Preset: Standard")).getBoundsInScreen(activePresetBounds)
+            ui.clickableParent(ui.waitForText("Preset: Standard")).getBoundsInScreen(activePresetBounds)
             val timerBounds = android.graphics.Rect()
-            waitForText("00:12").getBoundsInScreen(timerBounds)
+            ui.waitForText("00:12").getBoundsInScreen(timerBounds)
             check(activePresetBounds.height() >= 96 && activePresetBounds.bottom <= timerBounds.top - 16) {
                 "Preset clipped by fixed recording controls: $activePresetBounds / $timerBounds"
             }
             capture("descent-recording-active")
             // Details can scroll, while the recording timer and Stop remain fixed.
-            findScrollable(freshRoot())?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
-            check(!clickableParent(waitForText("Photo")).isEnabled)
-            recordingStop.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-            waitForText("Record")
+            ui.scrollForward()
+            check(!ui.clickableParent(ui.waitForText("Photo")).isEnabled)
+            ui.clickText("Stop")
+            ui.waitForText("Record")
             runOnMainSync { check(stops == 2 && !recording.value) }
             capture("descent-recording-ready")
             runOnMainSync {
                 check(controller.startAutomatically())
             }
-            waitForText("00:12")
+            ui.waitForText("00:12")
             runOnMainSync {
                 stopGate = CompletableDeferred()
                 check(controller.stopAutomatically())
             }
             waitForIdleSync()
-            val automaticStop = clickableParent(waitForText("Stop"))
+            val automaticStop = ui.clickableParent(ui.waitForText("Stop"))
             check(automaticStop.isEnabled)
             runOnMainSync { check(controller.state.value.busy && controller.state.value.recordingInFlight) }
-            automaticStop.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            ui.clickText("Stop")
             waitForManualStops(controller, 3L)
             runOnMainSync { stopGate.complete(Unit) }
-            waitForText("Record")
+            ui.waitForText("Record")
             runOnMainSync { check(!recording.value && controller.manualStopCount.value == 3L) }
             runOnMainSync { check(controller.startAutomatically()) }
-            waitForText("00:12")
+            ui.waitForText("00:12")
             runOnMainSync { check(controller.stopAutomatically()) }
-            waitForText("Record")
+            ui.waitForText("Record")
             runOnMainSync { check(!recording.value && controller.manualStopCount.value == 3L) }
             runOnMainSync { title.value = "Connected to GoPro " + "Long camera name ".repeat(12) }
             waitForIdleSync()
@@ -212,41 +213,5 @@ class DescentUiInstrumentation : Instrumentation() {
             SystemClock.sleep(100)
         }
         error("Manual override did not arrive")
-    }
-
-    private fun freshRoot(): AccessibilityNodeInfo? {
-        if (Build.VERSION.SDK_INT >= 33) uiAutomation.clearCache()
-        return uiAutomation.rootInActiveWindow
-    }
-
-    private fun waitForText(text: String): AccessibilityNodeInfo {
-        val deadline = SystemClock.elapsedRealtime() + 10000
-        while (SystemClock.elapsedRealtime() < deadline) {
-            findText(freshRoot(), text)?.let { return it }
-            SystemClock.sleep(100)
-        }
-        error("UI text did not appear: $text")
-    }
-
-    private fun findText(
-        node: AccessibilityNodeInfo?,
-        text: String,
-    ): AccessibilityNodeInfo? {
-        if (node == null) return null
-        if (node.text?.toString() == text) return node
-        for (index in 0 until node.childCount) findText(node.getChild(index), text)?.let { return it }
-        return null
-    }
-
-    private fun clickableParent(node: AccessibilityNodeInfo): AccessibilityNodeInfo {
-        if (node.isClickable) return node
-        return clickableParent(checkNotNull(node.parent))
-    }
-
-    private fun findScrollable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-        if (node == null) return null
-        if (node.isScrollable) return node
-        for (index in 0 until node.childCount) findScrollable(node.getChild(index))?.let { return it }
-        return null
     }
 }

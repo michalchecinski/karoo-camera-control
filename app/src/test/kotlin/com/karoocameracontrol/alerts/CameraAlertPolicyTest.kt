@@ -7,7 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
@@ -425,7 +425,7 @@ class CameraAlertPolicyTest {
                         alertEvent = { alerts += p.accept(it) },
                     )
                 controller.toggleManually()
-                delay(50)
+                withTimeout(2_000) { controller.state.first { !it.busy } }
                 assertFalse(controller.state.value.busy)
                 assertEquals(CameraAlertKind.FAILED, alerts.single().kind)
                 assertTrue(p.status(true).isEmpty())

@@ -84,6 +84,8 @@ python3 scripts/verify-descent-settings.py <isolated-emulator>
 ```
 
 Install both APKs and grant Bluetooth/Location permissions before running.
+For bounded boot checks, automatic setup and retained diagnostics, use the
+[emulator UI runner](ui-test-reliability.md).
 The preference scripts check the new hierarchy, persistence and both Back
 paths, restore defaults, and capture the changed screens. Existing descent
 UI instrumentation checks pending and confirmed Stop with the new gear header.

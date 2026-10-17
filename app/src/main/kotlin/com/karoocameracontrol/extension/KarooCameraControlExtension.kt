@@ -6,6 +6,7 @@ import com.karoocameracontrol.alerts.CameraAlertSettingsStore
 import com.karoocameracontrol.integrations.gopro.GoProBatteryDataType
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.GoProRecTimeDataType
+import com.karoocameracontrol.integrations.gopro.GoProRecordingDataType
 import com.karoocameracontrol.integrations.gopro.GoProStatusDataType
 import com.karoocameracontrol.radar.RadarRecordingController
 import com.karoocameracontrol.radar.RadarRecordingSettings
@@ -36,6 +37,7 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
             GoProStatusDataType(extension, applicationContext),
             GoProRecTimeDataType(extension, applicationContext),
             GoProBatteryDataType(extension, applicationContext),
+            GoProRecordingDataType(extension),
         )
     }
 

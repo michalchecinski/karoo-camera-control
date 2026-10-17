@@ -42,6 +42,7 @@ class RadarRecordingController private constructor(context: Context) {
     private val mutableOperationInFlight = MutableStateFlow(false)
     val operationInFlight = mutableOperationInFlight.asStateFlow()
     val isRunning: Boolean get() = scope != null
+    val manualStopRequired: Boolean get() = policy.manualStopRequired
 
     fun start(system: KarooSystemService) {
         if (scope != null) return

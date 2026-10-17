@@ -28,6 +28,10 @@
             </intent-filter>
         </activity>
 
+        <receiver
+            android:name=".recording.RecordingFieldReceiver"
+            android:exported="false" />
+
         <service
             android:name=".integrations.gopro.BluetoothPairingNotificationService"
             android:exported="true"

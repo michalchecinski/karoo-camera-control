@@ -18,7 +18,7 @@ navigation track and does not change the integration delivery order below.
 
 | Order | Feature | Purpose | Status |
 | --- | --- | --- | --- |
-| 1 | [Recording controls from the ride screen](ride-screen-recording-controls.md) | Start and stop a camera without leaving the ride screen. | Planned |
+| 1 | [Recording controls from the ride screen](ride-screen-recording-controls.md) | Start and stop a camera without leaving the ride screen. | Implemented; hardware QA pending |
 | 2 | [Native camera alerts and audible confirmation](camera-alerts-and-sound.md) | Confirm recording changes and report camera problems during a ride. | Implemented; hardware validation pending |
 | 3 | [Opt-in whole-ride recording](whole-ride-recording.md) | Automatically record from ride start to ride finish. | Planned |
 | 4 | [Automation status field](automation-status-field.md) | Explain what camera automation is doing and why it is waiting. | Planned |

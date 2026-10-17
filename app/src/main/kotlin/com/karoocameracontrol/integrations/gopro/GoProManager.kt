@@ -33,7 +33,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -321,6 +323,7 @@ class GoProManager private constructor(private val context: Context) {
                 newState: Int,
             ) {
                 super.onConnectionStateChange(gatt, status, newState)
+                if (connectedGatt !== gatt) return
                 val deviceName = gatt.device.name
 
                 // GATT_CONN_TERMINATE_PEER_USER means remote device disconnected - treat as normal disconnect
@@ -364,6 +367,7 @@ class GoProManager private constructor(private val context: Context) {
                 status: Int,
             ) {
                 super.onServicesDiscovered(gatt, status)
+                if (connectedGatt !== gatt) return
                 synchronized(continuationLock) {
                     if (currentOperationType == BleOperationType.DISCOVER_SERVICES) {
                         if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -384,6 +388,7 @@ class GoProManager private constructor(private val context: Context) {
                 value: ByteArray,
                 status: Int,
             ) {
+                if (connectedGatt !== gatt) return
                 handleCharacteristicRead(characteristic, status)
             }
 
@@ -395,6 +400,7 @@ class GoProManager private constructor(private val context: Context) {
                 characteristic: BluetoothGattCharacteristic,
                 status: Int,
             ) {
+                if (connectedGatt !== gatt) return
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                     handleCharacteristicRead(characteristic, status)
                 }
@@ -423,6 +429,7 @@ class GoProManager private constructor(private val context: Context) {
                 status: Int,
             ) {
                 super.onCharacteristicWrite(gatt, characteristic, status)
+                if (connectedGatt !== gatt) return
                 synchronized(continuationLock) {
                     if (currentOperationType == BleOperationType.WRITE_CHARACTERISTIC) {
                         if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -442,6 +449,7 @@ class GoProManager private constructor(private val context: Context) {
                 status: Int,
             ) {
                 super.onDescriptorWrite(gatt, descriptor, status)
+                if (connectedGatt !== gatt) return
                 synchronized(continuationLock) {
                     if (currentOperationType == BleOperationType.WRITE_DESCRIPTOR) {
                         if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -1000,7 +1008,7 @@ class GoProManager private constructor(private val context: Context) {
                     _cameraModeKnown.value = false
                     try {
                         // 1. Connect
-                        connectGattSuspend(device, autoConnect = isPaired)
+                        connectGattSuspend(device)
 
                         // 2. Discover Services
                         discoverServicesSuspend()
@@ -1012,6 +1020,20 @@ class GoProManager private constructor(private val context: Context) {
                         enableNotificationSuspend(GoProUUID.COMMAND_RESPONSE)
                         enableNotificationSuspend(GoProUUID.SETTING_RESPONSE)
                         enableNotificationSuspend(GoProUUID.QUERY_RESPONSE)
+
+                        // Connecting wakes a sleeping GoPro, but its command processor
+                        // may still be booting. Wait for a camera acknowledgement.
+                        Log.i(TAG, "Waiting for GoPro BLE readiness")
+                        val readinessGatt = connectedGatt ?: throw IllegalStateException("Not connected")
+                        awaitGoProBleReadiness(isConnected = { connectedGatt === readinessGatt }) {
+                            writeAndAwaitResponseSuspend(
+                                writeUuid = GoProUUID.COMMAND,
+                                responseUuid = GoProUUID.COMMAND_RESPONSE,
+                                messageType = 0x3C,
+                                value = GoProCommands.GET_HARDWARE_INFO,
+                            )
+                        }
+                        Log.i(TAG, "GoPro BLE ready")
 
                         // 5. Register for Status Updates
                         registerForStatusUpdatesSuspend()
@@ -1027,7 +1049,9 @@ class GoProManager private constructor(private val context: Context) {
 
                         break
                     } catch (e: Exception) {
-                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        // withTimeout also throws CancellationException; an operation
+                        // timing out must not silently abandon saved-device retries.
+                        currentCoroutineContext().ensureActive()
                         Log.e(TAG, "Connection failed", e)
                         disconnectGatt()
 
@@ -1195,29 +1219,11 @@ class GoProManager private constructor(private val context: Context) {
         }
     }
 
-    private suspend fun connectGattSuspend(
-        device: BluetoothDevice,
-        autoConnect: Boolean,
-    ) = operationMutex.withLock {
-        if (autoConnect) {
-            suspendCancellableCoroutine<Unit> { cont ->
-                synchronized(continuationLock) {
-                    currentOperationType = BleOperationType.CONNECT
-                    @Suppress("UNCHECKED_CAST")
-                    activeContinuation = cont as CancellableContinuation<Any?>
-                }
-                cont.invokeOnCancellation {
-                    synchronized(continuationLock) {
-                        activeContinuation = null
-                        currentOperationType = BleOperationType.NONE
-                    }
-                    // Clean up GATT on cancellation
-                    connectedGatt?.close()
-                    connectedGatt = null
-                }
-                connectedGatt = device.connectGatt(context, true, gattCallback)
-            }
-        } else {
+    private suspend fun connectGattSuspend(device: BluetoothDevice) =
+        operationMutex.withLock {
+            // Startup is an explicit wake/connect request, including for a saved
+            // camera. Android autoConnect is passive and can wait indefinitely.
+            Log.d(TAG, "Starting direct BLE connection attempt")
             withTimeout(CONNECT_TIMEOUT_MS) {
                 suspendCancellableCoroutine<Unit> { cont ->
                     synchronized(continuationLock) {
@@ -1233,11 +1239,10 @@ class GoProManager private constructor(private val context: Context) {
                         connectedGatt?.close()
                         connectedGatt = null
                     }
-                    connectedGatt = device.connectGatt(context, false, gattCallback)
+                    connectedGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
                 }
             }
         }
-    }
 
     private suspend fun discoverServicesSuspend() =
         operationMutex.withLock {
@@ -1474,7 +1479,7 @@ class GoProManager private constructor(private val context: Context) {
         private const val GATT_CONN_TERMINATE_PEER_USER = 19
 
         // GoPro preset mode IDs
-        private const val PRESET_MODE_VIDEO = 1000
+        internal const val PRESET_MODE_VIDEO = 1000
         private const val PRESET_MODE_PHOTO = 1001
         private const val PRESET_MODE_TIMELAPSE = 1002
 

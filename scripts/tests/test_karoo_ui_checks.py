@@ -68,7 +68,11 @@ from pathlib import Path
 arguments = sys.argv[1:]
 with Path(os.environ["FAKE_CALLS"]).open("a") as log:
     log.write(" ".join(arguments) + "\\n")
-if arguments[-2:] == ["getprop", "sys.boot_completed"]:
+if arguments == ["devices"]:
+    print("List of devices attached")
+    if os.environ.get("FAKE_ABSENT") != "1":
+        print("emulator-5554\\t" + ("offline" if os.environ.get("FAKE_OFFLINE") == "1" else "device"))
+elif arguments[-2:] == ["getprop", "sys.boot_completed"]:
     if os.environ.get("FAKE_OFFLINE") == "1":
         print("error: device offline")
         sys.exit(1)
@@ -104,6 +108,20 @@ else:
         result = self.invoke(serial="personal-karoo")
         self.assertEqual(2, result.returncode)
         self.assertFalse(self.calls.exists())
+
+    def test_absent_emulator_fails_without_waiting_for_boot(self):
+        result = self.invoke(boot_timeout="120", FAKE_ABSENT="1")
+        self.assertEqual(1, result.returncode)
+        self.assertIn("emulator-5554 is absent", result.stderr)
+        self.assertIn("--start-emulator", result.stderr)
+        calls = self.calls.read_text()
+        # Only the failure diagnostics may query boot status; no boot polling.
+        self.assertEqual(1, calls.count("getprop sys.boot_completed"))
+        self.assertNotIn("emu avd name", calls)
+        self.assertNotIn("install", calls)
+        self.assertNotIn("pm grant", calls)
+        self.assertFalse((self.root / "logs/preflight.log").exists())
+        self.assertTrue((self.root / "logs/system-startup.log").is_file())
 
     def test_offline_device_exits_with_diagnostics(self):
         result = self.invoke(boot_timeout="0.15", FAKE_OFFLINE="1")

@@ -169,6 +169,10 @@ def main(argv=None):
             raise CheckFailure(f"ADB not found: {adb}; specify --sdk or ANDROID_SDK_ROOT")
         if args.start_emulator:
             emulator = start_emulator(args.sdk, adb, args.serial, directory)
+        else:
+            devices = run_logged([str(adb), "devices"], directory / "adb-devices.log", 5).stdout
+            if not re.search(rf"(?m)^{re.escape(args.serial)}\s", devices):
+                raise CheckFailure(f"{args.serial} is absent; start the Karoo AVD or rerun with --start-emulator")
         execute(args, adb, directory)
         return 0
     except (CheckFailure, OSError) as error:

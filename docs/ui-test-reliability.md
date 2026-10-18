@@ -48,6 +48,12 @@ The script reads `ANDROID_SDK_ROOT`, then `ANDROID_HOME`, or defaults to
 `--skip-build` requires both debug APKs already built for the selected runner;
 otherwise the script builds with the appropriate `cameraTestRunner` property.
 
+Without `--start-emulator`, the runner first checks the ADB device list. An
+absent serial fails immediately with instructions to start the Karoo AVD or use
+`--start-emulator`, instead of waiting for the boot deadline. An emulator listed
+as offline still gets the bounded boot wait; it is never started a second time.
+Failure diagnostics are retained for absent devices too.
+
 Preflight checks ADB responsiveness and `sys.boot_completed=1` within one
 shared deadline. Defaults are **120 seconds for boot**, **300 seconds for the
 build**, and **120 seconds for instrumentation**. Change them with

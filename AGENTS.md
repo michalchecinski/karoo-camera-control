@@ -29,6 +29,23 @@ update the appropriate document in the `docs` folder.
 
 Do not use an `agent/` prefix for branch names.
 
+For independent changes, fetch and create a new feature branch from the latest
+`origin/main` before implementation. Use another base only when the user requests
+it or the change depends on work on that branch; make that dependency explicit.
+Do not inherit unrelated feature changes from the current checkout.
+
+### Implementation and review
+
+After implementation, run the relevant checks and an automatic code review of
+the complete proposed diff against the intended base, including staged,
+unstaged, and relevant untracked files. Verify that only the requested work is
+included. Resolve actionable findings and repeat affected checks and review
+before committing. Follow the human-judgment rule below when a finding requires
+a maintainer decision.
+
+Commit the completed, reviewed changes on the feature branch and push it to its
+remote after every commit, unless the user explicitly instructs otherwise.
+
 ### PR
 
 When creating a PR, use `.github/PULL_REQUEST_TEMPLATE.md` and check every

@@ -34,6 +34,9 @@ Do not use an `agent/` prefix for branch names.
 When creating a PR, use `.github/PULL_REQUEST_TEMPLATE.md` and check every
 item on its checklist. Always add a `version:` label. When a PR changes the UI, include screenshots of only the changed screens (use the `karoo-screenshots` skill).
 
+Create ready-for-review PRs unless draft status is explicitly requested.
+Report pending validation in the checklist.
+
 ### Human judgment
 
 If a review comment or another issue genuinely requires human judgment, ask

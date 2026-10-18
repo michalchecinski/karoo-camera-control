@@ -78,7 +78,12 @@ class SettingsNavigationInstrumentation : Instrumentation() {
             capture("camera-connection-disconnected")
 
             val first = ConnectionState.Connected("GoPro Test Camera")
-            runOnMainSync { connection.value = first }
+            runOnMainSync {
+                field<MutableStateFlow<Boolean>>(manager, "_recordingStateKnown").value = true
+                field<MutableStateFlow<Boolean>>(manager, "_cameraModeKnown").value = true
+                field<MutableStateFlow<Int>>(manager, "_cameraMode").value = 0
+                connection.value = first
+            }
             waitForText("Connected to GoPro Test Camera")
             check(clickableParent(waitForDescription("Disconnect")).isEnabled)
             capture("camera-connection-connected")
@@ -130,11 +135,23 @@ class SettingsNavigationInstrumentation : Instrumentation() {
             runOnMainSync {
                 check(recording.value)
                 recording.value = false
+                // The earlier simulated disconnection reset the camera mode.
+                field<MutableStateFlow<Int>>(manager, "_cameraMode").value = 0
             }
+            waitForText("Record")
+            runOnMainSync { check(activity.recordHardwareAction != null) }
+            clickDescription("Mode")
+            waitForText("Select a mode to return to the remote.")
+            runOnMainSync { check(activity.recordHardwareAction == null) }
+            clickText("Video")
+            waitForText("Record")
+            runOnMainSync { check(model.uiState.value.navigation.destination == ScreenDestination.MAIN) }
             clickDescription("Settings and features")
+            runOnMainSync { check(activity.recordHardwareAction == null) }
             scrollForward()
             clickDescription("Camera connection")
-            clickDescription("Disconnect")
+            // Exercise a real touch as well as the accessibility actions used above.
+            touchText("Disconnect")
             waitForDescription("Settings and features")
             check(connection.value == ConnectionState.Disconnected)
 
@@ -215,6 +232,22 @@ class SettingsNavigationInstrumentation : Instrumentation() {
 
     private fun clickText(text: String) {
         tap(clickableParent(waitForText(text)))
+    }
+
+    private fun touchText(text: String) {
+        val bounds = Rect()
+        waitForText(text).getBoundsInScreen(bounds)
+        check(!bounds.isEmpty && bounds.top >= 48 && bounds.bottom <= 704) { "Touch target is outside the app: $bounds" }
+        val now = SystemClock.uptimeMillis()
+        for (action in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP)) {
+            val event = android.view.MotionEvent.obtain(now, SystemClock.uptimeMillis(), action, bounds.exactCenterX(), bounds.exactCenterY(), 0)
+            try {
+                sendPointerSync(event)
+            } finally {
+                event.recycle()
+            }
+        }
+        waitForIdleSync()
     }
 
     private fun tap(node: AccessibilityNodeInfo) {

@@ -2,7 +2,9 @@
 
 Open the gear icon on the camera screen to configure the extension. The
 full-screen **Settings & features** hub groups configuration separately from
-the camera's mode, preset and Record/Stop controls.
+the camera's mode, preset and Record/Stop controls. Mode and preset now open
+separate selection pages from the Glance remote; each returns directly to the
+remote and leaves settings navigation unchanged.
 
 ## Pages
 

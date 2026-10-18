@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +22,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.karoocameracontrol.R
 import com.karoocameracontrol.integrations.gopro.Preset
@@ -32,6 +38,7 @@ fun PresetSelectionScreen(
     activePresetId: Int?,
     onPresetSelected: (Preset) -> Unit,
     onBack: () -> Unit,
+    enabled: Boolean = true,
 ) {
     Box(
         modifier =
@@ -42,13 +49,13 @@ fun PresetSelectionScreen(
         Column(
             modifier =
                 Modifier
-                    .fillMaxSize(),
+                    .fillMaxSize().padding(bottom = 64.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "Select Preset",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 16.dp),
+                text = stringResource(if (enabled) R.string.remote_preset_help else R.string.remote_capture_locked),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(12.dp),
             )
 
             LazyColumn(
@@ -56,7 +63,7 @@ fun PresetSelectionScreen(
             ) {
                 items(presets) { preset ->
                     val isActive = preset.id == activePresetId
-                    PresetItem(preset = preset, isActive = isActive, onClick = { onPresetSelected(preset) })
+                    PresetItem(preset = preset, isActive = isActive, enabled = enabled, onClick = { onPresetSelected(preset) })
                     HorizontalDivider()
                 }
             }
@@ -82,13 +89,15 @@ fun PresetItem(
     preset: Preset,
     isActive: Boolean,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .background(if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface)
+                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                .semantics { selected = isActive }
+                .background(if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
                 .padding(vertical = 12.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -110,6 +119,8 @@ fun PresetItem(
         Text(
             text = name,
             style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
         )
+        if (isActive) Icon(Icons.Default.Check, contentDescription = stringResource(R.string.remote_selected), modifier = Modifier.size(20.dp))
     }
 }

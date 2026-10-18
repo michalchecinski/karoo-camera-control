@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,32 +13,28 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.karoocameracontrol.R
-import com.karoocameracontrol.components.SimpleAlertDialog
-import com.karoocameracontrol.integrations.gopro.PresetGroup
-import com.karoocameracontrol.integrations.gopro.PresetIcon
-import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun ConnectedScreen(
@@ -51,242 +46,162 @@ fun ConnectedScreen(
     batteryLevel: Int,
     remainingTime: Int,
     cameraMode: Int,
-    availablePresets: List<PresetGroup>,
     activePresetName: String?,
-    // Added Icon ID
-    activePresetIcon: Int?,
     onToggleRecording: () -> Unit,
-    onSetMode: (Int) -> Unit,
+    onOpenModeSelection: () -> Unit,
     onOpenPresetSelection: () -> Unit,
-    onDisconnect: () -> Unit,
-    onForget: () -> Unit,
     onFinish: () -> Unit,
+    recordingTarget: Boolean? = null,
+    commandError: String? = null,
+    presetsAvailable: Boolean = true,
+    radarStatus: String = "Off",
+    descentStatus: String = "Off",
+    cameraStateKnown: Boolean = true,
 ) {
-    var showForgetConfirmation by remember { mutableStateOf(false) }
-
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(top = 8.dp),
-        contentAlignment = Alignment.TopCenter,
+    val pending = isRecordingOperationInFlight
+    val stopAvailable = isRecording || pending
+    val status =
+        when {
+            commandError != null -> stringResource(R.string.remote_failed)
+            pending && recordingTarget == false -> stringResource(R.string.remote_stopping)
+            pending -> stringResource(R.string.remote_starting)
+            isProcessing -> stringResource(R.string.remote_busy)
+            !cameraStateKnown -> stringResource(R.string.remote_waiting)
+            isRecording -> stringResource(R.string.remote_recording)
+            else -> stringResource(R.string.remote_ready)
+        }
+    val mode = cameraModeLabel(cameraMode)
+    Column(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(bottom = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(bottom = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.remote_battery, batteryLevel), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    stringResource(R.string.remote_storage, "%dh %02dm".format(remainingTime.coerceAtLeast(0) / 3600, remainingTime.coerceAtLeast(0) % 3600 / 60)),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Column(
-                modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                Modifier.fillMaxWidth().height(70.dp),
+                verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Compact camera status leaves room for the controls on Karoo.
-                Row(
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                ) {
-                    Text(
-                        text = "Battery: $batteryLevel%",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-
-                    val hours = remainingTime / 3600
-                    val minutes = (remainingTime % 3600) / 60
-                    val seconds = remainingTime % 60
-
-                    val timeText =
-                        if (hours > 0) {
-                            "%dh %02dm".format(hours, minutes)
-                        } else {
-                            "%02dm %02ds".format(minutes, seconds)
-                        }
-
-                    Text(
-                        text = "Storage: $timeText",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-
-                // Mode Selection
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    val current = if (cameraMode >= 1000) cameraMode - 1000 else cameraMode
-
-                    // Video
-                    Button(
-                        onClick = { onSetMode(0) },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        enabled = !isProcessing && !isRecording,
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = if (current == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                            ),
-                    ) {
-                        Text("Video", style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    }
-
-                    // Photo
-                    Button(
-                        onClick = { onSetMode(1) },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        enabled = !isProcessing && !isRecording,
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = if (current == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                            ),
-                    ) {
-                        Text("Photo", style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    }
-
-                    // Timelapse
-                    Button(
-                        onClick = { onSetMode(2) },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        enabled = !isProcessing && !isRecording,
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = if (current == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                            ),
-                    ) {
-                        Text("Timelapse", style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                    }
-                }
-
-                val currentModeId = if (cameraMode < 1000) cameraMode + 1000 else cameraMode
-                val currentPresets = availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
-
-                if (currentPresets.isNotEmpty()) {
-                    Button(
-                        onClick = onOpenPresetSelection,
-                        enabled = !isProcessing && !isRecording,
-                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
-                    ) {
-                        activePresetIcon?.let { iconId ->
-                            Icon(
-                                imageVector = PresetIcon.getIcon(iconId),
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 8.dp).size(24.dp),
-                            )
-                        }
-                        Text(
-                            text = activePresetName?.let { "Preset: $it" } ?: "Change Preset",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                } else {
-                    activePresetName?.let {
-                        Text(
-                            text = "Preset: $it",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-            }
-
-            // Keep scrollable details clear of the fixed recording control.
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (isRecording) {
-                val duration = recordingDuration.seconds
-                val formattedDuration =
-                    duration.toComponents { _, minutes, seconds, _ ->
-                        "%02d:%02d".format(minutes, seconds)
-                    }
                 Text(
-                    text = formattedDuration,
-                    style = MaterialTheme.typography.displaySmall,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    status,
+                    style = if ((isRecording && !pending) || !cameraStateKnown) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.headlineSmall,
+                    color = if (stopAvailable || commandError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
                 )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.back),
-                    contentDescription = "Back",
-                    modifier = Modifier.size(54.dp).clickable { onFinish() },
-                )
-                Button(
-                    onClick = onToggleRecording,
-                    // A second press is always available to stop or cancel a recording
-                    // request, even before the camera sends its encoding-state update.
-                    enabled = !isProcessing || isRecording || isRecordingOperationInFlight,
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .height(64.dp),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor =
-                                if (isRecording || isRecordingOperationInFlight) {
-                                    MaterialTheme.colorScheme.error
-                                } else {
-                                    MaterialTheme.colorScheme.primary
-                                },
-                            disabledContainerColor =
-                                if (isRecording || isRecordingOperationInFlight) {
-                                    MaterialTheme.colorScheme.error.copy(
-                                        alpha = 0.5f,
-                                    )
-                                } else {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                },
-                        ),
-                ) {
-                    if (isProcessing && !isRecording && !isRecordingOperationInFlight) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(32.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 3.dp,
-                        )
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                        ) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(24.dp)
-                                        .background(
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                            shape = if (isRecording || isRecordingOperationInFlight) RectangleShape else CircleShape,
-                                        ),
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isRecording || isRecordingOperationInFlight) "Stop" else "Record",
-                                style = MaterialTheme.typography.titleLarge,
-                            )
-                        }
-                    }
+                if (isRecording && !pending && cameraStateKnown) {
+                    Text(
+                        recordingFieldTime(recordingDuration),
+                        fontSize = 40.sp,
+                        lineHeight = 44.sp,
+                    )
+                }
+                if (!isRecording || pending || commandError != null) {
+                    Text(
+                        commandError ?: if (pending) stringResource(R.string.remote_confirming) else stringResource(R.string.remote_connected, deviceName ?: "GoPro"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
                 }
             }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                CaptureChoice(
+                    label = stringResource(R.string.remote_mode),
+                    value = mode,
+                    enabled = cameraStateKnown && !isProcessing && !isRecording,
+                    onClick = onOpenModeSelection,
+                    modifier = Modifier.weight(1f),
+                )
+                CaptureChoice(
+                    label = stringResource(R.string.remote_preset),
+                    value = activePresetName ?: stringResource(R.string.remote_unavailable),
+                    enabled = cameraStateKnown && !isProcessing && !isRecording && presetsAvailable,
+                    onClick = onOpenPresetSelection,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            AutomationStatusRow(stringResource(R.string.remote_radar), radarStatus)
+            AutomationStatusRow(stringResource(R.string.remote_descent), descentStatus)
         }
-
-        if (showForgetConfirmation) {
-            SimpleAlertDialog(
-                dialogTitle = "Confirm Unpair",
-                dialogSubTitle = "Are you sure you want to unpair and forget this device?",
-                onDismissRequest = { showForgetConfirmation = false },
-                onConfirmation = {
-                    onForget()
-                    showForgetConfirmation = false
-                },
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Image(
+                painterResource(R.drawable.back),
+                contentDescription = stringResource(R.string.camera_alert_back),
+                modifier = Modifier.size(54.dp).clickable(role = Role.Button, onClick = onFinish),
             )
+            Button(
+                onClick = onToggleRecording,
+                enabled = (cameraStateKnown && !isProcessing) || stopAvailable,
+                modifier = Modifier.weight(1f).height(64.dp),
+                shape = RoundedCornerShape(topStart = 32.dp, bottomStart = 32.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if (stopAvailable) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary),
+            ) {
+                Box(Modifier.size(24.dp).background(MaterialTheme.colorScheme.onPrimary, if (stopAvailable) RectangleShape else CircleShape))
+                Spacer(Modifier.size(8.dp))
+                Text(stringResource(if (stopAvailable) R.string.remote_stop else R.string.remote_record), style = MaterialTheme.typography.titleLarge)
+            }
         }
     }
 }
+
+@Composable
+private fun CaptureChoice(
+    label: String,
+    value: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(48.dp).semantics { contentDescription = label },
+        shape = RoundedCornerShape(10.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+    ) {
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+            Text(label, style = MaterialTheme.typography.labelSmall)
+            Text(value, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text("›")
+    }
+}
+
+@Composable
+private fun AutomationStatusRow(
+    label: String,
+    status: String,
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.25f))
+        Text(
+            status,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(0.75f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+        )
+    }
+}
+
+internal fun recordingFieldTime(seconds: Int): String =
+    if (seconds >= 3600) {
+        "%d:%02d:%02d".format(seconds / 3600, seconds % 3600 / 60, seconds % 60)
+    } else {
+        "%02d:%02d".format(seconds.coerceAtLeast(0) / 60, seconds.coerceAtLeast(0) % 60)
+    }

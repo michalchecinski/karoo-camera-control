@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
     internal var recordHardwareAction: (() -> Unit)? = null
     private var pressedRecordAction: (() -> Unit)? = null
     private var recordKeyRepeated = false
+    private val otherHeldKeys = mutableSetOf<Int>()
     private var permissionsGranted by mutableStateOf(false)
 
     private val requestPermissionsLauncher =
@@ -61,12 +62,13 @@ class MainActivity : ComponentActivity() {
         event: KeyEvent,
     ): Boolean {
         if (keyCode != KeyEvent.KEYCODE_NAVIGATE_IN) {
+            otherHeldKeys.add(keyCode)
             recordKeyRepeated = true
             return super.onKeyDown(keyCode, event)
         }
         if (event.repeatCount == 0) {
             pressedRecordAction = recordHardwareAction
-            recordKeyRepeated = false
+            recordKeyRepeated = otherHeldKeys.isNotEmpty() || !event.hasNoModifiers()
         } else {
             recordKeyRepeated = true
         }
@@ -77,11 +79,12 @@ class MainActivity : ComponentActivity() {
         keyCode: Int,
         event: KeyEvent,
     ): Boolean {
+        otherHeldKeys.remove(keyCode)
         if (keyCode == KeyEvent.KEYCODE_NAVIGATE_IN) {
             val action = pressedRecordAction
             pressedRecordAction = null
             if (action != null) {
-                if (!event.isCanceled && !recordKeyRepeated && action === recordHardwareAction &&
+                if (!event.isCanceled && !recordKeyRepeated && event.hasNoModifiers() && action === recordHardwareAction &&
                     event.eventTime - event.downTime < ViewConfiguration.getLongPressTimeout()
                 ) {
                     action()
@@ -94,6 +97,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         pressedRecordAction = null
+        otherHeldKeys.clear()
         super.onPause()
     }
 

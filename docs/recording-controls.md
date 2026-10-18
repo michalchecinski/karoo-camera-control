@@ -53,7 +53,8 @@ only on the connected remote. It uses the same manual recording controller as
 touch. Settings, mode selection and preset selection retain normal key behavior.
 Held/repeated keys, cancelled events, combinations, and presses that cross
 screen or connection changes do not trigger recording. Leaving the activity
-clears an outstanding press.
+clears an outstanding press and held-key tracking. Combinations are suppressed
+in either press order, including when the other key is released before Record.
 
 This verifies the Android input route, not the physical Karoo mapping. The
 Karoo SDK describes the bottom-right D button as accept/navigate-in, but target

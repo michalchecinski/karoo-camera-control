@@ -232,6 +232,36 @@ class DescentUiInstrumentation : Instrumentation() {
                 activity.onKeyDown(android.view.KeyEvent.KEYCODE_NAVIGATE_IN, android.view.KeyEvent(now, now + 100, android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_NAVIGATE_IN, 1))
                 activity.onKeyUp(android.view.KeyEvent.KEYCODE_NAVIGATE_IN, android.view.KeyEvent(now, now + 200, android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_NAVIGATE_IN, 0))
                 check(!recording.value && controller.manualStopCount.value == countBeforeHeldPress)
+                var actions = 0
+                activity.recordHardwareAction = { actions++ }
+                val recordKey = android.view.KeyEvent.KEYCODE_NAVIGATE_IN
+                val otherKey = android.view.KeyEvent.KEYCODE_DPAD_UP
+
+                fun key(
+                    code: Int,
+                    down: Boolean,
+                ) {
+                    val action = if (down) android.view.KeyEvent.ACTION_DOWN else android.view.KeyEvent.ACTION_UP
+                    val event = android.view.KeyEvent(now, now + 250, action, code, 0)
+                    if (down) activity.onKeyDown(code, event) else activity.onKeyUp(code, event)
+                }
+                // Both press orders, and both release orders, must suppress recording.
+                for (recordFirst in listOf(false, true)) {
+                    for (recordReleasedFirst in listOf(false, true)) {
+                        val first = if (recordFirst) recordKey else otherKey
+                        val second = if (recordFirst) otherKey else recordKey
+                        val releasedFirst = if (recordReleasedFirst) recordKey else otherKey
+                        val releasedSecond = if (recordReleasedFirst) otherKey else recordKey
+                        key(first, true)
+                        key(second, true)
+                        key(releasedFirst, false)
+                        key(releasedSecond, false)
+                        check(actions == 0) { "Key combination triggered recording" }
+                    }
+                }
+                key(recordKey, true)
+                key(recordKey, false)
+                check(actions == 1) { "Standalone press must work after releasing a combination" }
                 activity.recordHardwareAction = null
             }
             runOnMainSync { title.value = "GoPro " + "Long camera name ".repeat(12) }

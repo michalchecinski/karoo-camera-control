@@ -36,7 +36,6 @@ class RadarRecordingController private constructor(context: Context) {
     private var rideActive = false
     private var systemConnected = false
     private var commandError: String? = null
-    private var keepAliveFailed = false
     private val mutableStatus = MutableStateFlow("Waiting for Karoo extension")
     val status = mutableStatus.asStateFlow()
     private val mutableOperationInFlight = MutableStateFlow(false)
@@ -69,20 +68,6 @@ class RadarRecordingController private constructor(context: Context) {
                 evaluate()
                 delay(250)
             }
-        }
-        controllerScope.launch {
-            keepAliveLoop(
-                shouldSend = {
-                    settings.settings.value.enabled && systemConnected && rideActive &&
-                        camera.connectionState.value is ConnectionState.Connected &&
-                        !camera.recordingCommands.state.value.busy && policy.pendingAction == null
-                },
-                send = camera::keepAlive,
-                onResult = { error ->
-                    keepAliveFailed = error != null
-                    if (error != null) Log.w(TAG, "GoPro keep-alive failed", error)
-                },
-            )
         }
     }
 
@@ -120,7 +105,6 @@ class RadarRecordingController private constructor(context: Context) {
         val cameraReady = camera.recordingStateKnown.value && camera.cameraModeKnown.value
         val video = camera.cameraMode.value == 0 || camera.cameraMode.value == 1000
         if (!connected) {
-            keepAliveFailed = false
             commandJob?.cancel()
             mutableOperationInFlight.value = false
         }
@@ -171,7 +155,7 @@ class RadarRecordingController private constructor(context: Context) {
                 !cameraReady -> "Waiting for camera recording state and mode"
                 !video -> "Select Video mode on the camera"
                 !rideActive -> "Waiting for an active ride"
-                keepAliveFailed -> "Camera keep-alive failed — check camera"
+                camera.keepAliveFailed.value -> "Camera keep-alive failed — check camera"
                 policy.suppressed -> "Manual override — waiting for radar clear"
                 policy.ownsRecording && policy.currentPresence(now) == RadarPresence.UNKNOWN -> "Radar unavailable — stopping after delay"
                 policy.ownsRecording && policy.currentPresence(now) == RadarPresence.CLEAR -> "Radar clear — stopping after ${config.stopDelaySeconds}s"
@@ -201,7 +185,6 @@ class RadarRecordingController private constructor(context: Context) {
         systemConnected = false
         commandError = null
         mutableOperationInFlight.value = false
-        keepAliveFailed = false
         mutableStatus.value = "Waiting for Karoo extension"
     }
 

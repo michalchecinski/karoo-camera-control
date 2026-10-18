@@ -29,6 +29,10 @@ enter the existing two-second reconnection delay.
 Diagnostic logs record the start and completion of readiness and command result
 codes, without recording the hardware-info payload.
 
+After setup reaches Connected, the shared connection starts its
+[60-second keep-alive loop](connection-keep-alive.md). This is independent of
+wake-up/readiness probing and does not run over a disconnected link.
+
 ## Validation
 
 Unit tests cover an awake camera, boot-time failures followed by success, a probe

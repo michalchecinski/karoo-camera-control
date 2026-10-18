@@ -39,6 +39,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -240,6 +241,49 @@ class GoProManager private constructor(private val context: Context) {
         }
     }
 
+    private val _keepAliveFailed = MutableStateFlow(false)
+    val keepAliveFailed = _keepAliveFailed.asStateFlow()
+    private val keepAlive =
+        ConnectionKeepAlive(
+            scope,
+            onResult = { error ->
+                _keepAliveFailed.value = error != null
+                if (error != null) Log.e(TAG, "GoPro keep-alive failed; retrying next interval", error)
+            },
+            awaitCommandIdle = { recordingCommands.state.first { !it.busy } },
+        )
+
+    /** Also called when the extension restarts with an existing ready connection. */
+    private fun startKeepAlive() {
+        val gatt = connectedGatt ?: return
+        if (connectionState.value !is ConnectionState.Connected) return
+        keepAlive.start(gatt) {
+            writeAndAwaitResponseSuspend(
+                writeUuid = GoProUUID.SETTING,
+                responseUuid = GoProUUID.SETTING_RESPONSE,
+                messageType = 0x5B,
+                value = GoProCommands.KEEP_ALIVE,
+                expectedGatt = gatt,
+            )
+        }
+    }
+
+    private fun stopKeepAlive() {
+        keepAlive.stop()
+        _keepAliveFailed.value = false
+    }
+
+    fun onExtensionStarted() {
+        keepAlive.resume()
+        startKeepAlive()
+    }
+
+    fun onExtensionStopped() {
+        // A handshake finishing after service teardown must not restart the task.
+        keepAlive.shutdown()
+        _keepAliveFailed.value = false
+    }
+
     private var connectionJob: Job? = null
     private var recordingTimerJob: Job? = null
     private var recordingStartTimeMs: Long = 0L
@@ -337,6 +381,7 @@ class GoProManager private constructor(private val context: Context) {
                         }
                     } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                         Log.d(TAG, "onConnectionStateChange: Disconnected from camera (status=$status)")
+                        stopKeepAlive()
                         connectedGatt?.close()
                         connectedGatt = null
                         _connectionState.value = ConnectionState.Disconnected
@@ -351,6 +396,7 @@ class GoProManager private constructor(private val context: Context) {
                     }
                 } else {
                     Log.e(TAG, "onConnectionStateChange: Error $status")
+                    stopKeepAlive()
                     connectedGatt?.close()
                     connectedGatt = null
                     _connectionState.value = ConnectionState.Error("Connection error: $status")
@@ -764,15 +810,6 @@ class GoProManager private constructor(private val context: Context) {
         }
     }
 
-    suspend fun keepAlive() {
-        writeAndAwaitResponseSuspend(
-            writeUuid = GoProUUID.SETTING,
-            responseUuid = GoProUUID.SETTING_RESPONSE,
-            messageType = 0x5B,
-            value = GoProCommands.KEEP_ALIVE,
-        )
-    }
-
     suspend fun stopRecording() {
         Log.i(TAG, "Recording stop requested")
         pauseRecordingTimer()
@@ -1043,6 +1080,7 @@ class GoProManager private constructor(private val context: Context) {
 
                         savePairedDevice(device)
                         _connectionState.value = ConnectionState.Connected(device.name ?: device.address)
+                        startKeepAlive()
                         Log.d(TAG, "GoPro Connection Fully Established!")
                         _activePresetName.value = null // Clear when connected, will be set on loadPreset or by camera update
                         _activePresetIcon.value = null
@@ -1097,6 +1135,7 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     private fun disconnectGatt() {
+        stopKeepAlive()
         connectedGatt?.disconnect()
         connectedGatt?.close()
         connectedGatt = null
@@ -1236,6 +1275,7 @@ class GoProManager private constructor(private val context: Context) {
                             activeContinuation = null
                             currentOperationType = BleOperationType.NONE
                         }
+                        stopKeepAlive()
                         connectedGatt?.close()
                         connectedGatt = null
                     }
@@ -1309,7 +1349,14 @@ class GoProManager private constructor(private val context: Context) {
         responseUuid: UUID,
         messageType: Byte,
         value: ByteArray,
+        expectedGatt: BluetoothGatt? = null,
     ) = operationMutex.withLock {
+        currentCoroutineContext().ensureActive()
+        if (expectedGatt != null) {
+            check(connectedGatt === expectedGatt && connectionState.value is ConnectionState.Connected) {
+                "Keep-alive connection is no longer current"
+            }
+        }
         val response = CompletableDeferred<ByteArray>()
         val pending = PendingResponse(responseUuid, messageType, response)
         synchronized(responseLock) {

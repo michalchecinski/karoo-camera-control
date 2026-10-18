@@ -45,6 +45,7 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
         super.onCreate()
 
         goProManager = GoProManager.getInstance(applicationContext)
+        goProManager.onExtensionStarted()
         descentMonitor =
             DescentRecordingMonitor(
                 scope,
@@ -85,6 +86,7 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     }
 
     override fun onDestroy() {
+        goProManager.onExtensionStopped()
         alertMonitor.stop()
         radarRecording.stop()
         descentMonitor.stop()

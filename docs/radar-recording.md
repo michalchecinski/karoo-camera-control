@@ -45,13 +45,13 @@ Connect a supported GoPro and select Video mode, then start a Karoo ride.
 automation-owned recording. When the extension starts with the feature
 enabled it tries the existing saved-camera reconnect flow after requesting
 Bluetooth access from Karoo. First pairing still requires the normal setup.
-While enabled during an active ride, the controller sends Open GoPro
-keep-alive messages every three seconds to keep the connected camera ready
-between clips. This keeps the camera awake and uses battery. It does not
-change the camera's saved auto-power-off setting. Keep-alive failures appear
-in the status card and are retried on the next interval, including response
-timeouts. Cancelling the extension stops the loop without reporting a camera
-failure or sending another keep-alive.
+The shared BLE connection sends [keep-alive](connection-keep-alive.md) every
+60 seconds, independently of radar/descent preferences, ride state and recording
+state. Closing configuration does not stop it while the connection remains active.
+Keeping a camera awake costs battery and leaves its saved auto-power-off setting
+unchanged. The 60-second interval still requires physical model/firmware validation;
+Open GoPro recommends three seconds. Failures are logged and retried, and the
+existing radar status warning reflects the shared connection's latest result.
 
 ## Recording lifecycle
 
@@ -106,9 +106,9 @@ Build and formatting:
 The dependency-free Android instrumentation runner covers the radar decoder,
 start guards, recording ownership, the clear timer, repeated traffic, manual
 overrides, physical shutter stops, radar silence/loss, disconnection, and
-command failure cleanup/retry. They also exercise a real coroutine timeout
-followed by a successful keep-alive retry and cancellation during an
-in-flight keep-alive. Shared command checks verify radar/descent ownership,
+command failure cleanup/retry. The JVM connection keep-alive tests cover
+scheduling, response timeout recovery and cancellation independently of radar.
+Shared command checks verify radar/descent ownership,
 manual cancellation, and failed radar cleanup retries:
 
 ```sh

@@ -54,5 +54,7 @@ class ScreenNavigationTest {
         assertEquals(ScreenDestination.MAIN, ScreenNavigation(ScreenDestination.SCANNING).back().destination)
         assertFalse(ScreenNavigation(ScreenDestination.PRESETS).showsSettingsAction)
         assertTrue(ScreenNavigation(ScreenDestination.SCANNING).showsSettingsAction)
+        assertEquals(ScreenDestination.MAIN, ScreenNavigation(ScreenDestination.MODES).back().destination)
+        assertFalse(ScreenNavigation(ScreenDestination.MODES).showsSettingsAction)
     }
 }

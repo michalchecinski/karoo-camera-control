@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.ViewConfiguration
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +20,9 @@ import com.karoocameracontrol.theme.AppTheme
 import com.karoocameracontrol.diagnostics.DiagnosticLog as Log
 
 class MainActivity : ComponentActivity() {
+    internal var recordHardwareAction: (() -> Unit)? = null
+    private var pressedRecordAction: (() -> Unit)? = null
+    private var recordKeyRepeated = false
     private var permissionsGranted by mutableStateOf(false)
 
     private val requestPermissionsLauncher =
@@ -45,9 +50,51 @@ class MainActivity : ComponentActivity() {
                 MainScreen(
                     permissionsGranted = permissionsGranted,
                     onFinish = { finish() },
+                    onRecordActionChanged = { recordHardwareAction = it },
                 )
             }
         }
+    }
+
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (keyCode != KeyEvent.KEYCODE_NAVIGATE_IN) {
+            recordKeyRepeated = true
+            return super.onKeyDown(keyCode, event)
+        }
+        if (event.repeatCount == 0) {
+            pressedRecordAction = recordHardwareAction
+            recordKeyRepeated = false
+        } else {
+            recordKeyRepeated = true
+        }
+        return if (pressedRecordAction != null) true else super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_NAVIGATE_IN) {
+            val action = pressedRecordAction
+            pressedRecordAction = null
+            if (action != null) {
+                if (!event.isCanceled && !recordKeyRepeated && action === recordHardwareAction &&
+                    event.eventTime - event.downTime < ViewConfiguration.getLongPressTimeout()
+                ) {
+                    action()
+                }
+                return true
+            }
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    override fun onPause() {
+        pressedRecordAction = null
+        super.onPause()
     }
 
     private fun checkAndRequestPermissions() {

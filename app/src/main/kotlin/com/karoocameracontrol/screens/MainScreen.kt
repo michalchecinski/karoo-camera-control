@@ -21,7 +21,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +47,7 @@ import com.karoocameracontrol.integrations.gopro.PairedDevice
 fun MainScreen(
     permissionsGranted: Boolean,
     onFinish: () -> Unit,
+    onRecordActionChanged: (((() -> Unit)?) -> Unit) = {},
 ) {
     val viewModel: MainViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
@@ -57,6 +60,17 @@ fun MainScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var connectionToForget by remember { mutableStateOf<ConnectionState.Connected?>(null) }
     val destination = uiState.navigation.destination
+    val recordAction =
+        remember(viewModel, destination, System.identityHashCode(uiState.connectionState)) {
+            val connection = uiState.connectionState
+            if (destination == ScreenDestination.MAIN && connection is ConnectionState.Connected) {
+                { viewModel.toggleRecording(connection) }
+            } else {
+                null
+            }
+        }
+    SideEffect { onRecordActionChanged(recordAction) }
+    DisposableEffect(Unit) { onDispose { onRecordActionChanged(null) } }
     val screenStateHolder = rememberSaveableStateHolder()
     val onBack: () -> Unit = {
         if (destination != ScreenDestination.MAIN) {
@@ -102,9 +116,10 @@ fun MainScreen(
                         ScreenDestination.FEEDBACK -> stringResource(R.string.settings_feedback)
                         ScreenDestination.SCANNING -> "Scan Devices"
                         ScreenDestination.PRESETS -> stringResource(R.string.settings_presets)
+                        ScreenDestination.MODES -> stringResource(R.string.remote_mode_title)
                         ScreenDestination.MAIN ->
                             if (currentState is ConnectionState.Connected) {
-                                "Connected to ${currentState.deviceName ?: "Unknown Device"}"
+                                currentState.deviceName ?: "GoPro"
                             } else {
                                 "Karoo Camera Control"
                             }
@@ -183,6 +198,13 @@ fun MainScreen(
                         onRetry = viewModel::retryDiagnostics,
                         onDiscard = viewModel::discardDiagnostics,
                     )
+                } else if (destination == ScreenDestination.MODES) {
+                    ModeSelectionScreen(
+                        cameraMode = uiState.cameraMode,
+                        enabled = currentState is ConnectionState.Connected && uiState.cameraStateKnown && !uiState.isProcessing && !uiState.isRecording,
+                        onSelected = viewModel::setMode,
+                        onBack = onBack,
+                    )
                 } else if (destination == ScreenDestination.PRESETS) {
                     val currentModeId = if (uiState.cameraMode < 1000) uiState.cameraMode + 1000 else uiState.cameraMode
                     val currentPresets = uiState.availablePresets.find { it.id == currentModeId }?.presets ?: emptyList()
@@ -190,6 +212,7 @@ fun MainScreen(
                     PresetSelectionScreen(
                         presets = currentPresets,
                         activePresetId = uiState.activePresetId,
+                        enabled = currentState is ConnectionState.Connected && uiState.cameraStateKnown && !uiState.isProcessing && !uiState.isRecording,
                         onPresetSelected = { preset ->
                             viewModel.loadPreset(preset.id)
                         },
@@ -205,15 +228,24 @@ fun MainScreen(
                         batteryLevel = uiState.batteryLevel,
                         remainingTime = uiState.remainingVideoTime,
                         cameraMode = uiState.cameraMode,
-                        availablePresets = uiState.availablePresets,
                         activePresetName = uiState.activePresetName,
-                        activePresetIcon = uiState.activePresetIcon,
                         onToggleRecording = { viewModel.toggleRecording() },
-                        onSetMode = { mode -> viewModel.setMode(mode) },
+                        onOpenModeSelection = { viewModel.navigate(ScreenDestination.MODES) },
                         onOpenPresetSelection = { viewModel.navigate(ScreenDestination.PRESETS) },
-                        onDisconnect = { viewModel.disconnect() },
-                        onForget = { connectionToForget = currentState },
                         onFinish = onBack,
+                        recordingTarget = uiState.recordingTarget,
+                        cameraStateKnown = uiState.cameraStateKnown,
+                        commandError = uiState.cameraCommandError,
+                        presetsAvailable = uiState.availablePresets.any { normalizedCameraMode(it.id) == normalizedCameraMode(uiState.cameraMode) && it.presets.isNotEmpty() },
+                        radarStatus = if (radarSettings.enabled) radarStatus else stringResource(R.string.settings_off),
+                        descentStatus =
+                            when {
+                                uiState.descentOwnsRecording && uiState.isRecordingOperationInFlight ->
+                                    stringResource(if (uiState.recordingTarget == false) R.string.remote_stopping else R.string.remote_starting)
+                                uiState.descentOwnsRecording && uiState.isRecording -> stringResource(R.string.remote_recording)
+                                descentSettings.enabled -> descentStatus.message
+                                else -> stringResource(R.string.settings_off)
+                            },
                     )
                 } else if (destination == ScreenDestination.SCANNING) {
                     ScanningScreen(

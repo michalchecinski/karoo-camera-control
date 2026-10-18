@@ -12,6 +12,7 @@ import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.PresetGroup
 import com.karoocameracontrol.radar.RadarRecordingController
 import com.karoocameracontrol.radar.RadarRecordingSettings
+import com.karoocameracontrol.recording.AutomaticRecordingOwner
 import com.karoocameracontrol.recording.DescentSettings
 import com.karoocameracontrol.recording.DescentSettingsStore
 import com.karoocameracontrol.recording.ManualRecording
@@ -32,12 +33,15 @@ data class MainUiState(
     val isAutoConnecting: Boolean = false,
     val isProcessing: Boolean = false,
     val isRecordingOperationInFlight: Boolean = false,
+    val recordingTarget: Boolean? = null,
+    val descentOwnsRecording: Boolean = false,
     val navigation: ScreenNavigation = ScreenNavigation(),
     val cameraCommandError: String? = null,
     // Device Data
     val scannedDevices: List<android.bluetooth.BluetoothDevice> = emptyList(),
     val pairedDevices: List<com.karoocameracontrol.integrations.gopro.PairedDevice> = emptyList(),
     val isRecording: Boolean = false,
+    val cameraStateKnown: Boolean = false,
     val recordingDuration: Int = 0,
     val batteryLevel: Int = 0,
     val remainingVideoTime: Int = 0,
@@ -112,9 +116,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             goProManager.recordingDuration,
             goProManager.batteryLevel,
             goProManager.remainingVideoTime,
-            goProManager.cameraMode,
-        ) { isRecording, recordingDuration, batteryLevel, remainingVideoTime, cameraMode ->
-            StatusInfo(isRecording, recordingDuration, batteryLevel, remainingVideoTime, cameraMode)
+            combine(goProManager.cameraMode, goProManager.recordingStateKnown, goProManager.cameraModeKnown) { mode, recordingKnown, modeKnown ->
+                mode to (recordingKnown && modeKnown)
+            },
+        ) { isRecording, recordingDuration, batteryLevel, remainingVideoTime, mode ->
+            StatusInfo(isRecording, recordingDuration, batteryLevel, remainingVideoTime, mode.first, mode.second)
         }
 
     // 3. Group Preset Data
@@ -140,6 +146,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             localState.copy(
                 isProcessing = commandState.busy,
                 isRecordingOperationInFlight = commandState.recordingInFlight,
+                recordingTarget = commandState.targetRecording,
+                descentOwnsRecording = goProManager.recordingCommands.ownsRecording(AutomaticRecordingOwner.DESCENT),
                 cameraCommandError = commandState.error,
                 // Connection
                 connectionState = connInfo.first,
@@ -147,6 +155,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 pairedDevices = connInfo.third,
                 // Status
                 isRecording = statInfo.isRecording,
+                cameraStateKnown = statInfo.cameraStateKnown,
                 recordingDuration = statInfo.recordingDuration,
                 batteryLevel = statInfo.batteryLevel,
                 remainingVideoTime = statInfo.remainingVideoTime,
@@ -170,6 +179,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val batteryLevel: Int,
         val remainingVideoTime: Int,
         val cameraMode: Int,
+        val cameraStateKnown: Boolean,
     )
 
     private data class PresetInfo(
@@ -262,19 +272,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removePairedDevice(address: String) = goProManager.removePairedDevice(address)
 
-    fun toggleRecording() {
+    fun toggleRecording(expectedConnection: ConnectionState.Connected? = null) {
+        if (expectedConnection != null && goProManager.connectionState.value !== expectedConnection) return
+        val command = goProManager.recordingCommands.state.value
+        val stopAvailable = goProManager.isRecording.value || command.recordingInFlight
+        if (!stopAvailable && (!goProManager.recordingStateKnown.value || !goProManager.cameraModeKnown.value || command.busy)) return
         ManualRecording.toggle(getApplication())
     }
 
     fun setMode(mode: Int) {
+        if (goProManager.connectionState.value !is ConnectionState.Connected) return
+        if (!goProManager.recordingStateKnown.value || !goProManager.cameraModeKnown.value) return
         if (goProManager.recordingCommands.state.value.busy || goProManager.isRecording.value) return
+        if (normalizedCameraMode(goProManager.cameraMode.value) == mode) {
+            if (_uiState.value.navigation.destination == ScreenDestination.MODES) navigateBack()
+            return
+        }
         radarRecording.manualOverride()
         goProManager.recordingCommands.configure {
             goProManager.setMode(mode)
+            if (_uiState.value.navigation.destination == ScreenDestination.MODES) navigateBack()
         }
     }
 
     fun loadPreset(presetId: Int) {
+        if (goProManager.connectionState.value !is ConnectionState.Connected) return
+        if (!goProManager.recordingStateKnown.value || !goProManager.cameraModeKnown.value) return
         if (goProManager.recordingCommands.state.value.busy || goProManager.isRecording.value) return
         radarRecording.manualOverride()
         goProManager.recordingCommands.configure {

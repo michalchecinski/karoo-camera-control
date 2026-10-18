@@ -3,6 +3,7 @@ package com.karoocameracontrol.screens
 enum class ScreenDestination {
     MAIN,
     SCANNING,
+    MODES,
     PRESETS,
     SETTINGS,
     AUTOMATIC_RECORDING,

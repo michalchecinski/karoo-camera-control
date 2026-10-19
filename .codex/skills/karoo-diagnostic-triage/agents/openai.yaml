@@ -1,0 +1,7 @@
+interface:
+  display_name: "Karoo Diagnostic Triage"
+  short_description: "Check diagnostic logs before fixing Karoo app bugs"
+  default_prompt: "Use $karoo-diagnostic-triage to find matching Sentry reports, inspect their logs, and verify the cause of this Karoo Camera Control bug."
+
+policy:
+  allow_implicit_invocation: true

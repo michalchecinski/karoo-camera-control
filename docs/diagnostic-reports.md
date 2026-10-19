@@ -70,6 +70,18 @@ carry typed reasons (expired, preparation failure, or upload failure), which the
 Feedback screen maps to localized messages. Retry remains available only while
 a pending report can be submitted.
 
+## Investigating reported bugs
+
+The repository's
+[diagnostic triage skill](../.codex/skills/karoo-diagnostic-triage/SKILL.md)
+requires checking available Sentry reports and reading their `diagnostics.txt`
+attachments before choosing a fix for a reported malfunction, even when the
+user does not mention logs. It correlates the incident with the affected app
+version and session, distinguishes observations from unconfirmed explanations,
+and reports missing evidence without blocking independent code investigation.
+Sentry access remains read-only; private attachments are not committed or
+published in issues and pull requests.
+
 ## Release validation
 
 Run the diagnostic unit tests, the Gradle build, and ktlint. Inspect the Feedback

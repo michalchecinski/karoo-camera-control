@@ -80,6 +80,7 @@ class RecordingFieldInstrumentation : Instrumentation() {
 
                 val states =
                     when (scene) {
+                        "wake" -> listOf(RecordingFieldState(RecordingFieldStatus.WAKE_READY, RecordingFieldAction.START), RecordingFieldState(RecordingFieldStatus.WAKING, RecordingFieldAction.STOP))
                         "radar-cleanup" -> listOf(radarCleanup, RecordingFieldState(RecordingFieldStatus.STOPPING))
                         "pending" -> listOf(RecordingFieldState(RecordingFieldStatus.STARTING, RecordingFieldAction.STOP), RecordingFieldState(RecordingFieldStatus.STOPPING))
                         "unavailable" -> listOf(RecordingFieldState(RecordingFieldStatus.DISCONNECTED), RecordingFieldState(RecordingFieldStatus.UNKNOWN))
@@ -108,6 +109,12 @@ class RecordingFieldInstrumentation : Instrumentation() {
             }
             waitForIdleSync()
             if (capture) {
+                Thread.sleep(300)
+                val bitmap = checkNotNull(uiAutomation.takeScreenshot())
+                targetContext.cacheDir.resolve("ride-recording-$scene.png").outputStream().use {
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                }
+                bitmap.recycle()
                 sendStatus(0, Bundle().apply { putString("stream", "READY: $scene screenshot") })
                 Thread.sleep(15000)
             }

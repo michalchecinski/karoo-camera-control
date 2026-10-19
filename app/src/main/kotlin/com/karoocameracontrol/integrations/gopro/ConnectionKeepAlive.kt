@@ -9,7 +9,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/** One periodic task per ready BLE session, independent of UI and recording preferences. */
+/** One periodic task per ready BLE session, enabled by the active-ride readiness policy. */
 internal class ConnectionKeepAlive(
     private val scope: CoroutineScope,
     private val onResult: (Exception?) -> Unit,
@@ -74,6 +74,6 @@ internal class ConnectionKeepAlive(
     }
 
     companion object {
-        const val INTERVAL_MS = 60_000L
+        const val INTERVAL_MS = 3_000L
     }
 }

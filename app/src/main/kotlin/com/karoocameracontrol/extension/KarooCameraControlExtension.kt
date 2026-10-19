@@ -3,13 +3,13 @@ package com.karoocameracontrol.extension
 import android.content.Intent
 import com.karoocameracontrol.alerts.CameraAlertMonitor
 import com.karoocameracontrol.alerts.CameraAlertSettingsStore
+import com.karoocameracontrol.connection.CameraReadinessMonitor
 import com.karoocameracontrol.integrations.gopro.GoProBatteryDataType
 import com.karoocameracontrol.integrations.gopro.GoProManager
 import com.karoocameracontrol.integrations.gopro.GoProRecTimeDataType
 import com.karoocameracontrol.integrations.gopro.GoProRecordingDataType
 import com.karoocameracontrol.integrations.gopro.GoProStatusDataType
 import com.karoocameracontrol.radar.RadarRecordingController
-import com.karoocameracontrol.radar.RadarRecordingSettings
 import com.karoocameracontrol.recording.DescentRecordingMonitor
 import com.karoocameracontrol.recording.DescentSettingsStore
 import io.hammerhead.karooext.KarooSystemService
@@ -28,6 +28,7 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
     private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
     private lateinit var alertMonitor: CameraAlertMonitor
     private lateinit var descentMonitor: DescentRecordingMonitor
+    private lateinit var readinessMonitor: CameraReadinessMonitor
     private val radarRecording by lazy { RadarRecordingController.getInstance(applicationContext) }
 
     private val karooSystem by lazy { KarooSystemService(applicationContext) }
@@ -46,6 +47,8 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
 
         goProManager = GoProManager.getInstance(applicationContext)
         goProManager.onExtensionStarted()
+        readinessMonitor = CameraReadinessMonitor(applicationContext, scope, karooSystem, goProManager)
+        readinessMonitor.start()
         descentMonitor =
             DescentRecordingMonitor(
                 scope,
@@ -60,14 +63,12 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
 
         karooSystem.connect { connected ->
             scope.launch {
+                readinessMonitor.systemConnectionChanged(connected)
                 alertMonitor.systemConnectionChanged(connected)
                 descentMonitor.systemConnectionChanged(connected)
                 radarRecording.onSystemConnection(connected)
                 if (connected) {
                     karooSystem.dispatch(RequestBluetooth(extension))
-                    if (RadarRecordingSettings.getInstance(applicationContext).settings.value.enabled) {
-                        goProManager.tryAutoConnect()
-                    }
                 }
             }
         }
@@ -79,13 +80,13 @@ class KarooCameraControlExtension : KarooExtension("karoo-camera-control", "1.0"
         startId: Int,
     ): Int {
         Log.d(TAG, "KarooCameraControlExtension onStartCommand.")
-        // If the extension is started manually or by the system,
-        // we might want to automatically try to reconnect to a known GoPro.
-        // For now, it will just observe the state.
+        // The ride readiness subscription decides when to wake a saved camera.
+        // Starting the service alone must not wake it outside an eligible ride.
         return START_STICKY
     }
 
     override fun onDestroy() {
+        readinessMonitor.stop()
         goProManager.onExtensionStopped()
         alertMonitor.stop()
         radarRecording.stop()

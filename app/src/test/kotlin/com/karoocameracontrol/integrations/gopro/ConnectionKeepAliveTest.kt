@@ -39,7 +39,7 @@ class ConnectionKeepAliveTest {
             )
 
         suspend fun tick() {
-            assertEquals(60_000L, withTimeout(2_000) { waits.receive() })
+            assertEquals(3_000L, withTimeout(2_000) { waits.receive() })
             ticks.send(Unit)
             yield()
         }
@@ -52,7 +52,7 @@ class ConnectionKeepAliveTest {
         }
     }
 
-    @Test fun oneLoopPerConnectionSendsOnlyAtSixtySecondIntervals() =
+    @Test fun oneLoopPerConnectionSendsOnlyAtThreeSecondIntervals() =
         runBlocking {
             val f = Fixture(this)
             try {
@@ -153,7 +153,7 @@ class ConnectionKeepAliveTest {
                 val connection = Any()
                 f.loop.start(connection) { writes++ }
                 yield()
-                assertEquals(60_000L, f.waits.receive())
+                assertEquals(3_000L, f.waits.receive())
                 f.loop.shutdown()
                 yield()
                 assertEquals(0, writes)
@@ -222,14 +222,14 @@ class ConnectionKeepAliveTest {
             try {
                 var writes = 0
                 f.loop.start(Any()) {
-                    f.time += if (++writes == 1) 5_000 else 180_000
+                    f.time += if (++writes == 1) 1_000 else 9_000
                 }
                 f.tick()
                 assertEquals(null, f.result())
-                assertEquals(55_000L, f.waits.receive())
+                assertEquals(2_000L, f.waits.receive())
                 f.ticks.send(Unit)
                 assertEquals(null, f.result())
-                assertEquals(60_000L, f.waits.receive())
+                assertEquals(3_000L, f.waits.receive())
                 assertFalse(f.results.tryReceive().isSuccess)
             } finally {
                 f.close()

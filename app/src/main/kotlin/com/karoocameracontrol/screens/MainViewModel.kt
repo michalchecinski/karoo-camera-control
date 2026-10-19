@@ -6,6 +6,7 @@ import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.karoocameracontrol.alerts.CameraAlertSettingsStore
+import com.karoocameracontrol.connection.CameraReadinessSettings
 import com.karoocameracontrol.diagnostics.DiagnosticReports
 import com.karoocameracontrol.integrations.gopro.ConnectionState
 import com.karoocameracontrol.integrations.gopro.GoProManager
@@ -16,6 +17,7 @@ import com.karoocameracontrol.recording.AutomaticRecordingOwner
 import com.karoocameracontrol.recording.DescentSettings
 import com.karoocameracontrol.recording.DescentSettingsStore
 import com.karoocameracontrol.recording.ManualRecording
+import com.karoocameracontrol.recording.RecordingFieldAction
 import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.ReleaseBluetooth
 import io.hammerhead.karooext.models.RequestBluetooth
@@ -34,6 +36,9 @@ data class MainUiState(
     val isProcessing: Boolean = false,
     val isRecordingOperationInFlight: Boolean = false,
     val recordingTarget: Boolean? = null,
+    val isWaking: Boolean = false,
+    val canWakeRecording: Boolean = false,
+    val wakeTargetAddress: String? = null,
     val descentOwnsRecording: Boolean = false,
     val navigation: ScreenNavigation = ScreenNavigation(),
     val cameraCommandError: String? = null,
@@ -80,6 +85,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val goProManager = GoProManager.getInstance(application)
     private val karooSystem = KarooSystemService(application)
     private val radarRecording = RadarRecordingController.getInstance(application)
+    val readinessSettings = CameraReadinessSettings.getInstance(application)
     val cameraAlertSettings = CameraAlertSettingsStore.getInstance(application)
     val radarSettings = RadarRecordingSettings.getInstance(application)
     val radarStatus =
@@ -147,6 +153,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isProcessing = commandState.busy,
                 isRecordingOperationInFlight = commandState.recordingInFlight,
                 recordingTarget = commandState.targetRecording,
+                isWaking = commandState.waking,
+                canWakeRecording = goProManager.canWakeForRecording(),
+                wakeTargetAddress = goProManager.wakeTargetAddress(),
                 descentOwnsRecording = goProManager.recordingCommands.ownsRecording(AutomaticRecordingOwner.DESCENT),
                 cameraCommandError = commandState.error,
                 // Connection
@@ -197,14 +206,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
-            goProManager.pairedDevices.collect { devices ->
-                if (devices.isNotEmpty() && _uiState.value.connectionState is ConnectionState.Disconnected) {
-                    // Logic to handle auto-connect if needed, currently triggered by LaunchedEffect in MainScreen.
-                }
-            }
-        }
-
-        viewModelScope.launch {
             // New logic: When connected, automatically dismiss scanning screen
             goProManager.connectionState.collect { connectionState ->
                 if (connectionState is ConnectionState.Connected) {
@@ -219,18 +220,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         karooSystem.dispatch(ReleaseBluetooth("karoo-camera-control-ui"))
         karooSystem.disconnect()
         super.onCleared()
-    }
-
-    // Explicit AutoConnect trigger
-    private var autoConnectAttempted = false
-
-    fun tryAutoConnect() {
-        if (autoConnectAttempted) return
-        autoConnectAttempted = true
-        if (goProManager.pairedDevices.value.isNotEmpty()) {
-            _uiState.value = _uiState.value.copy(isAutoConnecting = true)
-            goProManager.tryAutoConnect()
-        }
     }
 
     fun startScan() {
@@ -272,11 +261,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removePairedDevice(address: String) = goProManager.removePairedDevice(address)
 
-    fun toggleRecording(expectedConnection: ConnectionState.Connected? = null) {
+    fun toggleRecording(expectedConnection: ConnectionState? = null) {
         if (expectedConnection != null && goProManager.connectionState.value !== expectedConnection) return
         val command = goProManager.recordingCommands.state.value
         val stopAvailable = goProManager.isRecording.value || command.recordingInFlight
-        if (!stopAvailable && (!goProManager.recordingStateKnown.value || !goProManager.cameraModeKnown.value || command.busy)) return
+        if (!stopAvailable && !goProManager.canWakeForRecording() &&
+            (!goProManager.recordingStateKnown.value || !goProManager.cameraModeKnown.value || command.busy)
+        ) {
+            return
+        }
         ManualRecording.toggle(getApplication())
     }
 
@@ -305,6 +298,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (_uiState.value.navigation.destination == ScreenDestination.PRESETS) navigateBack()
         }
     }
+
+    fun wakeAndRecord(expectedCamera: String?) =
+        ManualRecording.perform(getApplication(), RecordingFieldAction.START, expectedCamera)
+
+    fun cancelRecordingWake() = goProManager.recordingCommands.cancelWake()
 
     fun clearCameraCommandError() = goProManager.recordingCommands.clearError()
 

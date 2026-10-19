@@ -16,10 +16,11 @@ class RecordingFieldReceiver : BroadcastReceiver() {
                 ACTION_STOP -> RecordingFieldAction.STOP
                 else -> return
             }
-        ManualRecording.perform(context.applicationContext, action)
+        ManualRecording.perform(context.applicationContext, action, intent.getStringExtra(EXTRA_CAMERA))
     }
 
     companion object {
+        const val EXTRA_CAMERA = "camera"
         const val ACTION_START = "com.karoocameracontrol.recording.START"
         const val ACTION_STOP = "com.karoocameracontrol.recording.STOP"
     }

@@ -10,9 +10,10 @@ data class RecordingFieldInput(
     val command: CameraCommandState = CameraCommandState(),
     val seconds: Int = 0,
     val radarStopRequired: Boolean = false,
+    val canWake: Boolean = false,
 )
 
-enum class RecordingFieldStatus { DISCONNECTED, UNKNOWN, VIDEO_REQUIRED, READY, STARTING, RECORDING, STOPPING, BUSY, FAILED }
+enum class RecordingFieldStatus { DISCONNECTED, WAKE_READY, WAKING, UNKNOWN, VIDEO_REQUIRED, READY, STARTING, RECORDING, STOPPING, BUSY, FAILED }
 
 enum class RecordingFieldAction { START, STOP }
 
@@ -25,6 +26,14 @@ data class RecordingFieldState(
 
 fun recordingFieldState(input: RecordingFieldInput): RecordingFieldState {
     val command = input.command
+    if (command.waking) return RecordingFieldState(RecordingFieldStatus.WAKING, RecordingFieldAction.STOP)
+    if (!input.connected && input.canWake) {
+        return if (command.error != null) {
+            RecordingFieldState(RecordingFieldStatus.FAILED, RecordingFieldAction.START, command.error)
+        } else {
+            RecordingFieldState(RecordingFieldStatus.WAKE_READY, RecordingFieldAction.START)
+        }
+    }
     if (!input.connected) return RecordingFieldState(RecordingFieldStatus.DISCONNECTED)
     if (command.recordingInFlight) {
         return if (command.targetRecording == false) {
@@ -64,7 +73,11 @@ fun performRecordingFieldAction(
     manualOverride: () -> Boolean,
 ): Boolean {
     if (recordingFieldState(input).action != action) return false
-    val forceStop = manualOverride()
-    controller.toggleManually(forceStop = forceStop || action == RecordingFieldAction.STOP)
+    val forceStop = manualOverride() && input.connected
+    if (action == RecordingFieldAction.START && !forceStop) {
+        controller.startManually()
+    } else {
+        controller.toggleManually(forceStop = true)
+    }
     return true
 }

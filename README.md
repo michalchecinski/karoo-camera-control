@@ -13,7 +13,7 @@ This is an extension to control sports action cameras using Hammerhead Karoo cyc
 - Change camera modes (Video, Photo, Timelapse).
 - Select specific presets within each mode.
 - Automatically record radar-detected traffic during a ride, with a configurable stop delay after radar clears. [Setup and limitations](docs/radar-recording.md).
-- Send connection-wide GoPro keep-alive every 60 seconds, independently of recording settings. [Battery cost and pending hardware validation](docs/connection-keep-alive.md).
+- Wake a saved GoPro and record with one press. Keep it ready during active rides with radar, descent, or the optional whole-ride readiness fallback. [Setup, battery cost and hardware limits](docs/connection-keep-alive.md).
 - View battery life, remaining storage space.
 - Receive native camera alerts and optional audible recording confirmations during a ride. [Settings and validation](docs/camera-alerts.md).
 

@@ -30,6 +30,12 @@ whole-ride recording when available; it does not need to wait for every feature.
 
 ## Shared boundaries
 
+The separate [one-press wake-and-record track](wake-and-record.md) records a
+manual sleep/wake flow, 3-second keep-alive for active-ride radar/descent,
+and a whole-ride keep-alive fallback. It is implemented with physical hardware QA pending and does not alter
+the integration delivery order. Whole-ride keep-alive keeps a
+camera ready; it is distinct from whole-ride recording.
+
 - Reuse the existing camera command controller and its acknowledgement plus
   recording-state confirmation. A request is not proof that recording started.
 - Manual controls remain available and take precedence over automation.

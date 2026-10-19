@@ -9,7 +9,9 @@ import com.karoocameracontrol.radar.RadarRecordingController
 object ManualRecording {
     fun toggle(context: Context) {
         val camera = GoProManager.getInstance(context)
-        val forceStop = RadarRecordingController.getInstance(context).manualOverride()
+        val forceStop =
+            RadarRecordingController.getInstance(context).manualOverride() &&
+                camera.connectionState.value is ConnectionState.Connected
         camera.recordingCommands.toggleManually(forceStop = forceStop)
     }
 
@@ -26,13 +28,16 @@ object ManualRecording {
             command = camera.recordingCommands.state.value,
             seconds = camera.recordingDuration.value,
             radarStopRequired = RadarRecordingController.getInstance(context).manualStopRequired,
+            canWake = camera.canWakeForRecording(),
         )
 
     fun perform(
         context: Context,
         action: RecordingFieldAction,
+        expectedCamera: String? = null,
     ) {
         val camera = GoProManager.getInstance(context)
+        if (expectedCamera != null && camera.wakeTargetAddress() != expectedCamera) return
         // Explicit actions reject stale Start taps and repeated Stop taps while stopping.
         performRecordingFieldAction(snapshot(context, camera), action, camera.recordingCommands) {
             RadarRecordingController.getInstance(context).manualOverride()

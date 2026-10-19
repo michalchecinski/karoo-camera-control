@@ -6,12 +6,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,14 +59,24 @@ fun MainScreen(
     val radarStatus by viewModel.radarStatus.collectAsState()
     val descentSettings by viewModel.descentSettings.collectAsState()
     val descentStatus by viewModel.descentStatus.collectAsState()
+    val wholeRideKeepAlive by viewModel.readinessSettings.wholeRide.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var connectionToForget by remember { mutableStateOf<ConnectionState.Connected?>(null) }
     val destination = uiState.navigation.destination
     val recordAction =
-        remember(viewModel, destination, System.identityHashCode(uiState.connectionState)) {
+        remember(viewModel, destination, System.identityHashCode(uiState.connectionState), uiState.isWaking, uiState.canWakeRecording, uiState.pairedDevices.firstOrNull()) {
             val connection = uiState.connectionState
-            if (destination == ScreenDestination.MAIN && connection is ConnectionState.Connected) {
-                { viewModel.toggleRecording(connection) }
+            if (destination == ScreenDestination.MAIN &&
+                (
+                    connection is ConnectionState.Connected || uiState.isWaking ||
+                        uiState.canWakeRecording
+                )
+            ) {
+                if (connection is ConnectionState.Connected || uiState.isWaking) {
+                    { viewModel.toggleRecording(connection) }
+                } else {
+                    { viewModel.wakeAndRecord(uiState.wakeTargetAddress) }
+                }
             } else {
                 null
             }
@@ -73,7 +85,9 @@ fun MainScreen(
     DisposableEffect(Unit) { onDispose { onRecordActionChanged(null) } }
     val screenStateHolder = rememberSaveableStateHolder()
     val onBack: () -> Unit = {
-        if (destination != ScreenDestination.MAIN) {
+        if (destination == ScreenDestination.MAIN && uiState.isWaking) {
+            viewModel.cancelRecordingWake()
+        } else if (destination != ScreenDestination.MAIN) {
             viewModel.navigateBack()
         } else {
             when (uiState.connectionState) {
@@ -93,11 +107,6 @@ fun MainScreen(
             snackbarHostState.showSnackbar(message)
             viewModel.clearCameraCommandError()
         }
-    }
-
-    // Auto-connect trigger
-    LaunchedEffect(Unit) {
-        viewModel.tryAutoConnect()
     }
 
     Scaffold(
@@ -165,6 +174,8 @@ fun MainScreen(
                 } else if (destination == ScreenDestination.CAMERA_CONNECTION) {
                     CameraConnectionScreen(
                         connectionState = currentState,
+                        wholeRideKeepAlive = wholeRideKeepAlive,
+                        onWholeRideKeepAliveChanged = viewModel.readinessSettings::setWholeRide,
                         onDisconnect = viewModel::disconnect,
                         onForget = { connectionToForget = currentState as? ConnectionState.Connected },
                         onBack = onBack,
@@ -218,6 +229,8 @@ fun MainScreen(
                         },
                         onBack = onBack,
                     )
+                } else if (uiState.isWaking) {
+                    WakingRecordingScreen(onCancel = viewModel::cancelRecordingWake)
                 } else if (currentState is ConnectionState.Connected) {
                     ConnectedScreen(
                         deviceName = currentState.deviceName,
@@ -264,6 +277,7 @@ fun MainScreen(
                             ConnectingScreen(
                                 deviceName = state.deviceName,
                                 onCancel = { viewModel.cancelAutoConnect() },
+                                onWakeAndRecord = if (uiState.canWakeRecording) ({ viewModel.wakeAndRecord(uiState.wakeTargetAddress) }) else null,
                             )
                         }
                         is ConnectionState.Pairing -> {
@@ -292,6 +306,7 @@ fun MainScreen(
                                     onConnectToPaired = { address -> viewModel.connectToPaired(address) },
                                     onRemovePaired = { address -> viewModel.removePairedDevice(address) },
                                     onAddDevice = { viewModel.navigate(ScreenDestination.SCANNING) },
+                                    onWakeAndRecord = { viewModel.wakeAndRecord(uiState.wakeTargetAddress) },
                                     onFinish = onBack,
                                 )
                             }
@@ -322,6 +337,7 @@ fun PairedDevicesScreen(
     onRemovePaired: (String) -> Unit,
     onAddDevice: () -> Unit,
     onFinish: () -> Unit,
+    onWakeAndRecord: (() -> Unit)? = null,
 ) {
     var deviceToForget by remember { mutableStateOf<PairedDevice?>(null) }
 
@@ -339,7 +355,10 @@ fun PairedDevicesScreen(
                 )
             }
         } else {
-            LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(bottom = 86.dp).padding(16.dp)) {
+                if (onWakeAndRecord != null) {
+                    item { Text(stringResource(R.string.recording_wake_target, pairedDevices.first().name), style = MaterialTheme.typography.bodySmall) }
+                }
                 items(pairedDevices) { device ->
                     PairedDeviceItem(
                         device = device,
@@ -363,6 +382,15 @@ fun PairedDevicesScreen(
                         onFinish()
                     },
         )
+
+        if (pairedDevices.isNotEmpty() && onWakeAndRecord != null) {
+            Button(
+                onClick = onWakeAndRecord,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp).heightIn(min = 64.dp),
+            ) {
+                Text(stringResource(R.string.recording_wake_action))
+            }
+        }
 
         // Add Button
         Image(

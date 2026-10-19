@@ -42,16 +42,13 @@ override, and signal-loss behaviour.
 
 Connect a supported GoPro and select Video mode, then start a Karoo ride.
 `RideState.Recording` enables automation. A paused or ended ride stops an
-automation-owned recording. When the extension starts with the feature
-enabled it tries the existing saved-camera reconnect flow after requesting
-Bluetooth access from Karoo. First pairing still requires the normal setup.
-The shared BLE connection sends [keep-alive](connection-keep-alive.md) every
-60 seconds, independently of radar/descent preferences, ride state and recording
-state. Closing configuration does not stop it while the connection remains active.
-Keeping a camera awake costs battery and leaves its saved auto-power-off setting
-unchanged. The 60-second interval still requires physical model/firmware validation;
-Open GoPro recommends three seconds. Failures are logged and retried, and the
-existing radar status warning reflects the shared connection's latest result.
+automation-owned recording. During an active ride, [camera readiness](connection-keep-alive.md) wakes or
+reconnects the saved camera and sends keep-alive every three seconds when radar
+or descent is enabled, or when the whole-ride readiness option is enabled.
+Pause/end and loss of Karoo/ride state stop keep-alive; closing configuration does
+not. This uses camera battery and preserves its saved auto-power-off setting.
+Failures are logged/retried, with the existing radar warning reflecting shared
+keep-alive results. First pairing still requires normal setup.
 
 ## Recording lifecycle
 

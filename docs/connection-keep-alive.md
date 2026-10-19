@@ -1,69 +1,109 @@
-# Connected-camera keep-alive
+# Camera wake-up and ride keep-alive
 
-The shared GoPro BLE manager schedules one keep-alive every **60 seconds** after
-connection setup reaches Connected. The first write is due 60 seconds after
-setup. It runs before a ride, during active/paused rides, after a ride ends and
-between clips. Recording state and all app settings, including radar and descent,
-do not control it. There is no keep-alive setting.
+## Manual recording
 
-Closing the configuration activity leaves the loop running while BLE remains
-connected. Disconnection, connection errors and extension service shutdown cancel
-the loop, including any pending response wait. A new ready BLE connection starts
-a fresh interval; restarting the extension resumes it on an existing connection.
-Repeated starts for the same connection do not create duplicate loops.
+Opening the app shows saved cameras without automatically connecting. Use
+**Connect** for normal camera controls, or **Wake & record** to connect to the
+last-used saved camera and record with one press. The ride-screen recording
+field also offers **Wake & record** while disconnected. First pairing remains
+an explicit setup step; the app does not select an arbitrary newly discovered
+camera or change mode/preset automatically.
 
-The write reuses Open GoPro Setting **0x5B**, value **0x42**, and waits for its
-Settings Response. It waits for in-progress shutter, mode or preset operations
-and uses the same BLE operation mutex as other commands. The original GATT
-connection is checked after acquiring the mutex so queued work cannot target a
-replacement camera. A command that arrives after a keep-alive write begins waits
-for that bounded BLE transaction to finish, as with other BLE operations.
+The shared command controller shows **Waking camera…**, probes an existing
+connection or makes a direct BLE connection, and waits for camera readiness and
+known recording state/mode. If already recording, that clip is preserved. Otherwise
+Video mode is required before sending shutter. **Starting…** then means shutter
+has been requested; confirmed recording still requires acknowledgement and
+camera status. A request is bounded to 60 seconds, including waiting for an
+already-running readiness request. Failures expose an explicit retry, and never
+queue a later Start through indefinite reconnects.
 
-Response failures and timeouts are logged in local diagnostics and retried at
-the next scheduled interval. A busy command can defer a due write; missed
-intervals never produce a burst of catch-up writes. Normal response latency does
-not shift the 60-second schedule. Cancellation is not reported as a camera failure.
-Radar retains its existing keep-alive failure warning using the shared result.
+Cancel during wake-up sends no shutter. Once shutter has been sent, Stop uses
+the existing acknowledgement/state-confirmation flow. Explicit Disconnect,
+Forget of the selected camera, camera replacement, and extension shutdown
+invalidate pending wake intent. Shutdown attempts Stop cleanup for an in-flight
+Start but leaves a previously completed recording running. Cleanup can fail
+if the camera/link becomes unavailable; check the camera in that case.
 
-Keeping a camera awake consumes battery, including outside rides and with all
-recording automations disabled. This write preserves the camera's saved
-Auto Power Down setting.
+Manual Record can join a connection already being established for a saved
+camera. If the ride then pauses or the readiness policy is disabled, the manual
+request retains that connection attempt. Cancel invalidates the manual Start;
+an independently requested Connect can still finish without starting a clip.
 
-## Interval limitation and physical validation
+## Active-ride readiness
 
-[Open GoPro's Control documentation](https://gopro.github.io/OpenGoPro/docs/ble/control/#keep-alive)
-recommends sending every **3 seconds**. Issue #57 explicitly requests **60 seconds**.
-This implementation follows that requirement. Software checks cannot prove that
-60 seconds prevents idle sleep on a particular camera or firmware. No physical
-Karoo/GoPro validation was performed in this implementation session; reliability
-at this interval remains unverified. Do not change the interval based on a failed
-hardware check without a maintainer decision.
+The extension enables one shared **3-second** BLE keep-alive loop when Karoo
+reports an active ride (`RideState.Recording`) and either:
 
-Before release, record model, firmware, app build, auto-power-off preference,
-idle duration, timestamps of keep-alive writes/responses and subsequent recording
-results. Test before ride start, active/paused rides, after ride end, and with
-configuration closed; vary radar/descent off/on and leave idle beyond the camera's
-configured auto-power-off duration. Confirm later manual, radar and descent
-recording, disconnect/reconnect and service shutdown/restart. Verify the saved
-auto-power-off setting is unchanged. If sleep occurs, attach diagnostics and
-obtain a decision on the interval.
+- radar recording is enabled;
+- descent recording is enabled; or
+- **Keep camera ready during rides** is enabled.
 
-| Model | Firmware | Idle/ride/command checks | Result |
-|---|---|---|---|
-| Not tested | Not tested | Physical Karoo and supported GoPro required | Pending |
+The last option is saved, **off by default**, and available under
+**Settings & features → Camera connection**, including while disconnected.
+It provides immediate manual readiness during active rides when both automations
+are off. It does not start or stop a recording and is separate from whole-ride
+recording. Automation settings alone do not keep a camera awake outside a ride.
 
-## Automated checks
+Pause (including auto-pause), ride end, Karoo/ride stream loss, BLE disconnection
+and service shutdown stop keep-alive. Resuming an eligible active ride restores
+readiness, waking/reconnecting a saved camera if needed. Failed readiness attempts
+are bounded to 60 seconds and retried after five seconds while still eligible.
+Subscription completion/failure clears ride readiness and retries after three
+seconds. Closing configuration does not stop the extension's ride monitoring.
 
-`ConnectionKeepAliveTest` uses injected clock/wait barriers with the existing
-coroutine libraries to verify the production 60-second interval, duplicate start
-protection, response-time cadence, missed-period handling, command deferral,
-timeout/failure recovery, disconnect cancellation, reconnection and service-style
-stop/restart. Manager start/stop hooks, original-GATT checks and existing BLE
-response/mutex integration were reviewed by source inspection; they are not
-exercised by an Android BLE fixture. Physical transport and firmware behavior
-require the checks above.
+An explicit Disconnect suppresses background reconnect until readiness is newly
+enabled (for example after pause/resume or a policy change), or the rider explicitly
+connects/records. Outside active-ride readiness, the app does not reconnect in a
+background loop. Manual wake-and-record remains available outside rides.
+
+Stopping keep-alive lets the camera's own sleep timers apply; it does not send
+Sleep, Stop a manual clip, or change saved Auto Power Down. Keeping the GoPro
+awake uses battery, including between clips. Battery savings from this policy
+have not yet been measured on either device.
+
+## BLE behavior and limits
+
+The write uses Open GoPro Setting **0x5B**, value **0x42**, and waits for its
+Settings Response. It defers behind a busy camera command and shares the BLE
+operation mutex. Queued writes validate the original GATT identity. Normal
+response time does not shift cadence; long busy periods never cause catch-up
+bursts. Failures are logged and retried; cancellation is not reported as a camera
+failure. Radar retains its existing shared keep-alive failure warning.
+
+[Open GoPro recommends a three-second keep-alive](https://gopro.github.io/OpenGoPro/docs/ble/control/#keep-alive).
+This supersedes issue #57's initial 60-second, connection-wide design following
+the maintainer's battery/readiness decision. No dependency versions were changed.
+
+[Connecting over BLE wakes a sleeping camera](https://gopro.github.io/OpenGoPro/docs/ble/protocol/ble_setup/#advertisements)
+while it is advertising; GoPro documents the first eight hours after sleep.
+Wake-up adds connection/boot delay and cannot guarantee instant recording or
+wake a camera that is no longer advertising. Turn it on manually in that case.
+
+## Validation
+
+JVM tests cover cadence, timeouts, cancellation, readiness serialization and
+manual retention of a background attempt across pause, manual recording state
+transitions, wrong mode, existing clips, service shutdown cleanup, field actions,
+and the ride/automation/fallback policy. The isolated Karoo emulator exercises
+production wake UI/cancellation, no startup connection, offline fallback setting
+persistence/recreation, navigation and RemoteViews. Sample camera states are
+injected in test code, with no physical GATT connection.
 
 ```sh
 ./gradlew :app:ktlintCheck :app:testDebugUnitTest :app:verifyDescentRecording \
-  :app:assembleDebug :app:lintDebug :app:compileDebugAndroidTestKotlin
+  :app:assembleDebug :app:lintDebug :app:assembleDebugAndroidTest
 ```
+
+Physical Karoo/GoPro validation remains pending. Record models, firmware, app
+build, auto-power-off preference, idle duration, wake-to-ready and wake-to-record
+times, and battery consumption for both devices. Test app/field manual Start,
+cancellation before and after shutter, camera replacement and wrong mode,
+already-running clips, radar-only/descent-only readiness, both automations off,
+fallback off/on, pause/resume/end, link/system/stream loss, explicit Disconnect,
+and service shutdown/restart. Verify saved auto-power-off remains unchanged and
+existing recording ownership/manual override behavior survives these transitions.
+
+![Wake and record](../screenshots/emulator-karoo-480x800/camera-wake-ready.png)
+![Wake progress](../screenshots/emulator-karoo-480x800/camera-waking.png)
+![Ride readiness preference](../screenshots/emulator-karoo-480x800/camera-connection-readiness.png)

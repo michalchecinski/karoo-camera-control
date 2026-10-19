@@ -24,7 +24,9 @@ as proof that recording can start. Existing settings and their Back hierarchy
 remain under the header gear.
 
 The activity handles a short Android NAVIGATE_IN key press only while the
-connected remote is open, using the same manual recording path as touch.
+main remote or saved-camera page is open, using the same manual recording path
+as touch. On the saved-camera page it invokes Wake & record; during wake-up it
+cancels the request.
 Held/repeated/cancelled presses and stale screen/connection actions are ignored.
 Synthetic key events are testable on the emulator; the physical Karoo button
 mapping and real camera behavior still require hardware validation.

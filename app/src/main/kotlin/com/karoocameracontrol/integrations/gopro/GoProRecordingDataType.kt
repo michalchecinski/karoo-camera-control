@@ -3,8 +3,10 @@ package com.karoocameracontrol.integrations.gopro
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.view.View
 import android.widget.RemoteViews
+import androidx.core.net.toUri
 import com.karoocameracontrol.R
 import com.karoocameracontrol.recording.ManualRecording
 import com.karoocameracontrol.recording.RecordingFieldAction
@@ -40,7 +42,7 @@ class GoProRecordingDataType(extension: String) : DataTypeImpl(extension, "gopro
                         } else {
                             recordingFieldState(ManualRecording.snapshot(context, camera))
                         }
-                    emitter.updateView(recordingFieldView(context, state, config.viewSize, config.preview))
+                    emitter.updateView(recordingFieldView(context, state, config.viewSize, config.preview, camera.wakeTargetAddress()))
                     // SDK drops emissions faster than 1Hz. Read the latest complete snapshot
                     // on every tick so quick transitions cannot leave a stale final view.
                     delay(1000)
@@ -56,12 +58,15 @@ fun recordingFieldView(
     state: RecordingFieldState,
     size: Pair<Int, Int>,
     preview: Boolean,
+    expectedCamera: String? = null,
 ): RemoteViews {
     val density = context.resources.displayMetrics.density
     val tooSmall = size.first / density < 160 || size.second / density < 112
     val status =
         when (state.status) {
             RecordingFieldStatus.DISCONNECTED -> context.getString(R.string.recording_field_disconnected)
+            RecordingFieldStatus.WAKE_READY -> context.getString(R.string.recording_wake_ready)
+            RecordingFieldStatus.WAKING -> context.getString(R.string.recording_waking)
             RecordingFieldStatus.UNKNOWN -> context.getString(R.string.recording_field_unknown)
             RecordingFieldStatus.VIDEO_REQUIRED -> context.getString(R.string.recording_field_video_required)
             RecordingFieldStatus.READY -> context.getString(R.string.recording_field_ready)
@@ -81,7 +86,11 @@ fun recordingFieldView(
         setBoolean(R.id.recording_field_action, "setEnabled", action != null && !preview)
         if (action != null) {
             val label =
-                if (action == RecordingFieldAction.START) {
+                if (state.status == RecordingFieldStatus.WAKING) {
+                    R.string.recording_cancel_wake
+                } else if (state.status == RecordingFieldStatus.WAKE_READY) {
+                    R.string.recording_wake_action
+                } else if (action == RecordingFieldAction.START) {
                     R.string.recording_field_start
                 } else if (state.status == RecordingFieldStatus.STARTING) {
                     R.string.recording_field_cancel
@@ -100,7 +109,12 @@ fun recordingFieldView(
                     action.ordinal,
                     Intent(context, RecordingFieldReceiver::class.java).setAction(
                         if (action == RecordingFieldAction.START) RecordingFieldReceiver.ACTION_START else RecordingFieldReceiver.ACTION_STOP,
-                    ),
+                    ).apply {
+                        if (expectedCamera != null) {
+                            putExtra(RecordingFieldReceiver.EXTRA_CAMERA, expectedCamera)
+                            data = "karoocamera://recording/${Uri.encode(expectedCamera)}/${action.name}".toUri()
+                        }
+                    },
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
             }

@@ -75,6 +75,13 @@ References: [Android key handling](https://developer.android.com/develop/ui/view
 [Karoo hardware-action descriptions](https://hammerheadnav.github.io/karoo-ext/karoo-ext/io.hammerhead.karooext.models/-perform-hardware-action/index.html).
 A manual Stop suppresses automatic starts until the next descent.
 
+After acknowledgement, Start allows five seconds for recording-state confirmation.
+Stop allows up to 30 seconds because the camera can take longer to finish encoding
+and report that recording has stopped. Status queries continue every 500 ms after
+each reply; a registered state notification confirms the result immediately, even
+while a query reply is pending. A query timeout retries within the same overall
+confirmation deadline. Acknowledgement alone never confirms a recording transition.
+
 If the shutter response or recording-state confirmation times out, the shared
 controller reports **Camera command timed out** in the snackbar and releases
 the controls for retry or manual Stop. Cancelling a command through manual

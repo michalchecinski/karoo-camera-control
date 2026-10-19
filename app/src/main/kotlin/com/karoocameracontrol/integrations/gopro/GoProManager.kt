@@ -606,6 +606,9 @@ class GoProManager private constructor(private val context: Context) {
                         // Apply parsed values to state flows (only if present in response)
                         status.isRecording?.let { recording ->
                             val wasRecording = _isRecording.value
+                            if (!_recordingStateKnown.value || wasRecording != recording) {
+                                Log.i(TAG, "Camera recording state observed: $recording")
+                            }
                             _isRecording.value = recording
                             if (recording && !wasRecording) {
                                 startRecordingTimer()
@@ -984,14 +987,7 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     private suspend fun awaitRecordingState(isRecording: Boolean) {
-        withTimeout(RECORDING_STATE_CONFIRMATION_TIMEOUT_MS) {
-            while (_isRecording.value != isRecording) {
-                pollRecordingState()
-                if (_isRecording.value != isRecording) {
-                    delay(RECORDING_POLL_DELAY_MS)
-                }
-            }
-        }
+        awaitRecordingStateConfirmation(recording = _isRecording, target = isRecording) { pollRecordingState() }
     }
 
     private suspend fun pollInitialStatus() {
@@ -1629,13 +1625,11 @@ class GoProManager private constructor(private val context: Context) {
         // Timeout values (milliseconds)
         private const val CONNECT_TIMEOUT_MS = 10_000L
         private const val BLE_OPERATION_TIMEOUT_MS = 5_000L
-        private const val RECORDING_STATE_CONFIRMATION_TIMEOUT_MS = 5_000L
         private const val PAIRING_OPERATION_TIMEOUT_MS = 35_000L
         private const val RECONNECT_DELAY_MS = 2_000L
         private const val PAIRING_NOTIFICATION_INITIAL_DELAY_MS = 500L
 
         // Polling delays (milliseconds)
-        private const val RECORDING_POLL_DELAY_MS = 500L
         private const val RECORDING_SYNC_INTERVAL_MS = 5_000L
         private const val MODE_CHANGE_DELAY_MS = 200L
         private const val PRESET_FETCH_BASE_DELAY_MS = 300L

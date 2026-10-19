@@ -82,6 +82,27 @@ and reports missing evidence without blocking independent code investigation.
 Sentry access remains read-only; private attachments are not committed or
 published in issues and pull requests.
 
+The skill's standard-library Python helper lists reports without assuming a
+Sentry environment and downloads their log attachments into private temporary
+directories. With `SENTRY_AUTH_TOKEN` set locally, run from the repository root:
+
+```sh
+python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 1
+python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 7 --report-id SUPPORT_CODE
+python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py download EVENT_ID
+```
+
+Use the event ID returned for the matching support code. Listing outputs only
+report metadata; downloading outputs local file paths. The helper follows API
+pagination and reports incomplete retrieval as an error. It does not modify
+Sentry. Signed attachment storage redirects receive no Sentry auth token.
+Its offline regression checks cover pagination, exact support-code matching,
+metadata privacy, private attachment storage, and redirect handling:
+
+```sh
+python3 -m unittest discover -s .codex/skills/karoo-diagnostic-triage/scripts -p 'test_*.py'
+```
+
 ## Release validation
 
 Run the diagnostic unit tests, the Gradle build, and ktlint. Inspect the Feedback

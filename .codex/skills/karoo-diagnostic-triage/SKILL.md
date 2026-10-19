@@ -10,7 +10,7 @@ Check available diagnostic evidence before selecting a cause or implementing a b
 ## Find the relevant evidence
 
 - Read the repository's `AGENTS.md`, `docs/diagnostic-reports.md`, and the feature docs relevant to the symptom. Inspect the current code and version history alongside the reports.
-- Use read-only Sentry access. When the installed Sentry skill is available, load it for authentication and its bundled API helper. Otherwise use authenticated GET requests directly. Read `SENTRY_AUTH_TOKEN` from the environment; never print it or ask the user to paste it into chat. The public app DSN is not an API token.
+- Use read-only Sentry access through this skill's [report helper](scripts/sentry_diagnostics.py). When the installed Sentry skill is available, load it for authentication guidance; its generic helper remains useful for other Sentry queries. Read `SENTRY_AUTH_TOKEN` from the environment; never print it or ask the user to paste it into chat. The public app DSN is not an API token.
 - The known maintainer project is organization `self-vof`, project `android`, issue title `User-initiated diagnostics`. This is a starting point for this app, not a fallback for other projects. If it is unavailable or inconsistent with current project configuration, verify the target before searching elsewhere.
 - Search recent diagnostic events even when the user reports only that something is broken. Start with the reported incident window, or the last 24 hours when none is given; widen to seven days and then the relevant release period if needed. Report the scope of an unsuccessful search.
 - Do not filter by `prod` or assume an environment exists: manually submitted reports may have no environment tag. With the bundled Sentry helper, pass `--environment ''`. Do not filter to unresolved issues: diagnostic events can be grouped under an older or resolved issue. Do not infer event availability from an issue's count or `lastSeen` fields; inspect its events.
@@ -19,7 +19,25 @@ Check available diagnostic evidence before selecting a cause or implementing a b
 
 ## Read the attachments
 
-Finding an event is not sufficient. List its attachments and download `diagnostics.txt` into a private temporary working directory before drawing a conclusion about the incident. If an attachment is missing or unreadable, say so. The generic Sentry helper may not support attachment retrieval; use the GET endpoints below for that step.
+From the repository root, with `SENTRY_AUTH_TOKEN` already set locally:
+
+```sh
+python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 1
+python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 7 --report-id SUPPORT_CODE
+python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py download EVENT_ID
+```
+
+The helper defaults to the maintainer project, supports `--org` and `--project`
+before the subcommand, and never applies an environment filter. `list` prints
+sanitized metadata with the searched window, includes resolved diagnostic issues,
+and follows all pages. Match the support code to an event ID before downloading.
+`download` fetches only `diagnostics.txt` into a new private temporary directory
+and prints its path, not its contents. Missing attachments, access failures, and
+incomplete searches return a nonzero exit code. Read the saved log with local
+file tools. Run the helper's offline checks with
+`python3 -m unittest discover -s .codex/skills/karoo-diagnostic-triage/scripts -p 'test_*.py'`.
+
+Finding an event is not sufficient. Download and inspect `diagnostics.txt` before drawing a conclusion about the incident. If an attachment is missing or unreadable, say so. If the helper needs debugging or the Sentry interface changes, use the GET endpoints below.
 
 Relevant API paths, relative to `https://sentry.io`:
 

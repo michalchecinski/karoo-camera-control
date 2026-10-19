@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -123,10 +124,26 @@ fun CameraConnectionScreen(
     onDisconnect: () -> Unit,
     onForget: () -> Unit,
     onBack: () -> Unit,
+    wholeRideKeepAlive: Boolean = false,
+    onWholeRideKeepAliveChanged: (Boolean) -> Unit = {},
 ) {
     val connected = connectionState is ConnectionState.Connected
     SettingsPage(onBack) {
         Text(connectionSummary(connectionState), style = MaterialTheme.typography.titleSmall)
+        val keepAwakeTitle = stringResource(R.string.keepawake_title)
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 64.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(keepAwakeTitle, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+            Switch(
+                checked = wholeRideKeepAlive,
+                onCheckedChange = onWholeRideKeepAliveChanged,
+                modifier = Modifier.semantics { contentDescription = keepAwakeTitle },
+            )
+        }
+        Text(stringResource(R.string.keepawake_help), style = MaterialTheme.typography.bodySmall)
+        HorizontalDivider()
         Text(
             stringResource(if (connected) R.string.settings_connection_help else R.string.settings_connection_unavailable),
             style = MaterialTheme.typography.bodySmall,

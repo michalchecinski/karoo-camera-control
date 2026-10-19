@@ -32,18 +32,23 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
@@ -173,28 +178,10 @@ class GoProManager private constructor(private val context: Context) {
         loadPairedDevices()
     }
 
-    fun tryAutoConnect() {
-        val lastAddress = prefs.getString("last_connected_address", null)
-        val devices = _pairedDevices.value
-
-        if (lastAddress != null) {
-            // Check if it's still in the paired list
-            if (devices.any { it.address == lastAddress }) {
-                Log.d(TAG, "Auto-connecting to last saved device")
-                connectToDevice(lastAddress)
-                return
-            }
-        }
-
-        // Fallback: Connect to first paired device if exists
-        if (devices.isNotEmpty()) {
-            val firstDevice = devices.first()
-            Log.d(TAG, "Auto-connecting to first saved device")
-            connectToDevice(firstDevice.address)
-        }
-    }
-
     fun removePairedDevice(address: String) {
+        if (address == connectionTargetAddress || address == _pairedDevices.value.firstOrNull()?.address) {
+            recordingCommands.disconnected()
+        }
         val currentAddresses = prefs.getStringSet("paired_device_addresses", emptySet()) ?: emptySet()
         val newAddresses = currentAddresses - address
 
@@ -226,6 +213,8 @@ class GoProManager private constructor(private val context: Context) {
             startRecording = { startRecording() },
             stopRecording = { stopRecording() },
             alertEvent = alertFeed::command,
+            canWake = { canWakeForRecording() },
+            prepareRecording = { ensureCameraReady() },
         )
 
     init {
@@ -233,19 +222,90 @@ class GoProManager private constructor(private val context: Context) {
             connectionState.collect { state ->
                 alertFeed.connection(state is ConnectionState.Connected)
                 if (state !is ConnectionState.Connected) {
-                    recordingCommands.disconnected()
+                    recordingCommands.disconnected(preserveWake = true)
                     _cameraMode.value = -1
                 }
             }
         }
     }
 
+    @Volatile private var rideKeepAliveEnabled = false
+    private var rideReconnectSuppressed = false
+
+    private val _keepAliveFailed = MutableStateFlow(false)
+    val keepAliveFailed = _keepAliveFailed.asStateFlow()
+    private val keepAlive =
+        ConnectionKeepAlive(
+            scope,
+            onResult = { error ->
+                _keepAliveFailed.value = error != null
+                if (error != null) Log.e(TAG, "GoPro keep-alive failed; retrying next interval", error)
+            },
+            awaitCommandIdle = { recordingCommands.state.first { !it.busy } },
+        )
+
+    /** Also called when the extension restarts with an existing ready connection. */
+    private fun startKeepAlive() =
+        synchronized(connectionLifecycleLock) {
+            val gatt = connectedGatt ?: return@synchronized
+            if (!rideKeepAliveEnabled || connectionState.value !is ConnectionState.Connected) return@synchronized
+            keepAlive.start(gatt) {
+                writeAndAwaitResponseSuspend(
+                    writeUuid = GoProUUID.SETTING,
+                    responseUuid = GoProUUID.SETTING_RESPONSE,
+                    messageType = 0x5B,
+                    value = GoProCommands.KEEP_ALIVE,
+                    expectedGatt = gatt,
+                )
+            }
+        }
+
+    private fun stopKeepAlive() {
+        keepAlive.stop()
+        _keepAliveFailed.value = false
+    }
+
+    fun setRideKeepAliveEnabled(enabled: Boolean) =
+        synchronized(connectionLifecycleLock) {
+            if (enabled && !rideKeepAliveEnabled) rideReconnectSuppressed = false
+            rideKeepAliveEnabled = enabled
+            if (enabled) startKeepAlive() else stopKeepAlive()
+        }
+
+    fun onExtensionStarted() {
+        keepAlive.resume()
+        startKeepAlive()
+    }
+
+    fun onExtensionStopped() {
+        // A handshake finishing after service teardown must not restart the task.
+        recordingCommands.cancelForServiceShutdown()
+        rideKeepAliveEnabled = false
+        keepAlive.shutdown()
+        _keepAliveFailed.value = false
+    }
+
     private var connectionJob: Job? = null
+    private var connectionTargetAddress: String? = null
+    private var readinessConnectionAttempt = false
+    private var retainedReadinessAttempt: Job? = null
+    private val wakeCoordinator =
+        WakeCoordinator {
+            // Cancel can arrive after the ride relinquishes the attempt but before
+            // the queued manual request acquires readiness ownership.
+            val retained = retainedReadinessAttempt
+            retainedReadinessAttempt = null
+            if (retained != null && connectionJob === retained) {
+                retained.cancel()
+                disconnectGatt()
+            }
+        }
     private var recordingTimerJob: Job? = null
     private var recordingStartTimeMs: Long = 0L
 
     // BLE Operation Management
     @Volatile private var connectedGatt: BluetoothGatt? = null
+    private val connectionLifecycleLock = Any()
     private val connectionCallbacks = ConnectionCallbacks { connectedGatt }
     private val operationMutex = Mutex()
 
@@ -323,41 +383,45 @@ class GoProManager private constructor(private val context: Context) {
                 newState: Int,
             ) {
                 super.onConnectionStateChange(gatt, status, newState)
-                if (connectedGatt !== gatt) return
-                val deviceName = gatt.device.name
+                synchronized(connectionLifecycleLock) {
+                    if (connectedGatt !== gatt) return
+                    val deviceName = gatt.device.name
 
-                // GATT_CONN_TERMINATE_PEER_USER means remote device disconnected - treat as normal disconnect
-                if (status == BluetoothGatt.GATT_SUCCESS || status == GATT_CONN_TERMINATE_PEER_USER) {
-                    if (newState == BluetoothProfile.STATE_CONNECTED) {
-                        Log.d(TAG, "onConnectionStateChange: Connected to camera")
-                        synchronized(continuationLock) {
-                            if (currentOperationType == BleOperationType.CONNECT) {
-                                resumeActiveContinuationLocked(Unit)
+                    // GATT_CONN_TERMINATE_PEER_USER means remote device disconnected - treat as normal disconnect
+                    if (status == BluetoothGatt.GATT_SUCCESS || status == GATT_CONN_TERMINATE_PEER_USER) {
+                        if (newState == BluetoothProfile.STATE_CONNECTED) {
+                            Log.d(TAG, "onConnectionStateChange: Connected to camera")
+                            synchronized(continuationLock) {
+                                if (currentOperationType == BleOperationType.CONNECT) {
+                                    resumeActiveContinuationLocked(Unit)
+                                }
+                            }
+                        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                            Log.d(TAG, "onConnectionStateChange: Disconnected from camera (status=$status)")
+                            stopKeepAlive()
+                            connectedGatt?.close()
+                            connectedGatt = null
+                            _connectionState.value = ConnectionState.Disconnected
+                            _isRecording.value = false
+                            stopRecordingTimer()
+                            // If we were waiting for something else, this is an error
+                            synchronized(continuationLock) {
+                                if (currentOperationType != BleOperationType.NONE) {
+                                    resumeActiveContinuationWithExceptionLocked(Exception("Disconnected unexpectedly (status=$status)"))
+                                }
                             }
                         }
-                    } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                        Log.d(TAG, "onConnectionStateChange: Disconnected from camera (status=$status)")
+                    } else {
+                        Log.e(TAG, "onConnectionStateChange: Error $status")
+                        stopKeepAlive()
                         connectedGatt?.close()
                         connectedGatt = null
-                        _connectionState.value = ConnectionState.Disconnected
+                        _connectionState.value = ConnectionState.Error("Connection error: $status")
                         _isRecording.value = false
                         stopRecordingTimer()
-                        // If we were waiting for something else, this is an error
                         synchronized(continuationLock) {
-                            if (currentOperationType != BleOperationType.NONE) {
-                                resumeActiveContinuationWithExceptionLocked(Exception("Disconnected unexpectedly (status=$status)"))
-                            }
+                            resumeActiveContinuationWithExceptionLocked(Exception("Connection error: $status"))
                         }
-                    }
-                } else {
-                    Log.e(TAG, "onConnectionStateChange: Error $status")
-                    connectedGatt?.close()
-                    connectedGatt = null
-                    _connectionState.value = ConnectionState.Error("Connection error: $status")
-                    _isRecording.value = false
-                    stopRecordingTimer()
-                    synchronized(continuationLock) {
-                        resumeActiveContinuationWithExceptionLocked(Exception("Connection error: $status"))
                     }
                 }
             }
@@ -746,6 +810,83 @@ class GoProManager private constructor(private val context: Context) {
         connect(device, isPaired = true)
     }
 
+    fun wakeTargetAddress(): String? =
+        connectedGatt?.device?.address ?: connectionTargetAddress
+            ?.takeIf { connectionState.value is ConnectionState.Connecting }
+            ?: _pairedDevices.value.firstOrNull()?.address
+
+    fun canWakeForRecording(): Boolean =
+        _pairedDevices.value.isNotEmpty() &&
+            (
+                connectionState.value is ConnectionState.Disconnected || connectionState.value is ConnectionState.Error ||
+                    (connectionState.value is ConnectionState.Connecting && _pairedDevices.value.any { it.address == connectionTargetAddress })
+            )
+
+    /** Called on Main by manual Start or active-ride readiness; never sends shutter itself. */
+    suspend fun ensureCameraReady(forRide: Boolean = false) =
+        withTimeout(60_000) {
+            wakeCoordinator.run(forRide) {
+                if (forRide && rideReconnectSuppressed) return@run
+                if (!forRide) rideReconnectSuppressed = false
+                val target = wakeTargetAddress() ?: error("Pair a GoPro before recording")
+                var ownedAttempt: Job? = if (forRide) null else retainedReadinessAttempt
+                if (!forRide) retainedReadinessAttempt = null
+                var ready = false
+                try {
+                    var responsive = false
+                    if (connectionState.value is ConnectionState.Connected) {
+                        try {
+                            writeAndAwaitResponseSuspend(
+                                GoProUUID.COMMAND,
+                                GoProUUID.COMMAND_RESPONSE,
+                                0x3C,
+                                GoProCommands.GET_HARDWARE_INFO,
+                                expectedGatt = connectedGatt ?: error("Camera disconnected"),
+                            )
+                            responsive = true
+                        } catch (error: Exception) {
+                            currentCoroutineContext().ensureActive()
+                            // No shutter has been sent: retry readiness through a fresh wake connection.
+                            connectionJob?.cancelAndJoin()
+                            disconnectGatt()
+                        }
+                    }
+                    if (!responsive && connectionState.value !is ConnectionState.Connecting) {
+                        val device = bluetoothAdapter?.getRemoteDevice(target) ?: error("Bluetooth is unavailable")
+                        connect(device, isPaired = true, retrySaved = false, wakeRequest = true)
+                        ownedAttempt = connectionJob
+                    }
+                    if (connectionState.value is ConnectionState.Connecting && readinessConnectionAttempt) {
+                        // Adopt a readiness attempt retained when an active-ride request was cancelled.
+                        ownedAttempt = connectionJob
+                    }
+                    val state =
+                        connectionState.first {
+                            it is ConnectionState.Connected || it is ConnectionState.Error ||
+                                it is ConnectionState.PairingAccessRequired
+                        }
+                    check(state is ConnectionState.Connected) { "Camera unavailable. Turn it on and retry." }
+                    check(connectedGatt?.device?.address == target) { "Selected camera changed; retry recording" }
+                    combine(recordingStateKnown, cameraModeKnown) { recording, mode -> recording && mode }.first { it }
+                    check(connectedGatt?.device?.address == target && connectionState.value is ConnectionState.Connected) {
+                        "Camera disconnected before it was ready"
+                    }
+                    ready = true
+                } finally {
+                    if (!ready && ownedAttempt != null && connectionJob === ownedAttempt) {
+                        if (wakeCoordinator.shouldCancelOwnedAttempt(forRide)) {
+                            withContext(NonCancellable) {
+                                ownedAttempt?.cancelAndJoin()
+                                if (connectionJob === ownedAttempt) disconnectGatt()
+                            }
+                        } else {
+                            retainedReadinessAttempt = ownedAttempt
+                        }
+                    }
+                }
+            }
+        }
+
     suspend fun startRecording() {
         Log.i(TAG, "Recording start requested")
         try {
@@ -754,6 +895,7 @@ class GoProManager private constructor(private val context: Context) {
                 responseUuid = GoProUUID.COMMAND_RESPONSE,
                 messageType = COMMAND_ID_SET_SHUTTER,
                 value = GoProCommands.Recording.START,
+                expectedGatt = connectedGatt ?: error("Camera disconnected before recording"),
             )
             Log.i(TAG, "Recording start command acknowledged")
             awaitRecordingState(isRecording = true)
@@ -762,15 +904,6 @@ class GoProManager private constructor(private val context: Context) {
             Log.e(TAG, "Recording start interrupted or failed", error)
             throw error
         }
-    }
-
-    suspend fun keepAlive() {
-        writeAndAwaitResponseSuspend(
-            writeUuid = GoProUUID.SETTING,
-            responseUuid = GoProUUID.SETTING_RESPONSE,
-            messageType = 0x5B,
-            value = GoProCommands.KEEP_ALIVE,
-        )
     }
 
     suspend fun stopRecording() {
@@ -782,6 +915,7 @@ class GoProManager private constructor(private val context: Context) {
                 responseUuid = GoProUUID.COMMAND_RESPONSE,
                 messageType = COMMAND_ID_SET_SHUTTER,
                 value = GoProCommands.Recording.STOP,
+                expectedGatt = connectedGatt ?: error("Camera disconnected before stopping"),
             )
             Log.i(TAG, "Recording stop command acknowledged")
             awaitRecordingState(isRecording = false)
@@ -979,6 +1113,8 @@ class GoProManager private constructor(private val context: Context) {
     fun connect(
         device: BluetoothDevice,
         isPaired: Boolean = false,
+        retrySaved: Boolean = true,
+        wakeRequest: Boolean = false,
     ) {
         if (!hasPermissions()) {
             _connectionState.value = ConnectionState.Error("Permissions not granted")
@@ -995,13 +1131,21 @@ class GoProManager private constructor(private val context: Context) {
             return
         }
 
+        if (!wakeRequest) {
+            recordingCommands.disconnected()
+            rideReconnectSuppressed = false
+        }
         stopScan()
+        connectionTargetAddress = device.address
+        readinessConnectionAttempt = wakeRequest
         commandScope.launch { alertFeed.selectCamera(device.address) }
 
-        connectionJob?.cancel()
+        val previousConnection = connectionJob
+        previousConnection?.cancel()
+        _connectionState.value = ConnectionState.Connecting(device.name ?: device.address)
         connectionJob =
             scope.launch {
-                _connectionState.value = ConnectionState.Connecting(device.name ?: device.address)
+                previousConnection?.join()
 
                 while (isActive) {
                     _recordingStateKnown.value = false
@@ -1041,11 +1185,17 @@ class GoProManager private constructor(private val context: Context) {
                         // 6. Get Initial Status
                         pollInitialStatus()
 
-                        savePairedDevice(device)
-                        _connectionState.value = ConnectionState.Connected(device.name ?: device.address)
-                        Log.d(TAG, "GoPro Connection Fully Established!")
-                        _activePresetName.value = null // Clear when connected, will be set on loadPreset or by camera update
-                        _activePresetIcon.value = null
+                        val attemptContext = currentCoroutineContext()
+                        synchronized(connectionLifecycleLock) {
+                            attemptContext.ensureActive()
+                            check(connectedGatt === readinessGatt) { "Connection changed during setup" }
+                            savePairedDevice(device)
+                            _connectionState.value = ConnectionState.Connected(device.name ?: device.address)
+                            startKeepAlive()
+                            Log.d(TAG, "GoPro Connection Fully Established!")
+                            _activePresetName.value = null // Clear when connected, will be set on loadPreset or by camera update
+                            _activePresetIcon.value = null
+                        }
 
                         break
                     } catch (e: Exception) {
@@ -1055,7 +1205,7 @@ class GoProManager private constructor(private val context: Context) {
                         Log.e(TAG, "Connection failed", e)
                         disconnectGatt()
 
-                        if (isPaired && device.bondState == BluetoothDevice.BOND_BONDED && e !is PairingAccessRequiredException) {
+                        if (retrySaved && isPaired && device.bondState == BluetoothDevice.BOND_BONDED && e !is PairingAccessRequiredException) {
                             Log.d(TAG, "Retrying connection for saved device...")
                             _connectionState.value = ConnectionState.Connecting(device.name ?: device.address)
                             kotlinx.coroutines.delay(RECONNECT_DELAY_MS)
@@ -1089,22 +1239,30 @@ class GoProManager private constructor(private val context: Context) {
     }
 
     fun disconnect() {
-        if (!hasPermissions()) return
+        rideReconnectSuppressed = true
+        recordingCommands.disconnected()
+        if (!hasPermissions()) {
+            connectionJob?.cancel()
+            stopKeepAlive()
+            return
+        }
 
         // Cancel the connection job to stop any ongoing connection attempts
         connectionJob?.cancel()
         disconnectGatt()
     }
 
-    private fun disconnectGatt() {
-        connectedGatt?.disconnect()
-        connectedGatt?.close()
-        connectedGatt = null
-        _connectionState.value = ConnectionState.Disconnected
-        _isRecording.value = false
-        _cameraMode.value = -1
-        stopRecordingTimer()
-    }
+    private fun disconnectGatt() =
+        synchronized(connectionLifecycleLock) {
+            stopKeepAlive()
+            connectedGatt?.disconnect()
+            connectedGatt?.close()
+            connectedGatt = null
+            _connectionState.value = ConnectionState.Disconnected
+            _isRecording.value = false
+            _cameraMode.value = -1
+            stopRecordingTimer()
+        }
 
     // Suspend Functions
 
@@ -1236,10 +1394,16 @@ class GoProManager private constructor(private val context: Context) {
                             activeContinuation = null
                             currentOperationType = BleOperationType.NONE
                         }
-                        connectedGatt?.close()
-                        connectedGatt = null
+                        synchronized(connectionLifecycleLock) {
+                            stopKeepAlive()
+                            connectedGatt?.close()
+                            connectedGatt = null
+                        }
                     }
-                    connectedGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+                    synchronized(connectionLifecycleLock) {
+                        if (!cont.isActive) return@synchronized
+                        connectedGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+                    }
                 }
             }
         }
@@ -1309,7 +1473,14 @@ class GoProManager private constructor(private val context: Context) {
         responseUuid: UUID,
         messageType: Byte,
         value: ByteArray,
+        expectedGatt: BluetoothGatt? = null,
     ) = operationMutex.withLock {
+        currentCoroutineContext().ensureActive()
+        if (expectedGatt != null) {
+            check(connectedGatt === expectedGatt && connectionState.value is ConnectionState.Connected) {
+                "Keep-alive connection is no longer current"
+            }
+        }
         val response = CompletableDeferred<ByteArray>()
         val pending = PendingResponse(responseUuid, messageType, response)
         synchronized(responseLock) {

@@ -12,7 +12,7 @@ remote and leaves settings navigation unchanged.
 | --- | --- |
 | Automatic recording | [Radar recording](radar-recording.md) and [Descent recording](descent-recording.md), with separate saved On/Off choices and current status. |
 | Alerts & sound | [Recording confirmations, camera warnings and sound](camera-alerts.md). |
-| Camera connection | Current connection state, Disconnect and Forget camera. |
+| Camera connection | Current connection state, saved [Keep camera ready during rides](connection-keep-alive.md) option (off by default), Disconnect and Forget camera. |
 | Feedback & diagnostics | Feedback and tip QR codes, plus [explicit diagnostic uploads](diagnostic-reports.md). |
 
 The hub's automation summary describes saved preferences. **On** does not mean
@@ -107,5 +107,4 @@ sample camera state without a physical BLE connection.
 ![Settings and features](../screenshots/emulator-karoo-480x800/settings-hub.png)
 ![Camera and support rows](../screenshots/emulator-karoo-480x800/settings-hub-support.png)
 ![Automatic recording](../screenshots/emulator-karoo-480x800/automatic-recording.png)
-![Camera connection](../screenshots/emulator-karoo-480x800/camera-connection-connected.png)
-![Disconnected camera actions](../screenshots/emulator-karoo-480x800/camera-connection-disconnected.png)
+![Camera connection and ride readiness preference](../screenshots/emulator-karoo-480x800/camera-connection-readiness.png)

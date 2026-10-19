@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.karoocameracontrol.integrations.gopro.PairedDevice
 
@@ -27,26 +28,12 @@ fun PairedDeviceItem(
     onConnectClick: () -> Unit,
     onForgetClick: () -> Unit,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-                .clickable { onConnectClick() },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = device.name, style = MaterialTheme.typography.titleSmall)
-            Text(text = device.address, style = MaterialTheme.typography.bodySmall)
-        }
-        Row {
-            Button(onClick = { onConnectClick() }, modifier = Modifier.padding(end = 8.dp)) {
-                Text("Connect")
-            }
-            IconButton(onClick = { onForgetClick() }) {
-                Icon(Icons.Default.Delete, contentDescription = "Forget")
-            }
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text(device.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(device.address, style = MaterialTheme.typography.bodySmall)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = onConnectClick, modifier = Modifier.padding(end = 8.dp)) { Text("Connect") }
+            IconButton(onClick = onForgetClick) { Icon(Icons.Default.Delete, contentDescription = "Forget") }
         }
     }
 }

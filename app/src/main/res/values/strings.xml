@@ -120,4 +120,12 @@
     <string name="remote_selected">Selected</string>
     <string name="remote_radar">Radar</string>
     <string name="remote_descent">Descent</string>
+    <string name="recording_wake_ready">Camera not ready</string>
+    <string name="recording_wake_action">Wake &amp; record</string>
+    <string name="recording_waking">Waking camera…</string>
+    <string name="recording_wake_help">Recording starts when your last-used camera is ready in Video mode. Allow up to 60 seconds.</string>
+    <string name="recording_cancel_wake">Cancel</string>
+    <string name="keepawake_title">Keep camera ready during rides</string>
+    <string name="keepawake_help">Keep GoPro awake during active rides for quick manual recording. Uses more camera battery. Stops on pause or ride end. Radar or descent already does this when enabled.</string>
+    <string name="recording_wake_target">Wake &amp; record uses your last-used camera: %1$s</string>
 </resources>

@@ -18,6 +18,7 @@ data class CameraCommandState(
     val recordingInFlight: Boolean = false,
     val error: String? = null,
     val targetRecording: Boolean? = null,
+    val waking: Boolean = false,
 )
 
 enum class AutomaticRecordingOwner { DESCENT, RADAR }
@@ -31,6 +32,8 @@ class CameraCommandController(
     private val startRecording: suspend () -> Unit,
     private val stopRecording: suspend () -> Unit,
     private val alertEvent: (CameraAlertInput) -> Unit = {},
+    private val canWake: () -> Boolean = { false },
+    private val prepareRecording: (suspend () -> Unit)? = null,
 ) {
     private val _state = MutableStateFlow(CameraCommandState())
     val state = _state.asStateFlow()
@@ -98,15 +101,56 @@ class CameraCommandController(
     }
 
     fun toggleManually(forceStop: Boolean = false) {
+        if (_state.value.waking) {
+            cancelWake()
+            return
+        }
         val stop = forceStop || recording() || _state.value.recordingInFlight
-        if (!connected() || (_state.value.busy && !stop)) return
+        if ((!connected() && !canWake()) || (_state.value.busy && !stop)) return
         automaticOwner = null
         automaticStartPending = false
         if (stop) {
             _manualStopCount.value += 1
             launchCommand(recordingCommand = true, target = false) { stopRecording() }
         } else {
-            launchCommand(recordingCommand = true, target = true) { startRecording() }
+            startManually()
+        }
+    }
+
+    /** Explicit Start never becomes Stop because a stale field action arrived late. */
+    fun startManually() {
+        if (_state.value.busy || recording() || (!connected() && !canWake())) return
+        automaticOwner = null
+        automaticStartPending = false
+        launchCommand(recordingCommand = true, target = true, waking = prepareRecording != null) {
+            prepareRecording?.invoke()
+            currentCoroutineContext().ensureActive()
+            check(connected()) { "Camera disconnected before recording" }
+            // Reconnecting may reveal a clip started using the camera's own shutter.
+            if (!recording()) {
+                if (prepareRecording != null) check(videoMode()) { "Select Video mode on the camera" }
+                _state.value = _state.value.copy(waking = false)
+                // Connecting selects/rebaselines the alert feed; bind the shutter request
+                // to the now-ready camera so its confirmation retains manual origin.
+                if (prepareRecording != null) alertEvent(CameraAlertInput.CommandStarted(true, RecordingOrigin.MANUAL))
+                startRecording()
+            }
+        }
+    }
+
+    fun cancelWake() {
+        if (!_state.value.waking) return
+        _manualStopCount.value += 1
+        disconnected()
+        alertEvent(CameraAlertInput.CommandFinished(false, true))
+    }
+
+    fun cancelForServiceShutdown() {
+        when {
+            _state.value.waking -> cancelWake()
+            _state.value.recordingInFlight && _state.value.targetRecording == true -> toggleManually(forceStop = true)
+            _state.value.recordingInFlight && _state.value.targetRecording == false -> Unit // Let bounded Stop finish.
+            else -> disconnected() // Preserve an already-running clip.
         }
     }
 
@@ -119,7 +163,8 @@ class CameraCommandController(
         _state.value = _state.value.copy(error = null)
     }
 
-    fun disconnected() {
+    fun disconnected(preserveWake: Boolean = false) {
+        if (preserveWake && _state.value.waking) return
         generation += 1
         commandJob?.cancel()
         commandJob = null
@@ -136,6 +181,7 @@ class CameraCommandController(
         target: Boolean = false,
         origin: RecordingOrigin = RecordingOrigin.MANUAL,
         onFinished: (Boolean) -> Unit = {},
+        waking: Boolean = false,
         operation: suspend () -> Unit,
     ) {
         // Increment first so cancellation of the old command cannot clear new state.
@@ -143,7 +189,7 @@ class CameraCommandController(
         val previousJob = commandJob
         previousJob?.cancel()
         if (recordingCommand) alertEvent(CameraAlertInput.CommandStarted(target, origin))
-        _state.value = CameraCommandState(busy = true, recordingInFlight = recordingCommand, targetRecording = target.takeIf { recordingCommand })
+        _state.value = CameraCommandState(busy = true, recordingInFlight = recordingCommand, targetRecording = target.takeIf { recordingCommand }, waking = waking)
         commandJob =
             scope.launch(start = CoroutineStart.LAZY) {
                 var succeeded = false
@@ -170,7 +216,7 @@ class CameraCommandController(
                     if (generation == currentGeneration) {
                         onFinished(succeeded)
                         if (recordingCommand) alertEvent(CameraAlertInput.CommandFinished(succeeded, cancelled))
-                        _state.value = _state.value.copy(busy = false, recordingInFlight = false, targetRecording = null)
+                        _state.value = _state.value.copy(busy = false, recordingInFlight = false, targetRecording = null, waking = false)
                         commandJob = null
                     }
                 }

@@ -1,7 +1,10 @@
 # Ride-screen recording controls
 
 Add **GoPro Recording Controls** to a Karoo ride profile as a graphical data
-field. Connect your camera in the app first, then return to the ride screen.
+field. Pair a camera in the app first, then return to the ride screen.
+A saved, disconnected camera offers **Wake & record**; no separate Connect step
+is required. [Wake-up and readiness](connection-keep-alive.md) explains latency,
+cancellation and active-ride keep-alive.
 The app activity can remain closed while the extension displays the field.
 Existing GoPro Status, Rec Time, and Battery numeric fields are unchanged.
 
@@ -18,7 +21,9 @@ API. It does not require a dependency update or a Bonus Action mapping.
 | Stop awaiting confirmation | Stopping… | Wait; repeated taps are ignored |
 | Command failed | Command failed with reason | Retry Start or Stop when confirmed camera state permits |
 | Radar Start failed or remains unconfirmed | Command failed (or Starting… if the error was cleared) | Stop / cancel; Start is rejected until cleanup |
-| Camera disconnected | Camera disconnected | Unavailable |
+| Saved camera disconnected/connecting | Camera not ready | Wake & record |
+| Wake request pending | Waking camera… | Cancel without sending shutter |
+| No saved camera | Camera disconnected | Pair in the app first |
 | Recording state or stopped camera mode unknown | Waiting for camera state | Unavailable |
 | Stopped in another mode | Select Video on camera | Unavailable |
 | Mode/preset command pending | Camera busy | Unavailable |
@@ -69,3 +74,8 @@ Physical Karoo/GoPro QA is still required for native ride-screen touch forwardin
 field sizes and day/night readability on target firmware, real BLE start/cancel/stop
 confirmation, camera-side changes, reconnection, and automation regression checks.
 An emulator cannot verify those hardware paths.
+
+The wake-state capture below uses sample values in the production RemoteViews
+test host, not a native Karoo ride page or physical BLE connection.
+
+![Wake and record field states](../screenshots/emulator-karoo-480x800/ride-recording-wake.png)

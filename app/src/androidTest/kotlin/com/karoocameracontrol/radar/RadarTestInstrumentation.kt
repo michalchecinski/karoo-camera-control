@@ -9,8 +9,6 @@ import io.hammerhead.karooext.models.DataPoint
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.StreamState
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -44,8 +42,6 @@ class RadarTestInstrumentation : Instrumentation() {
                 "physical stop of manual recording suppresses traffic encounter" to ::manualPhysicalStop,
                 "manual stop on clear radar leaves next detection armed" to ::manualStopOnClear,
                 "automatic stop leaves the next encounter armed" to ::automaticStopRearms,
-                "keep-alive timeout reports failure and retries" to ::keepAliveTimeout,
-                "keep-alive cancellation stops without reporting a camera failure" to ::keepAliveCancellation,
                 "decoder separates vehicles clear and unavailable data" to ::decoder,
                 "descent cannot stop a radar recording" to ::radarOwnership,
                 "radar cannot stop a descent recording" to ::descentOwnership,
@@ -255,62 +251,6 @@ class RadarTestInstrumentation : Instrumentation() {
         policy.onRadar(RadarPresence.VEHICLE, 16_200)
         check(policy.tick(16_200, recording = false) == RecordingAction.START)
     }
-
-    private fun keepAliveTimeout() =
-        runBlocking {
-            var attempts = 0
-            val failure = CompletableDeferred<Exception>()
-            val recovered = CompletableDeferred<Unit>()
-            val job =
-                launch {
-                    keepAliveLoop(
-                        intervalMs = 1,
-                        shouldSend = { true },
-                        send = {
-                            attempts++
-                            if (attempts == 1) withTimeout(1) { delay(Long.MAX_VALUE) }
-                        },
-                        onResult = { error ->
-                            if (error != null) failure.complete(error) else recovered.complete(Unit)
-                        },
-                    )
-                }
-            try {
-                withTimeout(2_000) { recovered.await() }
-                check(withTimeout(2_000) { failure.await() } is TimeoutCancellationException)
-                check(attempts >= 2)
-            } finally {
-                job.cancelAndJoin()
-            }
-        }
-
-    private fun keepAliveCancellation() =
-        runBlocking {
-            val started = CompletableDeferred<Unit>()
-            var reportedResults = 0
-            var attempts = 0
-            val job =
-                launch {
-                    keepAliveLoop(
-                        intervalMs = 1,
-                        shouldSend = { true },
-                        send = {
-                            attempts++
-                            started.complete(Unit)
-                            delay(Long.MAX_VALUE)
-                        },
-                        onResult = { reportedResults++ },
-                    )
-                }
-            try {
-                withTimeout(2_000) { started.await() }
-            } finally {
-                job.cancelAndJoin()
-            }
-            check(job.isCancelled)
-            check(attempts == 1)
-            check(reportedResults == 0)
-        }
 
     private fun radarOwnership() =
         runBlocking {

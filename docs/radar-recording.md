@@ -42,16 +42,13 @@ override, and signal-loss behaviour.
 
 Connect a supported GoPro and select Video mode, then start a Karoo ride.
 `RideState.Recording` enables automation. A paused or ended ride stops an
-automation-owned recording. When the extension starts with the feature
-enabled it tries the existing saved-camera reconnect flow after requesting
-Bluetooth access from Karoo. First pairing still requires the normal setup.
-While enabled during an active ride, the controller sends Open GoPro
-keep-alive messages every three seconds to keep the connected camera ready
-between clips. This keeps the camera awake and uses battery. It does not
-change the camera's saved auto-power-off setting. Keep-alive failures appear
-in the status card and are retried on the next interval, including response
-timeouts. Cancelling the extension stops the loop without reporting a camera
-failure or sending another keep-alive.
+automation-owned recording. During an active ride, [camera readiness](connection-keep-alive.md) wakes or
+reconnects the saved camera and sends keep-alive every three seconds when radar
+or descent is enabled, or when the whole-ride readiness option is enabled.
+Pause/end and loss of Karoo/ride state stop keep-alive; closing configuration does
+not. This uses camera battery and preserves its saved auto-power-off setting.
+Failures are logged/retried, with the existing radar warning reflecting shared
+keep-alive results. First pairing still requires normal setup.
 
 ## Recording lifecycle
 
@@ -106,9 +103,9 @@ Build and formatting:
 The dependency-free Android instrumentation runner covers the radar decoder,
 start guards, recording ownership, the clear timer, repeated traffic, manual
 overrides, physical shutter stops, radar silence/loss, disconnection, and
-command failure cleanup/retry. They also exercise a real coroutine timeout
-followed by a successful keep-alive retry and cancellation during an
-in-flight keep-alive. Shared command checks verify radar/descent ownership,
+command failure cleanup/retry. The JVM connection keep-alive tests cover
+scheduling, response timeout recovery and cancellation independently of radar.
+Shared command checks verify radar/descent ownership,
 manual cancellation, and failed radar cleanup retries:
 
 ```sh

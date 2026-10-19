@@ -18,6 +18,13 @@ share a fixed bottom row on the Karoo screen. Back retains the standard Karoo
 artwork. Record/Stop keeps its 64 dp height and has a rounded left end and a
 flat right edge flush with the display boundary.
 
+## Wake and record
+
+The app and ride field offer [one-press Wake & record](connection-keep-alive.md)
+for the last-used saved camera while disconnected, including when joining a
+background connection. Waking is distinct from Starting; Cancel before shutter
+does not send Stop. Opening the app no longer wakes a camera by itself.
+
 ## Glance remote
 
 The app uses a light theme with teal controls. The connected header shows the
@@ -49,8 +56,9 @@ scroll above the fixed bottom controls.
 ### Right hardware button
 
 The foreground activity handles Android's `KEYCODE_NAVIGATE_IN` as Record/Stop
-only on the connected remote. It uses the same manual recording controller as
-touch. Settings, mode selection and preset selection retain normal key behavior.
+on the main remote or saved-camera page. When disconnected it invokes
+Wake & record for the displayed saved camera; during wake-up it cancels. It uses
+the same manual recording controller as touch. Settings, mode selection and preset selection retain normal key behavior.
 Held/repeated keys, cancelled events, combinations, and presses that cross
 screen or connection changes do not trigger recording. Leaving the activity
 clears an outstanding press and held-key tracking. Combinations are suppressed

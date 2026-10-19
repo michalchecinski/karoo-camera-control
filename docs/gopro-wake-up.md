@@ -1,11 +1,13 @@
 # GoPro wake-up on connection
 
-Starting the app reconnects to the last saved camera. Establishing a Bluetooth
-connection wakes a sleeping GoPro; there is no separate power-on command.
-The camera must have power, wireless connections enabled, and still be advertising.
-Open GoPro documents advertising for the first eight hours after sleep. A camera
-that is no longer advertising must be turned on manually.
-
+Opening the app no longer connects automatically. Choose Connect or use
+[Wake & record](connection-keep-alive.md) in the app or ride-screen field to wake
+the saved camera and record in one action. Active-ride readiness can also wake
+a camera when radar, descent or the saved whole-ride fallback requires it.
+Establishing a Bluetooth connection wakes a sleeping GoPro; there is no separate
+power-on command. The camera must have power, wireless connections enabled and
+still be advertising. Open GoPro documents advertising for the first eight hours
+after sleep. A camera no longer advertising must be turned on manually.
 Startup uses a direct BLE connection for both new and saved cameras, with a
 10-second timeout per attempt. Saved cameras use the existing retry loop rather
 than Android's passive `autoConnect` mode, which can wait indefinitely and leave
@@ -28,6 +30,12 @@ still take up to its five-second timeout before that check; saved cameras then
 enter the existing two-second reconnection delay.
 Diagnostic logs record the start and completion of readiness and command result
 codes, without recording the hardware-info payload.
+
+After setup reaches Connected, [ride-scoped keep-alive](connection-keep-alive.md)
+runs every three seconds only while active-ride readiness requires it. Manual
+wake-and-record requests are bounded to 60 seconds, including any shared readiness
+wait; they cancel their owned connection attempt on failure or cancellation.
+Explicit Connect retains the saved-device retry behavior described above.
 
 ## Validation
 

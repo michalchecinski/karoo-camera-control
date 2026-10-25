@@ -26,7 +26,7 @@ update the appropriate document in the `docs` folder.
 ## Bug investigation
 
 For reported app malfunctions, use
-[karoo-diagnostic-triage](.codex/skills/karoo-diagnostic-triage/SKILL.md)
+[karoo-diagnostic-triage](.agents/skills/karoo-diagnostic-triage/SKILL.md)
 to check available Sentry reports and attached logs before choosing a fix,
 even when the user does not mention diagnostics. Distinguish confirmed evidence
 from hypotheses and continue code investigation if reports are unavailable.

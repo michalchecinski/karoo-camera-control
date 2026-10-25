@@ -54,7 +54,7 @@ def control(title):
 def screenshot(filename):
     time.sleep(0.5)
     subprocess.check_call([
-        str(repo / ".codex/skills/karoo-screenshots/scripts/capture-app-only.sh"),
+        str(repo / ".agents/skills/karoo-screenshots/scripts/capture-app-only.sh"),
         args.serial, str(repo / "screenshots/emulator-karoo-480x800" / filename),
     ])
 

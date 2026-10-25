@@ -23,7 +23,7 @@ Capture the affected screens after UI work. Keep production README assets in `sc
 Run from the repository root. Supply the emulator serial and a descriptive output path:
 
 ```sh
-.codex/skills/karoo-screenshots/scripts/capture-app-only.sh emulator-5554 screenshots/emulator-karoo-480x800/camera-connected.png
+.agents/skills/karoo-screenshots/scripts/capture-app-only.sh emulator-5554 screenshots/emulator-karoo-480x800/camera-connected.png
 ```
 
 The script requires macOS `sips` and validates the 480×800 capture before cropping it to a 480×656 app-only PNG. Use `adb -s <serial> shell wm size` to verify the profile first.

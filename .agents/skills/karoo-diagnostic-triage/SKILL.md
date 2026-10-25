@@ -22,9 +22,9 @@ Check available diagnostic evidence before selecting a cause or implementing a b
 From the repository root, with `SENTRY_AUTH_TOKEN` already set locally:
 
 ```sh
-python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 1
-python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 7 --report-id SUPPORT_CODE
-python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py download EVENT_ID
+python3 .agents/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 1
+python3 .agents/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 7 --report-id SUPPORT_CODE
+python3 .agents/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py download EVENT_ID
 ```
 
 The helper defaults to the maintainer project, supports `--org` and `--project`
@@ -35,7 +35,7 @@ and follows all pages. Match the support code to an event ID before downloading.
 and prints its path, not its contents. Missing attachments, access failures, and
 incomplete searches return a nonzero exit code. Read the saved log with local
 file tools. Run the helper's offline checks with
-`python3 -m unittest discover -s .codex/skills/karoo-diagnostic-triage/scripts -p 'test_*.py'`.
+`python3 -m unittest discover -s .agents/skills/karoo-diagnostic-triage/scripts -p 'test_*.py'`.
 
 Finding an event is not sufficient. Download and inspect `diagnostics.txt` before drawing a conclusion about the incident. If an attachment is missing or unreadable, say so. If the helper needs debugging or the Sentry interface changes, use the GET endpoints below.
 

@@ -73,7 +73,7 @@ a pending report can be submitted.
 ## Investigating reported bugs
 
 The repository's
-[diagnostic triage skill](../.codex/skills/karoo-diagnostic-triage/SKILL.md)
+[diagnostic triage skill](../.agents/skills/karoo-diagnostic-triage/SKILL.md)
 requires checking available Sentry reports and reading their `diagnostics.txt`
 attachments before choosing a fix for a reported malfunction, even when the
 user does not mention logs. It correlates the incident with the affected app
@@ -87,9 +87,9 @@ Sentry environment and downloads their log attachments into private temporary
 directories. With `SENTRY_AUTH_TOKEN` set locally, run from the repository root:
 
 ```sh
-python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 1
-python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 7 --report-id SUPPORT_CODE
-python3 .codex/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py download EVENT_ID
+python3 .agents/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 1
+python3 .agents/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py list --days 7 --report-id SUPPORT_CODE
+python3 .agents/skills/karoo-diagnostic-triage/scripts/sentry_diagnostics.py download EVENT_ID
 ```
 
 Use the event ID returned for the matching support code. Listing outputs only
@@ -100,7 +100,7 @@ Its offline regression checks cover pagination, exact support-code matching,
 metadata privacy, private attachment storage, and redirect handling:
 
 ```sh
-python3 -m unittest discover -s .codex/skills/karoo-diagnostic-triage/scripts -p 'test_*.py'
+python3 -m unittest discover -s .agents/skills/karoo-diagnostic-triage/scripts -p 'test_*.py'
 ```
 
 ## Release validation
